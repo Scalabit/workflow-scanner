@@ -1,0 +1,14 @@
+name: 'Workflow Security Fixer'
+description: 'AI agent that analyzes and fixes GitHub workflows'
+inputs:
+  workflow-path:
+    description: 'Path to workflow file to analyze'
+    required: false
+    default: '.github/workflows'
+  fix-mode:
+    description: 'auto or suggest'
+    required: false
+    default: 'suggest'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
