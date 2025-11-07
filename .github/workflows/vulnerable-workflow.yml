@@ -1,0 +1,27 @@
+name: Vulnerable Workflow for Testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2  # Outdated version
+      
+      - name: Print PR title (Script Injection Vulnerability)
+        run: |
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "Branch: ${{ github.event.pull_request.head.ref }}"
+      
+      - name: Setup with hardcoded secret
+        env:
+          API_KEY: "sk-1234567890abcdef"  # Hardcoded secret
+        run: |
+          echo "Using API key..."
+      
+      - name: Run tests
+        run: |
+          npm test

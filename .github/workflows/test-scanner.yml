@@ -1,0 +1,23 @@
+name: Test Workflow Scanner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-scanner:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run workflow scanner
+        id: scanner
+        uses: Scalabit/workflow-scanner@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
