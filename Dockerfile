@@ -1,4 +1,4 @@
-FROM dagger/dagger:latest
+FROM ghcr.io/dagger/dagger:latest
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
