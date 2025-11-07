@@ -10,7 +10,6 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      workflows: write
     
     steps:
       - name: Checkout repository
@@ -20,6 +19,6 @@ jobs:
         id: scanner
         uses: Scalabit/workflow-scanner@main
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           repository: ${{ github.repository }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
