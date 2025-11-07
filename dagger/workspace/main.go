@@ -47,16 +47,3 @@ func (w *Workspace) ListFiles(ctx context.Context) (string, error) {
 		WithExec([]string{"find", ".", "-type", "f", "-name", "*.yml", "-o", "-name", "*.yaml"}).
 		Stdout(ctx)
 }
-
-// Return the result of running unit tests
-func (w *Workspace) Test(ctx context.Context) (string, error) {
-	nodeCache := dag.CacheVolume("node")
-	return dag.Container().
-		From("node:21").
-		WithDirectory("/src", w.Source).
-		WithMountedCache("/root/.npm", nodeCache).
-		WithWorkdir("/src").
-		WithExec([]string{"npm", "install"}).
-		WithExec([]string{"npm", "run", "test:unit", "run"}).
-		Stdout(ctx)
-}

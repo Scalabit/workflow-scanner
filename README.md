@@ -4,7 +4,15 @@ An AI-powered GitHub Action that automatically scans your GitHub Actions workflo
 
 ## Description
 
-This action uses Dagger (as a composite action) and AI to analyze your GitHub Actions workflows for common security issues. #TODO: See if use Docker instead of composite can be better
+This action uses Dagger (as a composite action) and AI to analyze your GitHub Actions workflows for common security issues. 
+
+#TODO: See if Docker image + entrypoint script, instead of composite, can be better.
+
+`action.yml`
+```
+runs:
+  using: 'composite'
+```
 
 When security issues are found, the action automatically creates a pull request with the necessary fixes and a detailed description of the changes.
 
@@ -108,3 +116,7 @@ jobs:
 
 This project is licensed under the terms included in the LICENSE file.
 
+## Next steps
+- See if Docker image + entrypoint script, instead of composite, can be better.
+- Don't make this repo public until we remove the LLM KEY and PAT from secrets.
+- See what are the possibilities of using GITHUB_TOKEN instead PAT_TOKEN.
