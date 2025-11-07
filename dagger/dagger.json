@@ -11,16 +11,8 @@
       "pin": "b316e472d3de5bb0e54fe3991be68dc85e33ef38"
     },
     {
-      "name": "llm",
-      "source": "github.com/dagger/dagger/dev/llm@v0.19.4"
-    },
-    {
-      "name": "env",
-      "source": "github.com/dagger/dagger/dev/env@v0.19.4"
-    },
-    {
       "name": "workspace",
-      "source": "github.com/dagger/dagger/dev/workspace@v0.19.4"
+      "source": "./workspace"
     }
   ],
   "source": "."
