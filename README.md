@@ -4,7 +4,7 @@ An AI-powered GitHub Action that automatically scans your GitHub Actions workflo
 
 ## Description
 
-This action uses Dagger and AI to analyze your GitHub Actions workflows for common security issues.
+This action uses Dagger (as a composite action) and AI to analyze your GitHub Actions workflows for common security issues. #TODO: See if use Docker instead of composite can be better
 
 When security issues are found, the action automatically creates a pull request with the necessary fixes and a detailed description of the changes.
 
@@ -13,14 +13,24 @@ When security issues are found, the action automatically creates a pull request 
 ### Required
 
 #### `github-token`
-**Required** GitHub token with permissions to write issues and repository contents.
+**Required** GitHub Personal Access Token (PAT) with permissions to write issues, repository contents, and workflows.
 
-**Example:** `${{ secrets.GITHUB_TOKEN }}`
+**Note:** Cannot use `GITHUB_TOKEN` because it lacks permission to modify workflow files. You must create a PAT with `repo` scope.
+
+**Example:** `${{ secrets.PAT_TOKEN }}`
 
 #### `repository`
 **Required** The GitHub repository to scan in the format `owner/repo`.
 
 **Example:** `octocat/hello-world`
+
+#### `openai-api-key`
+**Required** API key for LLM analysis. The action supports multiple LLM providers based on the secret name:
+- `OPENAI_API_KEY` - Uses OpenAI (GPT models)
+- `ANTHROPIC_API_KEY` - Uses Anthropic (Claude models)
+- `GEMINI_API_KEY` - Uses Google Gemini
+
+**Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
 
 ### Optional
 
@@ -36,15 +46,28 @@ The URL of the created pull request containing the security fixes.
 
 ## Secrets Used
 
-This action requires a GitHub token (`github-token` input) with the following permissions:
-- `contents: write` - To create pull requests with workflow fixes
-- `pull-requests: write` - To create pull requests
-- `issues: write` - To create pull request descriptions
+This action requires the following secrets:
+
+### `PAT_TOKEN` (GitHub Personal Access Token)
+A Personal Access Token with the following permissions:
+- `repo` - Full control of private repositories (includes all permissions below)
+  - `contents: write` - To create pull requests with workflow fixes
+  - `pull-requests: write` - To create pull requests
+  - `issues: write` - To create pull request descriptions
+
+**Why PAT is required:** The built-in `GITHUB_TOKEN` cannot modify workflow files (`.github/workflows/`) for security reasons. You must create a PAT at https://github.com/settings/tokens
+
+### `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`
+Your LLM API key for AI-powered security analysis. The action automatically detects which provider to use based on the environment variable name:
+- **OpenAI:** Set `OPENAI_API_KEY` to use GPT models
+- **Anthropic:** Set `ANTHROPIC_API_KEY` to use Claude models  
+- **Google Gemini:** Set `GEMINI_API_KEY` to use Gemini models
 
 ## Environment Variables
 
 The action uses the following environment variables internally:
-- `GITHUB_TOKEN` - Set from the `github-token` input parameter
+- `GITHUB_TOKEN` - Set from the `github-token` input parameter (your PAT)
+- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` - Set from the `openai-api-key` input parameter (provider auto-detected)
 
 ## Example Usage
 
@@ -56,9 +79,11 @@ name: Scan Workflows for Security Issues
 on:
   schedule:
   workflow_dispatch:
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,8 +91,9 @@ jobs:
       - name: Scan and fix workflows
         uses: Scalabit/workflow-scanner@main
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           repository: ${{ github.repository }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
 ## How It Works
