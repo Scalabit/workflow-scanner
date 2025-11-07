@@ -6,19 +6,24 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+    permissions:                        # Added minimal permissions
+      contents: read
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v2  # Outdated version
+        uses: actions/checkout@v4      # Updated to latest stable version
       
-      - name: Print PR title (Script Injection Vulnerability)
-        run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "Branch: ${{ github.event.pull_request.head.ref }}"
-      
-      - name: Setup with hardcoded secret
+      - name: Print PR title (Sanitized)
         env:
-          API_KEY: "sk-1234567890abcdef"  # Hardcoded secret
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "PR Title: ${PR_TITLE//[^a-zA-Z0-9 ._-]/}"
+          echo "Branch: ${PR_BRANCH//[^a-zA-Z0-9._-]/}"
+      
+      - name: Setup with secret from Actions secrets  # Removed hardcoded secret
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Using API key..."
       
