@@ -21,4 +21,4 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
-          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}

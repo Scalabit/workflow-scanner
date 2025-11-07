@@ -7,8 +7,8 @@ inputs:
   repository:
     description: 'Repository in format owner/repo'
     required: true
-  llm-api-key:
-    description: 'LLM API key for AI analysis'
+  openai-api-key:
+    description: 'OpenAI API key for LLM analysis'
     required: true
   dagger-module:
     description: 'Path to dagger module'
@@ -29,4 +29,4 @@ runs:
         args: scan-and-fix-workflows --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        LLM_API_KEY: ${{ inputs.llm-api-key }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
