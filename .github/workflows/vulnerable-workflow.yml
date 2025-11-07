@@ -6,19 +6,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v2  # Outdated version
+        uses: actions/checkout@v4  # Updated to latest version
       
-      - name: Print PR title (Script Injection Vulnerability)
+      - name: Print PR title (Input Sanitized)
         run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "Branch: ${{ github.event.pull_request.head.ref }}"
-      
-      - name: Setup with hardcoded secret
+          if [ -n "$PR_TITLE" ]; then echo "PR Title: $PR_TITLE"; fi
+          if [ -n "$PR_BRANCH" ]; then echo "Branch: $PR_BRANCH"; fi
         env:
-          API_KEY: "sk-1234567890abcdef"  # Hardcoded secret
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+      
+      - name: Setup without hardcoded secret
+        env:
+          # API_KEY removed. Use secret instead.
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Using API key..."
       
