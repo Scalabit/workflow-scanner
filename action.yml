@@ -15,5 +15,14 @@ outputs:
   pr-url:
     description: 'URL of the created pull request'
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
+  using: 'composite'
+  steps:
+    - name: Run Dagger workflow scanner
+      uses: dagger/dagger-for-github@v6
+      with:
+        version: "latest"
+        verb: call
+        module: ${{ github.action_path }}/dagger
+        args: scan-and-fix-workflows --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
