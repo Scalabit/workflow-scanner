@@ -1,14 +1,19 @@
-name: 'Workflow Security Fixer'
+name: 'Workflow Security Scanner'
 description: 'AI agent that analyzes and fixes GitHub workflows'
 inputs:
-  workflow-path:
-    description: 'Path to workflow file to analyze'
+  github-token:
+    description: 'GitHub token with repo permissions'
+    required: true
+  repository:
+    description: 'Repository in format owner/repo'
+    required: true
+  dagger-module:
+    description: 'Path to dagger module'
     required: false
-    default: '.github/workflows'
-  fix-mode:
-    description: 'auto or suggest'
-    required: false
-    default: 'suggest'
+    default: 'dagger'
+outputs:
+  pr-url:
+    description: 'URL of the created pull request'
 runs:
   using: 'docker'
   image: 'Dockerfile'

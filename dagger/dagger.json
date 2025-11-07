@@ -1,0 +1,27 @@
+{
+  "name": "workflow-scanner",
+  "engineVersion": "v0.19.4",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "github-issue",
+      "source": "github.com/kpenfound/dag/github-issue@b316e472d3de5bb0e54fe3991be68dc85e33ef38",
+      "pin": "b316e472d3de5bb0e54fe3991be68dc85e33ef38"
+    },
+    {
+      "name": "llm",
+      "source": "github.com/dagger/dagger/dev/llm@v0.19.4"
+    },
+    {
+      "name": "env",
+      "source": "github.com/dagger/dagger/dev/env@v0.19.4"
+    },
+    {
+      "name": "workspace",
+      "source": "github.com/dagger/dagger/dev/workspace@v0.19.4"
+    }
+  ],
+  "source": "."
+}
