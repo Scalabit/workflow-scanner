@@ -35,6 +35,13 @@ When security issues are found, the action automatically creates a pull request 
 
 **Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
 
+*Model Selection:* You can optionally specify which model to use by setting additional environment variables:
+- `OPENAI_MODEL` - Default: `gpt-4o` ([available models](https://platform.openai.com/docs/models))
+- `ANTHROPIC_MODEL` - Default: `claude-sonnet-4-5` ([available models](https://docs.anthropic.com/en/docs/about-claude/models/all-models))
+- `GEMINI_MODEL` - Default: `gemini-2.0-flash` ([available models](https://ai.google.dev/gemini-api/docs/models/gemini))
+
+See [Dagger LLM Configuration](https://docs.dagger.io/reference/configuration/llm) for more details and advanced options.
+
 ### Optional
 
 #### `repository`
@@ -94,6 +101,8 @@ jobs:
 
       - name: Scan and fix workflows
         uses: Scalabit/workflow-scanner@main
+        env:
+          OPENAI_MODEL: gpt-4o-mini  # Optional: specify a model (default: gpt-4o)
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
