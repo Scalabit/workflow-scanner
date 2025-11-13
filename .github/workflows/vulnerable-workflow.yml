@@ -9,16 +9,21 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v2  # Outdated version
+        uses: actions/checkout@v4  # Fixed outdated version
       
-      - name: Print PR title (Script Injection Vulnerability)
+      - name: Print PR title (Script Injection Mitigated)
         run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "Branch: ${{ github.event.pull_request.head.ref }}"
-      
-      - name: Setup with hardcoded secret
+          # The following input is sanitized to prevent script injection
+          echo "PR Title: $(echo "$PR_TITLE" | sed 's/[^a-zA-Z0-9 _-]//g')"
+          echo "Branch: $(echo "$BRANCH" | sed 's/[^a-zA-Z0-9 _\/-]//g')"
         env:
-          API_KEY: "sk-1234567890abcdef"  # Hardcoded secret
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+      
+      - name: Setup with API key from secrets (Was hardcoded)
+        env:
+          # Previous hardcoded API_KEY was replaced with a secret reference
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Using API key..."
       
