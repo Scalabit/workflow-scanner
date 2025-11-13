@@ -6,14 +6,11 @@ inputs:
     required: true
   repository:
     description: 'Repository in format owner/repo'
-    required: true
+    required: false
+    default: ${{ github.repository }}
   openai-api-key:
     description: 'OpenAI API key for LLM analysis'
     required: true
-  dagger-module:
-    description: 'Path to dagger module'
-    required: false
-    default: 'dagger'
 outputs:
   pr-url:
     description: 'URL of the created pull request'

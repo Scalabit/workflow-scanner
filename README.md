@@ -28,7 +28,9 @@ When security issues are found, the action automatically creates a pull request 
 **Example:** `${{ secrets.PAT_TOKEN }}`
 
 #### `repository`
-**Required** The GitHub repository to scan in the format `owner/repo`.
+**Optional** The GitHub repository to scan in the format `owner/repo`. 
+
+**Default:** `${{ github.repository }}` (the repository where the action is running)
 
 **Example:** `octocat/hello-world`
 
@@ -39,13 +41,6 @@ When security issues are found, the action automatically creates a pull request 
 - `GEMINI_API_KEY` - Uses Google Gemini
 
 **Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
-
-### Optional
-
-#### `dagger-module`
-**Optional** Path to the Dagger module directory.
-
-**Default:** `dagger`
 
 ## Outputs
 
@@ -100,7 +95,6 @@ jobs:
         uses: Scalabit/workflow-scanner@main
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
-          repository: ${{ github.repository }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
