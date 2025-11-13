@@ -4,13 +4,13 @@ inputs:
   github-token:
     description: 'GitHub token with repo permissions'
     required: true
+  llm-api-key:
+    description: 'LLM API key for AI analysis (OpenAI, Anthropic, or Gemini)'
+    required: true
   repository:
     description: 'Repository in format owner/repo'
     required: false
     default: ${{ github.repository }}
-  openai-api-key:
-    description: 'OpenAI API key for LLM analysis'
-    required: true
 outputs:
   pr-url:
     description: 'URL of the created pull request'
@@ -26,4 +26,6 @@ runs:
         args: scan-and-fix-workflows --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        OPENAI_API_KEY: ${{ inputs.llm-api-key }}
+        ANTHROPIC_API_KEY: ${{ inputs.llm-api-key }}
+        GEMINI_API_KEY: ${{ inputs.llm-api-key }}

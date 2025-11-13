@@ -27,20 +27,22 @@ When security issues are found, the action automatically creates a pull request 
 
 **Example:** `${{ secrets.PAT_TOKEN }}`
 
+#### `llm-api-key`
+**Required** API key for LLM analysis. The action supports multiple LLM providers. Pass the appropriate secret based on your provider:
+- `OPENAI_API_KEY` - Uses OpenAI (GPT models)
+- `ANTHROPIC_API_KEY` - Uses Anthropic (Claude models)
+- `GEMINI_API_KEY` - Uses Google Gemini
+
+**Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
+
+### Optional
+
 #### `repository`
 **Optional** The GitHub repository to scan in the format `owner/repo`. 
 
 **Default:** `${{ github.repository }}` (the repository where the action is running)
 
 **Example:** `octocat/hello-world`
-
-#### `openai-api-key`
-**Required** API key for LLM analysis. The action supports multiple LLM providers based on the secret name:
-- `OPENAI_API_KEY` - Uses OpenAI (GPT models)
-- `ANTHROPIC_API_KEY` - Uses Anthropic (Claude models)
-- `GEMINI_API_KEY` - Uses Google Gemini
-
-**Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
 
 ## Outputs
 
@@ -70,7 +72,7 @@ Your LLM API key for AI-powered security analysis. The action automatically dete
 
 The action uses the following environment variables internally:
 - `GITHUB_TOKEN` - Set from the `github-token` input parameter (your PAT)
-- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` - Set from the `openai-api-key` input parameter (provider auto-detected)
+- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` - Set from the `llm-api-key` input parameter (all three are set, provider auto-detected based on which key is valid)
 
 ## Example Usage
 
@@ -80,7 +82,6 @@ The action uses the following environment variables internally:
 name: Scan Workflows for Security Issues
 
 on:
-  schedule:
   workflow_dispatch:
 
 jobs:
@@ -95,7 +96,7 @@ jobs:
         uses: Scalabit/workflow-scanner@main
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          llm-api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
 ## How It Works
