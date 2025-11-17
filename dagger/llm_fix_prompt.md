@@ -32,7 +32,38 @@ You have been provided with ZIZMOR scan results in the `zizmor_issues` input tha
    - Complex secret handling patterns
 4. Fix ONLY the security issues mentioned in the ZIZMOR results
 5. Do NOT make changes beyond what's needed to address the identified vulnerabilities
-6. You NEED to change the code to meet the fixes you are suggesting for the issues found in zizmor 
+6. You NEED to change the code to meet the fixes you are suggesting for the issues found in zizmor
+
+## Special Guidance for Specific Findings
+
+### `unpinned-uses`: Unpinned Action References
+When ZIZMOR reports `unpinned-uses` findings:
+- **NEVER use branch names** like `@main`, `@master`, `@v1` - these are mutable and insecure
+- **ALWAYS use full 40-character commit SHA hashes** (e.g., `@3fb27e8b4e5c6a9d1f2e7a8b9c0d1e2f3a4b5c6d`)
+- **DO NOT use short hashes** or fake/placeholder hashes (e.g., `@a1b2c3d`)
+- **IF YOU DON'T KNOW THE REAL HASH:**
+  - **DO NOT change the code or make up a fake hash**
+  - **LEAVE the line unchanged**
+  - **ADD a comment above the line** explaining that a manual fix is needed
+  - **Example:**
+    ```yaml
+    # TODO: Pin this action to a commit SHA - visit https://github.com/owner/repo/releases to find the hash
+    uses: owner/repo@main
+    ```
+- **How to get the correct hash:**
+  1. Go to the action's GitHub repository
+  2. Find the tag/release you want to use (e.g., `v4`)
+  3. Click on the tag to see the commit
+  4. Copy the full 40-character commit SHA
+- **Example fix:**
+  ```yaml
+  # ❌ WRONG - mutable reference
+  uses: actions/checkout@v4
+  
+  # ✅ CORRECT - pinned to immutable commit hash
+  uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+  ```
+- Add a comment showing which version the hash corresponds to for maintainability 
 
 ## SECRET EXPOSURE WARNING
 If you find any hardcoded secrets, API keys, passwords, or tokens in the workflow files:
