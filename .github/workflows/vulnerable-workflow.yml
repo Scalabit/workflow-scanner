@@ -6,10 +6,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v2  # Outdated version
+        uses: actions/checkout@v3  # Updated to a secure version
+        with:
+          persist-credentials: false
       
       - name: Print PR title (Script Injection Vulnerability)
         run: |
@@ -18,7 +23,7 @@ jobs:
       
       - name: Setup with hardcoded secret
         env:
-          API_KEY: "sk-1234567890abcdef"  # Hardcoded secret
+          API_KEY: ${{ secrets.API_KEY }}  # WARNING: Hardcoded secret found and replaced - original key should be revoked
         run: |
           echo "Using API key..."
       
