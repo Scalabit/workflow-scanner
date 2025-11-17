@@ -120,16 +120,15 @@ func (m *WorkflowScanner) getZizmorContainer(source *dagger.Directory) *dagger.C
 }
 
 func (m *WorkflowScanner) runZizmorAutoFix(ctx context.Context, source *dagger.Directory) (*dagger.Directory, string, error) {
-	container := m.getZizmorContainer(source)
+	container := m.getZizmorContainer(source).
+		WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"})
 	
-	zizmorContainer := container.WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"})
-	
-	output, err := zizmorContainer.Stdout(ctx)
+	output, err := container.Stdout(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
 	}
 	
-	fixedDirectory := zizmorContainer.Directory("/workspace")
+	fixedDirectory := container.Directory("/workspace")
 	return fixedDirectory, output, nil
 }
 
@@ -155,6 +154,13 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 	// Only skip LLM if truly no issues found
 	if issues == "" || issues == "[]" || issues == "[]\n" {
 		return source.WithoutDirectory("node_modules"), "No remaining issues found after ZIZMOR auto-fix", nil
+	}
+
+	// Materialize the directory to break the container chain BEFORE passing to workspace
+	// This prevents the workspace module from reading through the old zizmor container
+	_, err := source.Entries(ctx)
+	if err != nil {
+		return source, fmt.Sprintf("Failed to materialize directory: %v", err), nil
 	}
 
 	environment := dag.Env().
