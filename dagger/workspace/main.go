@@ -34,8 +34,10 @@ func (w *Workspace) WriteFile(
 	// The new contents of the file
 	contents string,
 ) *Workspace {
-	w.Source = w.Source.WithNewFile(path, contents)
-	return w
+	// Return a NEW workspace with the updated source (immutable pattern)
+	return &Workspace{
+		Source: w.Source.WithNewFile(path, contents),
+	}
 }
 
 // List all of the files in the Workspace
