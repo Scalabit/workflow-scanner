@@ -156,18 +156,18 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 		return source.WithoutDirectory("node_modules"), "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
-	// Materialize the directory to break the container chain BEFORE passing to workspace
-	// This prevents the workspace module from reading through the old zizmor container
-	_, err := source.Entries(ctx)
-	if err != nil {
-		return source, fmt.Sprintf("Failed to materialize directory: %v", err), nil
-	}
+	// Break the container chain by copying through a fresh container
+	// This prevents workspace module from inheriting the zizmor auto-fix container lineage
+	cleanSource := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/clean", source).
+		Directory("/clean")
 
 	environment := dag.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithWorkspaceInput(
 			"workspace",
-			dag.Workspace(source),
+			dag.Workspace(cleanSource),
 			"the workspace containing GitHub Actions workflows with remaining issues").
 		WithWorkspaceOutput(
 			"completed",
