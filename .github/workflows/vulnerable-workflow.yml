@@ -6,19 +6,30 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      # Principle of least privilege: Only grant the minimum permissions required for this job
+      contents: read
+      pull-requests: none
+      issues: none
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v2  # Outdated version
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
       
       - name: Print PR title (Script Injection Vulnerability)
         run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "Branch: ${{ github.event.pull_request.head.ref }}"
+          echo "PR Title: ${GITHUB_EVENT_PULL_REQUEST_TITLE}"
+          echo "Branch: ${GITHUB_EVENT_PULL_REQUEST_HEAD_REF}"
+        env:
+          GITHUB_EVENT_PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_EVENT_PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       
       - name: Setup with hardcoded secret
+        # WARNING: Hardcoded secret found and replaced - original key should be revoked
         env:
-          API_KEY: "sk-1234567890abcdef"  # Hardcoded secret
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Using API key..."
       
