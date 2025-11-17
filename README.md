@@ -25,7 +25,7 @@ When security issues are found, the action automatically creates a pull request 
 
 **Note:** Cannot use `GITHUB_TOKEN` because it lacks permission to modify workflow files. You must create a PAT with `repo` scope.
 
-**Example:** `${{ secrets.PAT_TOKEN }}`
+**Example:** `${{ secrets.GH_PAT }}`
 
 #### `llm-api-key`
 **Required** API key for LLM analysis. The action supports multiple LLM providers. Pass the appropriate secret based on your provider:
@@ -60,7 +60,7 @@ The URL of the created pull request containing the security fixes.
 
 This action requires the following secrets:
 
-### `PAT_TOKEN` (GitHub Personal Access Token)
+### `GH_PAT` (GitHub Personal Access Token)
 A Personal Access Token with the following permissions:
 - `repo` - Full control of private repositories (includes all permissions below)
   - `contents: write` - To create pull requests with workflow fixes
@@ -104,7 +104,7 @@ jobs:
         env:
           OPENAI_MODEL: gpt-4o-mini  # Optional: specify a model (default: gpt-4o)
         with:
-          github-token: ${{ secrets.PAT_TOKEN }}
+          github-token: ${{ secrets.GH_PAT }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
