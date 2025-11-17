@@ -17,7 +17,7 @@ jobs:
 
       - name: Run workflow scanner
         id: scanner
-        uses: Scalabit/workflow-scanner@v1
+        uses: Scalabit/workflow-scanner@main
         with:
           github-token: ${{ secrets.PAT_TOKEN }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
