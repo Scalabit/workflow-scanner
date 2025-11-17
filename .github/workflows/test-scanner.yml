@@ -14,7 +14,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
+      # TODO: Pin this action to a commit SHA - visit https://github.com/Scalabit/workflow-scanner/releases to find the hash
       - name: Run workflow scanner
         id: scanner
         uses: Scalabit/workflow-scanner@v1
