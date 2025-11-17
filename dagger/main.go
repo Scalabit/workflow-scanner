@@ -187,7 +187,20 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 	}
 	
 	// Only try to get workspace if explanations succeeded
-	completed := workEnv.Output("completed").AsWorkspace().Source()
+	completedWorkspace := workEnv.Output("completed").AsWorkspace()
+	
+	// Export and re-import the directory to break the container chain
+	// This prevents the workspace module from reading through the ZIZMOR auto-fix container
+	completed := completedWorkspace.Source()
+	
+	// Force evaluation of the directory to ensure writes are committed
+	entries, err := completed.Entries(ctx)
+	if err != nil {
+		return source.WithoutDirectory("node_modules"), fmt.Sprintf("Failed to read LLM workspace: %v", err), nil
+	}
+	if len(entries) == 0 {
+		return source.WithoutDirectory("node_modules"), "LLM returned empty workspace", nil
+	}
 	
 	return completed.WithoutDirectory("node_modules"), explanations, nil
 }
