@@ -188,21 +188,19 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 	
 	// Only try to get workspace if explanations succeeded
 	completedWorkspace := workEnv.Output("completed").AsWorkspace()
-	
-	// Export and re-import the directory to break the container chain
-	// This prevents the workspace module from reading through the ZIZMOR auto-fix container
 	completed := completedWorkspace.Source()
 	
-	// Force evaluation of the directory to ensure writes are committed
-	entries, err := completed.Entries(ctx)
-	if err != nil {
-		return source.WithoutDirectory("node_modules"), fmt.Sprintf("Failed to read LLM workspace: %v", err), nil
-	}
-	if len(entries) == 0 {
-		return source.WithoutDirectory("node_modules"), "LLM returned empty workspace", nil
-	}
+	// Force materialization by copying through a container
+	// This breaks the lazy evaluation chain completely
+	materializeContainer := dag.Container().
+		From("alpine:latest").
+		WithDirectory("/workspace", completed).
+		WithWorkdir("/workspace")
 	
-	return completed.WithoutDirectory("node_modules"), explanations, nil
+	// Get the directory back - now it's materialized through the copy operation
+	materializedDir := materializeContainer.Directory("/workspace")
+	
+	return materializedDir.WithoutDirectory("node_modules"), explanations, nil
 }
 
 func (m *WorkflowScanner) scanExternalDependencies(ctx context.Context, source *dagger.Directory) (string, error) {
