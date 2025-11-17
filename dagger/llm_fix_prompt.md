@@ -41,6 +41,16 @@ When ZIZMOR reports `unpinned-uses` findings:
 - **NEVER use branch names** like `@main`, `@master`, `@v1` - these are mutable and insecure
 - **ALWAYS use full 40-character commit SHA hashes** (e.g., `@3fb27e8b4e5c6a9d1f2e7a8b9c0d1e2f3a4b5c6d`)
 - **DO NOT use short hashes** or fake/placeholder hashes (e.g., `@a1b2c3d`)
+
+**For PUBLIC well-known actions (actions/checkout, actions/setup-node, etc.):**
+- You SHOULD know the commit hashes for common versions
+- Look up the hash and FIX the code directly
+- **PREFER updating to the latest stable version** when fixing older versions
+- Pin to the full 40-character commit SHA of the latest stable release
+- Add a comment showing which version the hash corresponds to
+- These are public repositories - you can reference their release tags
+
+**For PRIVATE or CUSTOM actions (organization-specific actions):**
 - **IF YOU DON'T KNOW THE REAL HASH:**
   - **DO NOT change the code or make up a fake hash**
   - **LEAVE the line unchanged**
