@@ -156,18 +156,11 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 		return source.WithoutDirectory("node_modules"), "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
-	// Break the container chain by copying through a fresh container
-	// This prevents workspace module from inheriting the zizmor auto-fix container lineage
-	cleanSource := dag.Container().
-		From("alpine:latest").
-		WithDirectory("/clean", source).
-		Directory("/clean")
-
 	environment := dag.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithWorkspaceInput(
 			"workspace",
-			dag.Workspace(cleanSource),
+			dag.Workspace(source),
 			"the workspace containing GitHub Actions workflows with remaining issues").
 		WithWorkspaceOutput(
 			"completed",
@@ -192,18 +185,11 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 		return source.WithoutDirectory("node_modules"), "LLM processing failed - returning original workspace unchanged", nil
 	}
 	
-	// Only try to get workspace if explanations succeeded
+	// Get the completed workspace from LLM
 	completedWorkspace := workEnv.Output("completed").AsWorkspace()
 	completed := completedWorkspace.Source()
 	
-	// Break the container chain on OUTPUT by copying through fresh container
-	// This ensures LLM's writes are materialized and independent
-	cleanCompleted := dag.Container().
-		From("alpine:latest").
-		WithDirectory("/output", completed).
-		Directory("/output")
-	
-	return cleanCompleted.WithoutDirectory("node_modules"), explanations, nil
+	return completed.WithoutDirectory("node_modules"), explanations, nil
 }
 
 func (m *WorkflowScanner) scanExternalDependencies(ctx context.Context, source *dagger.Directory) (string, error) {
