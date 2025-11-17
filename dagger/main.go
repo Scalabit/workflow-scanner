@@ -187,7 +187,19 @@ func (m *WorkflowScanner) fixRemainingIssuesWithLLM(ctx context.Context, source 
 	}
 	
 	// Only try to get workspace if explanations succeeded
-	completed := workEnv.Output("completed").AsWorkspace().Source()
+	completedWorkspace := workEnv.Output("completed").AsWorkspace()
+	completed := completedWorkspace.Source()
+	
+	// Verify the workspace is not empty - list files to trigger evaluation
+	files, err := completed.Entries(ctx)
+	if err != nil {
+		return source.WithoutDirectory("node_modules"), fmt.Sprintf("LLM workspace retrieval failed: %v - returning original workspace unchanged", err), nil
+	}
+	
+	// If no files returned, something went wrong
+	if len(files) == 0 {
+		return source.WithoutDirectory("node_modules"), "LLM returned empty workspace - returning original workspace unchanged", nil
+	}
 	
 	return completed.WithoutDirectory("node_modules"), explanations, nil
 }
