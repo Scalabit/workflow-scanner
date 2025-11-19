@@ -2,12 +2,11 @@ package agent
 
 import (
 	"context"
-	internalDagger "dagger/workflow-scanner/internal/dagger"
 	"dagger/workflow-scanner/pkg/dagger"
 )
 
 type Agent interface {
-	FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error)
+	FixRemainingIssues(ctx context.Context, source dagger.Directory, issues string) (dagger.Directory, string, error)
 }
 
 type AgentImpl struct {
@@ -20,7 +19,7 @@ func NewAgent(client dagger.Client) Agent {
 	}
 }
 
-func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
+func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source dagger.Directory, issues string) (dagger.Directory, string, error) {
 	// Only skip LLM if truly no issues found
 	if issues == "" || issues == "[]" || issues == "[]\n" {
 		return source.WithoutDirectory("node_modules"), "No remaining issues found after ZIZMOR auto-fix", nil

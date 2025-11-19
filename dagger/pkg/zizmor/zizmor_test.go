@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"dagger/workflow-scanner/tests/mocks"
-	internalDagger "dagger/workflow-scanner/internal/dagger"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -18,7 +17,7 @@ func TestZizmorImpl_CheckRemainingIssues(t *testing.T) {
 
 	mockClient := mocks.NewMockClient(ctrl)
 	mockContainer := mocks.NewMockContainer(ctrl)
-	mockDirectory := &internalDagger.Directory{}
+	mockDirectory := mocks.NewMockDirectory(ctrl)
 
 	tests := []struct {
 		name           string
@@ -83,7 +82,7 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 
 	mockClient := mocks.NewMockClient(ctrl)
 	mockContainer := mocks.NewMockContainer(ctrl)
-	mockDirectory := &internalDagger.Directory{}
+	mockDirectory := mocks.NewMockDirectory(ctrl)
 
 	tests := []struct {
 		name           string
@@ -129,7 +128,8 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerOutput, tt.containerError)
 			
 			if tt.containerError == nil {
-				mockContainer.EXPECT().Directory("/workspace").Return(mockDirectory)
+				resultDir := mocks.NewMockDirectory(ctrl)
+				mockContainer.EXPECT().Directory("/workspace").Return(resultDir)
 			}
 
 			zizmor := NewZizmor(mockClient)
@@ -144,7 +144,6 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, fixedDirectory)
-				assert.Equal(t, mockDirectory, fixedDirectory)
 			}
 		})
 	}

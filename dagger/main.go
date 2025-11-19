@@ -6,6 +6,7 @@ import (
 
 	"dagger/workflow-scanner/internal/dagger"
 	"dagger/workflow-scanner/pkg/agent"
+	pkgDagger "dagger/workflow-scanner/pkg/dagger"
 	"dagger/workflow-scanner/pkg/github"
 	"dagger/workflow-scanner/pkg/zizmor"
 )
@@ -14,14 +15,17 @@ type WorkflowScanner struct{}
 
 // Scan GitHub Actions workflows for security vulnerabilities and create a PR with fixes
 func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
+	daggerClient := pkgDagger.NewClientAdapter(dag)
+	wrappedSource := pkgDagger.NewDirectoryAdapter(source)
+	
 	zizmor := zizmor.NewZizmor(dag)
 	agent := agent.NewAgent(dag)
 	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubToken}))
 
-	return scanAndFixWorflowsImpl(ctx, repository, source, zizmor, agent, githubClient)
+	return scanAndFixWorflowsImpl(ctx, repository, wrappedSource, zizmor, agent, githubClient)
 }
 
-func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
+func scanAndFixWorflowsImpl(ctx context.Context, repository string, source pkgDagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
 
 	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {

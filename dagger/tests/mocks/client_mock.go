@@ -110,7 +110,7 @@ func (mr *MockClientMockRecorder) LLM(opts ...any) *gomock.Call {
 }
 
 // Workspace mocks base method.
-func (m *MockClient) Workspace(source *dagger.Directory) dagger0.Workspace {
+func (m *MockClient) Workspace(source dagger0.Directory) dagger0.Workspace {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Workspace", source)
 	ret0, _ := ret[0].(dagger0.Workspace)

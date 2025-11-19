@@ -11,7 +11,7 @@ package mocks
 
 import (
 	context "context"
-	dagger "dagger/workflow-scanner/internal/dagger"
+	dagger "dagger/workflow-scanner/pkg/dagger"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -42,10 +42,10 @@ func (m *MockAgent) EXPECT() *MockAgentMockRecorder {
 }
 
 // FixRemainingIssues mocks base method.
-func (m *MockAgent) FixRemainingIssues(ctx context.Context, source *dagger.Directory, issues string) (*dagger.Directory, string, error) {
+func (m *MockAgent) FixRemainingIssues(ctx context.Context, source dagger.Directory, issues string) (dagger.Directory, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FixRemainingIssues", ctx, source, issues)
-	ret0, _ := ret[0].(*dagger.Directory)
+	ret0, _ := ret[0].(dagger.Directory)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

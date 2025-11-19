@@ -7,7 +7,7 @@ import (
 )
 
 type Directory interface {
-	WithoutDirectory(path string) *dagger.Directory
+	WithoutDirectory(path string) Directory
 }
 
 type Env interface {
@@ -24,7 +24,7 @@ type EnvOutput interface {
 }
 
 type Workspace interface {
-	Source() *dagger.Directory
+	Source() Directory
 }
 
 type CurrentModule interface {

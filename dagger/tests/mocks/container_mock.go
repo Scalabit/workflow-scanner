@@ -12,6 +12,7 @@ package mocks
 import (
 	context "context"
 	dagger "dagger/workflow-scanner/internal/dagger"
+	dagger0 "dagger/workflow-scanner/pkg/dagger"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -42,14 +43,14 @@ func (m *MockContainer) EXPECT() *MockContainerMockRecorder {
 }
 
 // Directory mocks base method.
-func (m *MockContainer) Directory(path string, opts ...dagger.ContainerDirectoryOpts) *dagger.Directory {
+func (m *MockContainer) Directory(path string, opts ...dagger.ContainerDirectoryOpts) dagger0.Directory {
 	m.ctrl.T.Helper()
 	varargs := []any{path}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "Directory", varargs...)
-	ret0, _ := ret[0].(*dagger.Directory)
+	ret0, _ := ret[0].(dagger0.Directory)
 	return ret0
 }
 
@@ -61,10 +62,10 @@ func (mr *MockContainerMockRecorder) Directory(path any, opts ...any) *gomock.Ca
 }
 
 // From mocks base method.
-func (m *MockContainer) From(address string) *dagger.Container {
+func (m *MockContainer) From(address string) dagger0.Container {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "From", address)
-	ret0, _ := ret[0].(*dagger.Container)
+	ret0, _ := ret[0].(dagger0.Container)
 	return ret0
 }
 
@@ -90,14 +91,14 @@ func (mr *MockContainerMockRecorder) Stdout(ctx any) *gomock.Call {
 }
 
 // WithDirectory mocks base method.
-func (m *MockContainer) WithDirectory(path string, source *dagger.Directory, opts ...dagger.ContainerWithDirectoryOpts) *dagger.Container {
+func (m *MockContainer) WithDirectory(path string, source dagger0.Directory, opts ...dagger.ContainerWithDirectoryOpts) dagger0.Container {
 	m.ctrl.T.Helper()
 	varargs := []any{path, source}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "WithDirectory", varargs...)
-	ret0, _ := ret[0].(*dagger.Container)
+	ret0, _ := ret[0].(dagger0.Container)
 	return ret0
 }
 
@@ -109,14 +110,14 @@ func (mr *MockContainerMockRecorder) WithDirectory(path, source any, opts ...any
 }
 
 // WithExec mocks base method.
-func (m *MockContainer) WithExec(args []string, opts ...dagger.ContainerWithExecOpts) *dagger.Container {
+func (m *MockContainer) WithExec(args []string, opts ...dagger.ContainerWithExecOpts) dagger0.Container {
 	m.ctrl.T.Helper()
 	varargs := []any{args}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "WithExec", varargs...)
-	ret0, _ := ret[0].(*dagger.Container)
+	ret0, _ := ret[0].(dagger0.Container)
 	return ret0
 }
 
@@ -128,14 +129,14 @@ func (mr *MockContainerMockRecorder) WithExec(args any, opts ...any) *gomock.Cal
 }
 
 // WithWorkdir mocks base method.
-func (m *MockContainer) WithWorkdir(path string, opts ...dagger.ContainerWithWorkdirOpts) *dagger.Container {
+func (m *MockContainer) WithWorkdir(path string, opts ...dagger.ContainerWithWorkdirOpts) dagger0.Container {
 	m.ctrl.T.Helper()
 	varargs := []any{path}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "WithWorkdir", varargs...)
-	ret0, _ := ret[0].(*dagger.Container)
+	ret0, _ := ret[0].(dagger0.Container)
 	return ret0
 }
 

@@ -52,7 +52,8 @@ func TestAgentImpl_FixRemainingIssues_EarlyReturn(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockClient := mocks.NewMockClient(ctrl)
-	mockDirectory := &internalDagger.Directory{}
+	mockDirectory := mocks.NewMockDirectory(ctrl)
+	resultDirectory := mocks.NewMockDirectory(ctrl)
 	
 	// Test early return cases - these don't call LLM chain
 	tests := []struct {
@@ -79,12 +80,13 @@ func TestAgentImpl_FixRemainingIssues_EarlyReturn(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// For early return cases, no mocking needed since LLM chain is skipped
+			mockDirectory.EXPECT().WithoutDirectory("node_modules").Return(resultDirectory)
+
 			agent := NewAgent(mockClient)
 			actualDir, explanation, err := agent.FixRemainingIssues(context.Background(), mockDirectory, tt.issues)
 
 			assert.NoError(t, err)
-			assert.NotNil(t, actualDir)
+			assert.Equal(t, resultDirectory, actualDir)
 			assert.Equal(t, tt.expectedExplanation, explanation)
 		})
 	}
@@ -102,9 +104,10 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 	mockLLM := mocks.NewMockLLM(ctrl)
 	mockLLMWithEnv := mocks.NewMockLLMWithEnv(ctrl)
 	mockEnvOutput := mocks.NewMockEnvOutput(ctrl)
-	mockDirectory := &internalDagger.Directory{}
+	mockDirectory := mocks.NewMockDirectory(ctrl)
 	mockFile := &internalDagger.File{}
-	resultDir := &internalDagger.Directory{}
+	resultDir := mocks.NewMockDirectory(ctrl)
+	finalDir := mocks.NewMockDirectory(ctrl)
 
 	tests := []struct {
 		name              string
@@ -158,6 +161,10 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 				mockEnv.EXPECT().Output("completed").Return(mockEnvOutput)
 				mockEnvOutput.EXPECT().AsWorkspace().Return(mockWorkspace)
 				mockWorkspace.EXPECT().Source().Return(resultDir)
+				resultDir.EXPECT().WithoutDirectory("node_modules").Return(finalDir)
+			} else {
+				// On error, return original workspace
+				mockDirectory.EXPECT().WithoutDirectory("node_modules").Return(finalDir)
 			}
 
 			agent := NewAgent(mockClient)
@@ -168,7 +175,7 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.NotNil(t, actualDir)
+			assert.Equal(t, finalDir, actualDir)
 			assert.Equal(t, tt.expectedExplanation, explanation)
 		})
 	}

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"dagger/workflow-scanner/tests/mocks"
-	internalDagger "dagger/workflow-scanner/internal/dagger"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -17,7 +16,7 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
-	mockDirectory := &internalDagger.Directory{}
+	mockDirectory := mocks.NewMockDirectory(ctrl)
 
 	tests := []struct {
 		name          string

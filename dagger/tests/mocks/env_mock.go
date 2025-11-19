@@ -18,6 +18,38 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+type MockDirectory struct {
+	ctrl     *gomock.Controller
+	recorder *MockDirectoryMockRecorder
+	isgomock struct{}
+}
+
+type MockDirectoryMockRecorder struct {
+	mock *MockDirectory
+}
+
+func NewMockDirectory(ctrl *gomock.Controller) *MockDirectory {
+	mock := &MockDirectory{ctrl: ctrl}
+	mock.recorder = &MockDirectoryMockRecorder{mock}
+	return mock
+}
+
+func (m *MockDirectory) EXPECT() *MockDirectoryMockRecorder {
+	return m.recorder
+}
+
+func (m *MockDirectory) WithoutDirectory(path string) dagger0.Directory {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithoutDirectory", path)
+	ret0, _ := ret[0].(dagger0.Directory)
+	return ret0
+}
+
+func (mr *MockDirectoryMockRecorder) WithoutDirectory(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithoutDirectory", reflect.TypeOf((*MockDirectory)(nil).WithoutDirectory), path)
+}
+
 // MockEnv is a mock of Env interface.
 type MockEnv struct {
 	ctrl     *gomock.Controller
@@ -190,10 +222,10 @@ func (m *MockWorkspace) EXPECT() *MockWorkspaceMockRecorder {
 }
 
 // Source mocks base method.
-func (m *MockWorkspace) Source() *dagger.Directory {
+func (m *MockWorkspace) Source() dagger0.Directory {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Source")
-	ret0, _ := ret[0].(*dagger.Directory)
+	ret0, _ := ret[0].(dagger0.Directory)
 	return ret0
 }
 
