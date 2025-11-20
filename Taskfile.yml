@@ -29,7 +29,14 @@ tasks:
       - |
         echo "DAGGER_SESSION_PORT=123" > .env
         echo "DAGGER_SESSION_TOKEN=123" >> .env
-
+  tidy:
+    cmds: 
+      - |
+        go mod tidy
+        (
+          cd workspace
+          go mod tidy
+        )
   unit-tests:
     cmds: 
       - |
@@ -37,6 +44,7 @@ tasks:
         set -a
         source .env
         set +a
+        task tidy
         go test ./... -v run *_test.go
 
   install-mockgen:

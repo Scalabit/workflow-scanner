@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint-fmt:
-    name: Run golangci-lint linter and formatter
+    name: Lint & Fmt
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,7 +36,7 @@ jobs:
         run: task fmt
 
   unittest:
-    name: Run unit tests
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
 
       - name: Install mockgen
         run: task install-mockgen
-        
+
       - name: Generate main dagger code
         uses: dagger/dagger-for-github@v8.2.0
         with:
@@ -75,7 +75,7 @@ jobs:
         run: task unit-tests
 
   security:
-    name: Run gosec
+    name: Security checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
