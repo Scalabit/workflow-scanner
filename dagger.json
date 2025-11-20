@@ -12,8 +12,7 @@
     },
     {
       "name": "workspace",
-      "source": "./workspace"
+      "source": "workspace"
     }
-  ],
-  "source": "."
+  ]
 }
