@@ -6,8 +6,8 @@ on:
       - main
 
 jobs:
-  lint:
-    name: Run golangci-lint 
+  lint-fmt:
+    name: Run golangci-lint linter and formatter
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +30,10 @@ jobs:
 
       - name: Run golangci-lint
         run: task lint
+
+      - name: Run golangci-lint
+        if: always()
+        run: task fmt
 
   unittest:
     name: Run unit tests

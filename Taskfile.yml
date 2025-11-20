@@ -48,7 +48,14 @@ tasks:
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.2
 
   fmt:
-    cmd: golangci-lint fmt ./...
+    cmds: 
+      - |
+        # autofix locally, output issue in action
+        if [ "${CI}" == "true" ]; then
+          golangci-lint fmt -d ./...
+        else
+          golangci-lint fmt ./...
+        fi
 
   lint:
     cmd: golangci-lint run ./...
