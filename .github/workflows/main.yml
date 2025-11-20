@@ -21,8 +21,7 @@ jobs:
     - name: Output semver
       id: get_bump
       run: |
-        semver=$(echo ${{ join(github.event.pull_request.labels.*.name, '|') }} | grep -Po "semver-(major|minor|patch)")
-        if [[ "$(echo ${semver} | wc -l)" -gt 1 ]]; then
+        if [[ "$(echo ${{ join(github.event.pull_request.labels.*.name, '|') }} | grep -Po "semver-(major|minor|patch)" | wc -l)" -gt 1 ]]; then
             echo "More than 1 semver tag found: ${semver}"
             return 1
         fi

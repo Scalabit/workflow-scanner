@@ -15,10 +15,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         labels="$(gh api -X GET repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} --jq '.labels.[].name')"
-        echo "${labels}"
-        semver=$(echo "${labels}" | grep -Po "semver-(major|minor|patch)")
-        echo "$(echo ${semver} | wc -l)"
-        if ! [[ "$(echo ${semver} | wc -l)" -eq 1 ]]; then
+        if ! [[ "$(echo "${labels}" | grep -Po "semver-(major|minor|patch)" | wc -l)" -eq 1 ]]; then
             echo "Bad number of semver labels given: ${semver}"
             return 1
         fi
