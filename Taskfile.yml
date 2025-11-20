@@ -1,12 +1,17 @@
 version: 3
 
+vars:
+  DAGGER_VERSION: v0.19.6
+
 tasks:
   dagger:
     cmds: 
       - |
         dagger develop --sdk=go --compat=skip
-        cd workspace
-        dagger develop --sdk=go --compat=skip
+        (
+          cd workspace
+          dagger develop --sdk=go --compat=skip
+        )
   mocks:
     cmds:
       - |
@@ -34,14 +39,15 @@ tasks:
         set +a
         go test ./... -v run *_test.go
 
+  install-dagger:
+    cmd: curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION={{ .DAGGER_VERSION }} BIN_DIR=$HOME/.local/bin sh
+
   tools:
-    vars:
-      DAGGER_VERSION: v0.19.6
     cmds: 
       - |
         if ! which dagger ; then
           echo "dagger not found, installing..."
-          curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION={{ .DAGGER_VERSION }} BIN_DIR=$HOME/.local/bin sh
+          task install-dagger
         fi
         go install go.uber.org/mock/mockgen@latest
         go install github.com/securego/gosec/v2/cmd/gosec@latest

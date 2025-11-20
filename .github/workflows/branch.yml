@@ -50,8 +50,23 @@ jobs:
       - name: Install Task
         uses: go-task/setup-task@v1
 
-      - name: Generate dagger code and mocks
-        run: task generate
+      - name: Generate main dagger code
+        uses: dagger/dagger-for-github@v8.2.0
+        with:
+            verb: develop
+            args: --sdk=go --compat=skip
+            version: "v0.19.6"
+
+      - name: Generate workspace dagger code
+        uses: dagger/dagger-for-github@v8.2.0
+        with:
+            workdir: workspace
+            verb: develop
+            args: --sdk=go --compat=skip
+            version: "v0.19.6"
+
+      - name: Generate mocks
+        run: task mocks
 
       - name: Run tests with task
         run: task unit-tests
@@ -75,8 +90,23 @@ jobs:
       - name: Install Task
         uses: go-task/setup-task@v1
 
-      - name: Generate dagger code and mocks
-        run: task generate
+      - name: Generate main dagger code
+        uses: dagger/dagger-for-github@v8.2.0
+        with:
+            verb: develop
+            args: --sdk=go --compat=skip
+            version: "v0.19.6"
+
+      - name: Generate workspace dagger code
+        uses: dagger/dagger-for-github@v8.2.0
+        with:
+            workdir: workspace
+            verb: develop
+            args: --sdk=go --compat=skip
+            version: "v0.19.6"
+
+      - name: Generate mocks
+        run: task mocks
 
       - name: Run gosec
         run: task gosec
