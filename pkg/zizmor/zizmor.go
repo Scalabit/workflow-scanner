@@ -1,6 +1,6 @@
 package zizmor
 
-//go:generate mockgen -source=zizmor.go -destination=../../mocks/zizmor_mock.go -package=mocks Zizmor
+//go:generate mockgen -source=zizmor.go -destination=../../mocks/zizmor/zizmor_mock.go -package=mockZizmor Zizmor
 
 import (
 	"context"
@@ -14,7 +14,15 @@ const (
 	RESULT_SIZE_LIMIT = 40000
 )
 
+type FORMAT string
+
+const (
+	Plain = FORMAT("plain")
+	Json  = FORMAT("json")
+)
+
 type Zizmor interface {
+	Run(ctx context.Context, fix bool, format FORMAT, source *internalDagger.Directory) (*internalDagger.Directory, string, error)
 	CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error)
 	RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error)
 	ScanExternalDependencies(ctx context.Context, source *internalDagger.Directory) (string, error)
@@ -25,10 +33,32 @@ type ZizmorImpl struct {
 	client dagger.Client
 }
 
+func getZizmorCmd(fix bool, format FORMAT) string {
+	extraFlags := []string{}
+	if fix {
+		extraFlags = append(extraFlags, "--fix=all")
+	}
+	extraFlags = append(extraFlags, fmt.Sprintf("--format=%s", format))
+
+	return fmt.Sprintf("zizmor %s .github/workflows/ 2>&1 || true", strings.Join(extraFlags, " "))
+}
+
 func NewZizmor(client dagger.Client) Zizmor {
 	return &ZizmorImpl{
 		client: client,
 	}
+}
+
+func (ziz *ZizmorImpl) Run(ctx context.Context, fix bool, format FORMAT, source *internalDagger.Directory) (*internalDagger.Directory, string, error) {
+	container := ziz.getZizmorContainer(source).WithExec([]string{"sh", "-c", getZizmorCmd(fix, format)})
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
+	}
+
+	//container.Export(ctx, "/home/sabrina/git/workflow-scanner/")
+
+	return container.Directory("/workspace"), output, nil
 }
 
 func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error) {

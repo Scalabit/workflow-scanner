@@ -8,6 +8,7 @@ import (
 
 	"workflow-scanner/internal/dagger"
 	"workflow-scanner/mocks"
+	mockZizmor "workflow-scanner/mocks/zizmor"
 	pkgDagger "workflow-scanner/pkg/dagger"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 	tests := []struct {
 		name           string
 		repository     string
-		setupMocks     func(*gomock.Controller) (*mocks.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory)
+		setupMocks     func(*gomock.Controller) (*mockZizmor.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory)
 		expectedResult string
 		expectedError  bool
 		errorContains  string
@@ -26,8 +27,8 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 		{
 			name:       "successful workflow - no issues found",
 			repository: "owner/repo",
-			setupMocks: func(ctrl *gomock.Controller) (*mocks.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
-				mockZizmor := mocks.NewMockZizmor(ctrl)
+			setupMocks: func(ctrl *gomock.Controller) (*mockZizmor.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
+				mockZizmor := mockZizmor.NewMockZizmor(ctrl)
 				mockAgent := mocks.NewMockAgent(ctrl)
 				mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
 				mockDirectory := &dagger.Directory{}
@@ -73,8 +74,8 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 		{
 			name:       "workflow with remaining issues requiring LLM",
 			repository: "owner/repo",
-			setupMocks: func(ctrl *gomock.Controller) (*mocks.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
-				mockZizmor := mocks.NewMockZizmor(ctrl)
+			setupMocks: func(ctrl *gomock.Controller) (*mockZizmor.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
+				mockZizmor := mockZizmor.NewMockZizmor(ctrl)
 				mockAgent := mocks.NewMockAgent(ctrl)
 				mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
 				mockDirectory := &dagger.Directory{}
@@ -124,8 +125,8 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 		{
 			name:       "ZIZMOR auto-fix fails",
 			repository: "owner/repo",
-			setupMocks: func(ctrl *gomock.Controller) (*mocks.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
-				mockZizmor := mocks.NewMockZizmor(ctrl)
+			setupMocks: func(ctrl *gomock.Controller) (*mockZizmor.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
+				mockZizmor := mockZizmor.NewMockZizmor(ctrl)
 				mockAgent := mocks.NewMockAgent(ctrl)
 				mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
 				mockDirectory := &dagger.Directory{}
@@ -146,8 +147,8 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 		{
 			name:       "LLM processing fails",
 			repository: "owner/repo",
-			setupMocks: func(ctrl *gomock.Controller) (*mocks.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
-				mockZizmor := mocks.NewMockZizmor(ctrl)
+			setupMocks: func(ctrl *gomock.Controller) (*mockZizmor.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
+				mockZizmor := mockZizmor.NewMockZizmor(ctrl)
 				mockAgent := mocks.NewMockAgent(ctrl)
 				mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
 				mockDirectory := &dagger.Directory{}
@@ -179,8 +180,8 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 		{
 			name:       "external findings too long - gets truncated",
 			repository: "owner/repo",
-			setupMocks: func(ctrl *gomock.Controller) (*mocks.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
-				mockZizmor := mocks.NewMockZizmor(ctrl)
+			setupMocks: func(ctrl *gomock.Controller) (*mockZizmor.MockZizmor, *mocks.MockAgent, *mocks.MockWrapperIssueClient, pkgDagger.Directory) {
+				mockZizmor := mockZizmor.NewMockZizmor(ctrl)
 				mockAgent := mocks.NewMockAgent(ctrl)
 				mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
 				mockDirectory := &dagger.Directory{}

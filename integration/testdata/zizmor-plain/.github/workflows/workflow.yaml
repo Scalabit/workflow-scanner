@@ -1,0 +1,77 @@
+name: Cleanup snapshots
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  fetch-commits:
+    name: Fetch all PR commits
+    runs-on: ubuntu-latest
+    outputs:
+      PR_COMMITS: ${{ steps.get-commits.outputs.PR_COMMITS }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Get PR commits from context
+        id: get-commits
+        run: |
+          COMMITS=$(git log --format="%H" ${{ github.event.pull_request.base.sha }}^..${{ github.event.pull_request.head.sha }})
+          PR_COMMITS=$(echo "$COMMITS" | jq -R -s -c 'split("\n")[:-1]')
+          echo "PR_COMMITS=$PR_COMMITS" >> "$GITHUB_OUTPUT"
+
+  destroy-snapshot:
+    name: destroy snapshot's infra
+    permissions:
+      contents: read
+    needs: [fetch-commits]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false 
+      matrix:
+        commit: ${{ fromJSON(needs.fetch-commits.outputs.PR_COMMITS) }}
+    steps:
+     - name: Checkout repository
+       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 
+       with:
+          persist-credentials: false
+     
+     - name: Authenticate with Google Cloud
+       uses: google-github-actions/auth@71f986410dfbc7added4569d411d040a91dc6935
+       with:
+         credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+     - name: Configure Docker to use GCP Artifact Registry
+       run: gcloud auth configure-docker europe-north1-docker.pkg.dev
+
+     - name: Set Up Terraform
+       uses: hashicorp/setup-terraform@c529327889820530c60b4ce5bbc8d6099e166666
+     
+     - name: Install task
+       uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611
+       with:
+         version: '3.x'
+
+     - name: Create service accout file 
+       run: echo '${{ secrets.GCP_SERVICE_ACCOUNT }}' > terraform/sva.json
+
+     - name: Terraform init 
+       run: environment=${{ matrix.commit }} task terraform-init 
+     
+     - name: Terraform destroy
+       run: environment=${{ matrix.commit }} task terraform-destroy
+       env: 
+          TF_VAR_environment: ${{ matrix.commit }}
+          TF_VAR_containerVersion: "cleanup"
