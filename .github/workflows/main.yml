@@ -23,7 +23,7 @@ jobs:
       run: |
         if [[ "$(echo ${{ join(github.event.pull_request.labels.*.name, '|') }} | grep -Po "semver-(major|minor|patch)" | wc -l)" -gt 1 ]]; then
             echo "More than 1 semver tag found: ${semver}"
-            return 1
+            exit 1
         fi
         echo "bump=${semver}" | sed 's/semver-//g' >> $GITHUB_OUTPUT
 

@@ -17,5 +17,5 @@ jobs:
         labels="$(gh api -X GET repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} --jq '.labels.[].name')"
         if ! [[ "$(echo "${labels}" | grep -Po "semver-(major|minor|patch)" | wc -l)" -eq 1 ]]; then
             echo "Bad number of semver labels given: ${semver}"
-            return 1
+            exit 1
         fi
