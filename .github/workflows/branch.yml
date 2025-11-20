@@ -1,0 +1,72 @@
+name: Run qualification on branch
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  lint:
+    name: Run golangci-lint 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+    
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.3
+
+      - name: Install Task
+        uses: go-task/setup-task@v1
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.6.2
+          install-mode: binary
+          install-only: true
+
+      - name: Run golangci-lint
+        run: task lint
+
+  unittest:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+    
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.3
+
+      - name: Install Task
+        uses: go-task/setup-task@v1
+
+      - name: Run tests with task
+        run: task unit-tests
+
+  security:
+    name: Run gosec
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+    
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.3
+
+      # use go install and run task, does not seem to properly exclude generated dagger code
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Install Task
+        uses: go-task/setup-task@v1
+
+      - name: Run gosec
+        run: task gosec

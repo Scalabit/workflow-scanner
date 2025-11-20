@@ -26,7 +26,13 @@ tasks:
         echo "DAGGER_SESSION_TOKEN=123" >> .env
 
   unit-tests:
-    cmd: go test ./... -v run *_test.go
+    cmds: 
+      - |
+        task dotenv
+        set -a
+        source .env
+        set +a
+        go test ./... -v run *_test.go
 
   tools:
     vars:
@@ -38,7 +44,22 @@ tasks:
           curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION={{ .DAGGER_VERSION }} BIN_DIR=$HOME/.local/bin sh
         fi
         go install go.uber.org/mock/mockgen@latest
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.2
 
   fmt:
     cmd: golangci-lint fmt ./...
+
+  lint:
+    cmd: golangci-lint run ./...
+
+  gosec:
+    cmds:
+      - |
+        gosec -exclude-dir internal -exclude-dir workspace -exclude-generated -nosec ./...
+        (
+          cd workspace
+          gosec -exclude-dir internal -exclude-generated -nosec ./...
+        )
+        
+        
