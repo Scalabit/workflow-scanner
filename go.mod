@@ -1,4 +1,4 @@
-module dagger/workflow-scanner
+module workflow-scanner
 
 go 1.25.3
 

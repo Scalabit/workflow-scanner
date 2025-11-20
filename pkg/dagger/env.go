@@ -3,7 +3,7 @@ package dagger
 //go:generate mockgen -source=env.go -destination=../../mocks/env_mock.go -package=mocks Env
 
 import (
-	"dagger/workflow-scanner/internal/dagger"
+	"workflow-scanner/internal/dagger"
 )
 
 type Env interface {

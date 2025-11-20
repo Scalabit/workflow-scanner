@@ -83,7 +83,7 @@ func TestGetPrTitleBody(t *testing.T) {
 			)
 
 			assert.Equal(t, tt.expectedTitle, title)
-			
+
 			for _, expectedPart := range tt.expectedBodyParts {
 				assert.Contains(t, body, expectedPart,
 					"Expected body to contain: %s", expectedPart)

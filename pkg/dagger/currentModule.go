@@ -2,7 +2,7 @@ package dagger
 
 //go:generate mockgen -source=currentModule.go -destination=../../mocks/currentModule_mock.go -package=mocks CurrentModule
 
-import "dagger/workflow-scanner/internal/dagger"
+import "workflow-scanner/internal/dagger"
 
 type CurrentModule interface {
 	Source() Directory

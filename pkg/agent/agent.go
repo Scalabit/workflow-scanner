@@ -4,8 +4,8 @@ package agent
 
 import (
 	"context"
-	internalDagger "dagger/workflow-scanner/internal/dagger"
-	"dagger/workflow-scanner/pkg/dagger"
+	internalDagger "workflow-scanner/internal/dagger"
+	"workflow-scanner/pkg/dagger"
 )
 
 type Agent interface {
@@ -30,6 +30,12 @@ func NewAgent(client dagger.Client) Agent {
 
 func areThereIssues(issuesOut string) bool {
 	return issuesOut == "" || issuesOut == "[]" || issuesOut == "[]\n"
+}
+
+func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
+	directory, llmOut, err := agent.fixRemainingIssuesImpl(ctx, source, issues)
+
+	return directory.WithoutDirectory("node_modules"), llmOut, err
 }
 
 func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
@@ -72,11 +78,4 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	completed := completedWorkspace.Source()
 
 	return completed, explanations, nil
-}
-
-func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
-	directory, llmOut, err := agent.fixRemainingIssuesImpl(ctx, source, issues)
-
-	// TODO: properly mock this, reintegrate into previous function and remove it
-	return directory.WithoutDirectory("node_modules"), llmOut, err
 }

@@ -1,11 +1,17 @@
 package zizmor
 
+//go:generate mockgen -source=zizmor.go -destination=../../mocks/zizmor_mock.go -package=mocks Zizmor
+
 import (
 	"context"
-	internalDagger "dagger/workflow-scanner/internal/dagger"
-	"dagger/workflow-scanner/pkg/dagger"
 	"fmt"
 	"strings"
+	internalDagger "workflow-scanner/internal/dagger"
+	"workflow-scanner/pkg/dagger"
+)
+
+const (
+	RESULT_SIZE_LIMIT = 40000
 )
 
 type Zizmor interface {
@@ -25,17 +31,6 @@ func NewZizmor(client dagger.Client) Zizmor {
 	}
 }
 
-// GetZizmorContainer returns a container with ZIZMOR pre-installed and workspace mounted
-func (ziz *ZizmorImpl) getZizmorContainer(source *internalDagger.Directory) dagger.Container {
-	// Use Python slim for reliable pip install - more predictable than Rust compilation
-	return ziz.client.Container().
-		From("python:3.12-slim").
-		WithExec([]string{"pip", "install", "zizmor"}).
-		WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}). // Verify installation
-		WithDirectory("/workspace", source).
-		WithWorkdir("/workspace")
-}
-
 func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error) {
 	container := ziz.getZizmorContainer(source).
 		WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"})
@@ -45,8 +40,7 @@ func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDag
 		return nil, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
 	}
 
-	fixedDirectory := container.Directory("/workspace")
-	return fixedDirectory, output, nil
+	return container.Directory("/workspace"), output, nil
 }
 
 func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error) {
@@ -125,6 +119,7 @@ func (ziz *ZizmorImpl) ScanExternalDependencies(ctx context.Context, source *int
 		findings, err := cloneContainer.WithExec([]string{"sh", "-c", scanCmd}).Stdout(ctx)
 		if err != nil {
 			allFindings.WriteString(fmt.Sprintf("### %s\nFailed to scan: %s\n\n", repo, err.Error()))
+
 			continue
 		}
 
@@ -153,8 +148,9 @@ func (ziz *ZizmorImpl) SummarizeExternalFindings(fullReport string) string {
 	currentRepo := ""
 
 	for _, line := range lines {
-		if strings.HasPrefix(line, "### ") {
-			currentRepo = strings.TrimPrefix(line, "### ")
+		if after, ok := strings.CutPrefix(line, "### "); ok {
+			currentRepo = after
+
 			continue
 		}
 
@@ -175,9 +171,19 @@ func (ziz *ZizmorImpl) SummarizeExternalFindings(fullReport string) string {
 
 	// Truncate if too long
 	result := summary.String()
-	if len(result) > 40000 {
-		result = result[:40000] + "\n\n... (truncated)"
+	if len(result) > RESULT_SIZE_LIMIT {
+		result = result[:RESULT_SIZE_LIMIT] + "\n\n... (truncated)"
 	}
 
 	return result
+}
+
+func (ziz *ZizmorImpl) getZizmorContainer(source *internalDagger.Directory) dagger.Container {
+	// Use Python slim for reliable pip install - more predictable than Rust compilation
+	return ziz.client.Container().
+		From("python:3.12-slim").
+		WithExec([]string{"pip", "install", "zizmor"}).
+		WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}). // Verify installation
+		WithDirectory("/workspace", source).
+		WithWorkdir("/workspace")
 }

@@ -4,7 +4,7 @@ package main
 
 import (
 	"context"
-	"dagger/workspace/internal/dagger"
+	"workspace/internal/dagger"
 )
 
 type Workspace struct {
@@ -18,7 +18,6 @@ func New(
 	return &Workspace{Source: source}
 }
 
-// Read a file in the Workspace
 func (w *Workspace) ReadFile(
 	ctx context.Context,
 	// The path to the file in the workspace
@@ -27,7 +26,6 @@ func (w *Workspace) ReadFile(
 	return w.Source.File(path).Contents(ctx)
 }
 
-// Write a file to the Workspace
 func (w *Workspace) WriteFile(
 	// The path to the file in the workspace
 	path string,
@@ -40,7 +38,6 @@ func (w *Workspace) WriteFile(
 	}
 }
 
-// List all of the files in the Workspace
 func (w *Workspace) ListFiles(ctx context.Context) (string, error) {
 	return dag.Container().
 		From("alpine:3").

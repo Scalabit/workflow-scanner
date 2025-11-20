@@ -2,5 +2,19 @@
     "go.testEnvVars": {
         "DAGGER_SESSION_PORT": "123",
         "DAGGER_SESSION_TOKEN": "123"
-    }
+    },
+    "go.lintTool": "golangci-lint",
+    "go.lintOnSave": "file",
+    "go.lintFlags": [
+        "--path-mode=abs",
+        "--fast-only"
+    ],
+    "go.formatTool": "custom",
+    "go.alternateTools": {
+        "customFormatter": "golangci-lint"
+    },
+    "go.formatFlags": [
+        "fmt",
+        "--stdin"
+    ]
 }

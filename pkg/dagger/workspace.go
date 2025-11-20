@@ -2,7 +2,7 @@ package dagger
 
 //go:generate mockgen -source=workspace.go -destination=../../mocks/workspace_mock.go -package=mocks Workspace
 
-import "dagger/workflow-scanner/internal/dagger"
+import "workflow-scanner/internal/dagger"
 
 type Workspace interface {
 	Source() *dagger.Directory

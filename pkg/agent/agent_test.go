@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	internalDagger "dagger/workflow-scanner/internal/dagger"
-	"dagger/workflow-scanner/mocks"
+	internalDagger "workflow-scanner/internal/dagger"
+	"workflow-scanner/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
