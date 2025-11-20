@@ -39,17 +39,18 @@ tasks:
         set +a
         go test ./... -v run *_test.go
 
-  install-dagger:
-    cmd: curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION={{ .DAGGER_VERSION }} BIN_DIR=$HOME/.local/bin sh
+  install-mockgen:
+    cmd: go install go.uber.org/mock/mockgen@latest
+    
 
   tools:
     cmds: 
       - |
         if ! which dagger ; then
           echo "dagger not found, installing..."
-          task install-dagger
+          curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION={{ .DAGGER_VERSION }} BIN_DIR=$HOME/.local/bin sh
         fi
-        go install go.uber.org/mock/mockgen@latest
+        task install-mockgen
         go install github.com/securego/gosec/v2/cmd/gosec@latest
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.2
 
