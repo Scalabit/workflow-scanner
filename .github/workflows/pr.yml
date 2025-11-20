@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Verify semver label exists
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         labels="$(gh api repos/$OWNER/$REPO_NAME/pulls/$PULL_REQUEST_NUMBER --jq '.labels.[].name')"
         semver=$(echo "${labels}" | grep -Po "semver-(major|minor|patch)")
