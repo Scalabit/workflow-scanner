@@ -1,0 +1,6 @@
+{
+    "go.testEnvVars": {
+        "DAGGER_SESSION_PORT": "123",
+        "DAGGER_SESSION_TOKEN": "123"
+    }
+}
