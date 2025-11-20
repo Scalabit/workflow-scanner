@@ -10,7 +10,8 @@ jobs:
     steps:
     - name: Verify semver label exists
       run: |
-        semver=$(echo "${{ join(github.event.pull_request.labels.*.name, '|') }}" | grep -Po "semver-(major|minor|patch)")
+        labels="$(gh api repos/$OWNER/$REPO_NAME/pulls/$PULL_REQUEST_NUMBER --jq '.labels.[].name')"
+        semver=$(echo "${labels}" | grep -Po "semver-(major|minor|patch)")
         if ! [[ "$(echo ${semver} | wc -l)" -eq 1 ]]; then
             echo "Bad number of semver labels given: ${semver}"
             return 1
