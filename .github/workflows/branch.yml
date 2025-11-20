@@ -28,10 +28,10 @@ jobs:
           install-mode: binary
           install-only: true
 
-      - name: Run golangci-lint
+      - name: Lint
         run: task lint
 
-      - name: Run golangci-lint
+      - name: Format
         if: always()
         run: task fmt
 
@@ -49,6 +49,9 @@ jobs:
 
       - name: Install Task
         uses: go-task/setup-task@v1
+
+      - name: Generate dagger code and mocks
+        run: task generate
 
       - name: Run tests with task
         run: task unit-tests
@@ -71,6 +74,9 @@ jobs:
 
       - name: Install Task
         uses: go-task/setup-task@v1
+
+      - name: Generate dagger code and mocks
+        run: task generate
 
       - name: Run gosec
         run: task gosec

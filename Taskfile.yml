@@ -1,7 +1,7 @@
 version: 3
 
 tasks:
-  generate-dagger:
+  dagger:
     cmds: 
       - |
         dagger develop --sdk=go --compat=skip
@@ -14,9 +14,9 @@ tasks:
         go generate $(pwd)/pkg/github
         go generate $(pwd)/pkg/zizmor
         go generate $(pwd)/pkg/agent
-  setup:
+  generate:
     cmds:
-      - task: generate-dagger
+      - task: dagger
       - task: mocks
   # necessary for running tests out of vscode ui
   dotenv:
