@@ -100,7 +100,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Scan and fix workflows
-        uses: Scalabit/workflow-scanner@a2150268df243daa99fec1e73fb4c0bbf5973fa1 #v1
+        uses: Scalabit/workflow-scanner@main # name of the branch you want to test
         env:
           OPENAI_MODEL: gpt-4o-mini  # Optional: specify a model (default: gpt-4o)
         with:
