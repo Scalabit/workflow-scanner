@@ -20,9 +20,8 @@ runs:
     - name: Run Dagger workflow scanner
       uses: dagger/dagger-for-github@v6
       with:
-        version: "latest"
+        version: "v0.19.6"
         verb: call
-        module: ${{ github.action_path }}/dagger
         args: scan-and-fix-workflows --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
