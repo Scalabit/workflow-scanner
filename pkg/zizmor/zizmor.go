@@ -2,15 +2,16 @@ package zizmor
 
 import (
 	"context"
+	internalDagger "dagger/workflow-scanner/internal/dagger"
 	"dagger/workflow-scanner/pkg/dagger"
 	"fmt"
 	"strings"
 )
 
 type Zizmor interface {
-	CheckRemainingIssues(ctx context.Context, source dagger.Directory) (string, error)
-	RunZizmorAutoFix(ctx context.Context, source dagger.Directory) (dagger.Directory, string, error)
-	ScanExternalDependencies(ctx context.Context, source dagger.Directory) (string, error)
+	CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error)
+	RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error)
+	ScanExternalDependencies(ctx context.Context, source *internalDagger.Directory) (string, error)
 	SummarizeExternalFindings(fullReport string) string
 }
 
@@ -25,7 +26,7 @@ func NewZizmor(client dagger.Client) Zizmor {
 }
 
 // GetZizmorContainer returns a container with ZIZMOR pre-installed and workspace mounted
-func (ziz *ZizmorImpl) getZizmorContainer(source dagger.Directory) dagger.Container {
+func (ziz *ZizmorImpl) getZizmorContainer(source *internalDagger.Directory) dagger.Container {
 	// Use Python slim for reliable pip install - more predictable than Rust compilation
 	return ziz.client.Container().
 		From("python:3.12-slim").
@@ -35,7 +36,7 @@ func (ziz *ZizmorImpl) getZizmorContainer(source dagger.Directory) dagger.Contai
 		WithWorkdir("/workspace")
 }
 
-func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source dagger.Directory) (dagger.Directory, string, error) {
+func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error) {
 	container := ziz.getZizmorContainer(source).
 		WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"})
 
@@ -48,7 +49,7 @@ func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source dagger.Direc
 	return fixedDirectory, output, nil
 }
 
-func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source dagger.Directory) (string, error) {
+func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error) {
 	container := ziz.getZizmorContainer(source).
 		WithExec([]string{"sh", "-c", "zizmor --format=json .github/workflows/ 2>/dev/null || echo '[]'"})
 
@@ -66,7 +67,7 @@ func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source dagger.D
 	return output, nil
 }
 
-func (ziz *ZizmorImpl) ScanExternalDependencies(ctx context.Context, source dagger.Directory) (string, error) {
+func (ziz *ZizmorImpl) ScanExternalDependencies(ctx context.Context, source *internalDagger.Directory) (string, error) {
 	// Create a container with git and ZIZMOR but NOT mount the source (we'll clone external repos)
 	baseContainer := ziz.client.Container().
 		From("python:3.12-slim").

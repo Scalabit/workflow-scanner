@@ -12,7 +12,6 @@ package mocks
 import (
 	context "context"
 	dagger "dagger/workflow-scanner/internal/dagger"
-	dagger0 "dagger/workflow-scanner/pkg/dagger"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -43,7 +42,7 @@ func (m *MockWrapperIssueClient) EXPECT() *MockWrapperIssueClientMockRecorder {
 }
 
 // CreatePullRequest mocks base method.
-func (m *MockWrapperIssueClient) CreatePullRequest(ctx context.Context, repo, title, body string, source dagger0.Directory, opts ...dagger.GithubIssueCreatePullRequestOpts) (string, error) {
+func (m *MockWrapperIssueClient) CreatePullRequest(ctx context.Context, repo, title, body string, source *dagger.Directory, opts ...dagger.GithubIssueCreatePullRequestOpts) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, repo, title, body, source}
 	for _, a := range opts {

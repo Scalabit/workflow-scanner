@@ -1,16 +1,25 @@
 package agent
 
+//go:generate mockgen -source=agent.go -destination=../../mocks/agent_mock.go -package=mocks Agent
+
 import (
 	"context"
+	internalDagger "dagger/workflow-scanner/internal/dagger"
 	"dagger/workflow-scanner/pkg/dagger"
 )
 
 type Agent interface {
-	FixRemainingIssues(ctx context.Context, source dagger.Directory, issues string) (dagger.Directory, string, error)
+	FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error)
 }
 
 type AgentImpl struct {
 	client dagger.Client
+}
+
+func NewAgentImpl(client dagger.Client) *AgentImpl {
+	return &AgentImpl{
+		client: client,
+	}
 }
 
 func NewAgent(client dagger.Client) Agent {
@@ -19,10 +28,14 @@ func NewAgent(client dagger.Client) Agent {
 	}
 }
 
-func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source dagger.Directory, issues string) (dagger.Directory, string, error) {
+func areThereIssues(issuesOut string) bool {
+	return issuesOut == "" || issuesOut == "[]" || issuesOut == "[]\n"
+}
+
+func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
 	// Only skip LLM if truly no issues found
-	if issues == "" || issues == "[]" || issues == "[]\n" {
-		return source.WithoutDirectory("node_modules"), "No remaining issues found after ZIZMOR auto-fix", nil
+	if areThereIssues(issues) {
+		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
 	environment := agent.client.Env().
@@ -51,12 +64,19 @@ func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source dagger.Di
 	explanations, err := workEnv.Output("explanations").AsString(ctx)
 	if err != nil {
 		// If LLM fails completely, return original workspace
-		return source.WithoutDirectory("node_modules"), "LLM processing failed - returning original workspace unchanged", nil
+		return source, "LLM processing failed - returning original workspace unchanged", nil
 	}
 
 	// Get the completed workspace from LLM
 	completedWorkspace := workEnv.Output("completed").AsWorkspace()
 	completed := completedWorkspace.Source()
 
-	return completed.WithoutDirectory("node_modules"), explanations, nil
+	return completed, explanations, nil
+}
+
+func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
+	directory, llmOut, err := agent.fixRemainingIssuesImpl(ctx, source, issues)
+
+	// TODO: properly mock this, reintegrate into previous function and remove it
+	return directory.WithoutDirectory("node_modules"), llmOut, err
 }

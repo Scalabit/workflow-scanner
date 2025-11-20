@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"dagger/workflow-scanner/tests/mocks"
+	"dagger/workflow-scanner/internal/dagger"
+	"dagger/workflow-scanner/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -16,7 +17,6 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGithub := mocks.NewMockWrapperIssueClient(ctrl)
-	mockDirectory := mocks.NewMockDirectory(ctrl)
 
 	tests := []struct {
 		name          string
@@ -42,7 +42,7 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 		{
 			name:          "PR creation fails",
 			repo:          "owner/repo",
-			title:         "Security fixes", 
+			title:         "Security fixes",
 			body:          "Fixed security issues",
 			mockURL:       "",
 			mockError:     errors.New("API rate limit exceeded"),
@@ -55,7 +55,7 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockGithub.EXPECT().
-				CreatePullRequest(gomock.Any(), tt.repo, tt.title, tt.body, mockDirectory).
+				CreatePullRequest(gomock.Any(), tt.repo, tt.title, tt.body, gomock.Any()).
 				Return(tt.mockURL, tt.mockError)
 
 			result, err := mockGithub.CreatePullRequest(
@@ -63,11 +63,11 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 				tt.repo,
 				tt.title,
 				tt.body,
-				mockDirectory,
+				&dagger.Directory{},
 			)
 
 			assert.Equal(t, tt.expectedURL, result)
-			
+
 			if tt.expectedError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)

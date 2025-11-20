@@ -11,7 +11,7 @@ package mocks
 
 import (
 	context "context"
-	dagger "dagger/workflow-scanner/pkg/dagger"
+	dagger "dagger/workflow-scanner/internal/dagger"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -42,7 +42,7 @@ func (m *MockZizmor) EXPECT() *MockZizmorMockRecorder {
 }
 
 // CheckRemainingIssues mocks base method.
-func (m *MockZizmor) CheckRemainingIssues(ctx context.Context, source dagger.Directory) (string, error) {
+func (m *MockZizmor) CheckRemainingIssues(ctx context.Context, source *dagger.Directory) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckRemainingIssues", ctx, source)
 	ret0, _ := ret[0].(string)
@@ -57,10 +57,10 @@ func (mr *MockZizmorMockRecorder) CheckRemainingIssues(ctx, source any) *gomock.
 }
 
 // RunZizmorAutoFix mocks base method.
-func (m *MockZizmor) RunZizmorAutoFix(ctx context.Context, source dagger.Directory) (dagger.Directory, string, error) {
+func (m *MockZizmor) RunZizmorAutoFix(ctx context.Context, source *dagger.Directory) (*dagger.Directory, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RunZizmorAutoFix", ctx, source)
-	ret0, _ := ret[0].(dagger.Directory)
+	ret0, _ := ret[0].(*dagger.Directory)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -73,7 +73,7 @@ func (mr *MockZizmorMockRecorder) RunZizmorAutoFix(ctx, source any) *gomock.Call
 }
 
 // ScanExternalDependencies mocks base method.
-func (m *MockZizmor) ScanExternalDependencies(ctx context.Context, source dagger.Directory) (string, error) {
+func (m *MockZizmor) ScanExternalDependencies(ctx context.Context, source *dagger.Directory) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ScanExternalDependencies", ctx, source)
 	ret0, _ := ret[0].(string)

@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"dagger/workflow-scanner/tests/mocks"
+	"dagger/workflow-scanner/internal/dagger"
+	"dagger/workflow-scanner/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -17,35 +18,34 @@ func TestZizmorImpl_CheckRemainingIssues(t *testing.T) {
 
 	mockClient := mocks.NewMockClient(ctrl)
 	mockContainer := mocks.NewMockContainer(ctrl)
-	mockDirectory := mocks.NewMockDirectory(ctrl)
 
 	tests := []struct {
-		name           string
+		name            string
 		containerOutput string
 		containerError  error
-		expectedResult string
-		expectedError  string
+		expectedResult  string
+		expectedError   string
 	}{
 		{
-			name:           "no issues found - empty JSON array",
+			name:            "no issues found - empty JSON array",
 			containerOutput: "[]",
 			containerError:  nil,
-			expectedResult: "",
-			expectedError:  "",
+			expectedResult:  "",
+			expectedError:   "",
 		},
 		{
-			name:           "issues found - valid JSON",
+			name:            "issues found - valid JSON",
 			containerOutput: `[{"desc": "security issue", "file": "workflow.yml"}]`,
 			containerError:  nil,
-			expectedResult: `[{"desc": "security issue", "file": "workflow.yml"}]`,
-			expectedError:  "",
+			expectedResult:  `[{"desc": "security issue", "file": "workflow.yml"}]`,
+			expectedError:   "",
 		},
 		{
-			name:           "container execution fails",
+			name:            "container execution fails",
 			containerOutput: "",
 			containerError:  errors.New("container failed"),
-			expectedResult: "",
-			expectedError:  "failed to check remaining issues: container failed",
+			expectedResult:  "",
+			expectedError:   "failed to check remaining issues: container failed",
 		},
 	}
 
@@ -55,17 +55,17 @@ func TestZizmorImpl_CheckRemainingIssues(t *testing.T) {
 			mockContainer.EXPECT().From("python:3.12-slim").Return(mockContainer)
 			mockContainer.EXPECT().WithExec([]string{"pip", "install", "zizmor"}).Return(mockContainer)
 			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}).Return(mockContainer)
-			mockContainer.EXPECT().WithDirectory("/workspace", mockDirectory).Return(mockContainer)
+			mockContainer.EXPECT().WithDirectory("/workspace", gomock.Any()).Return(mockContainer)
 			mockContainer.EXPECT().WithWorkdir("/workspace").Return(mockContainer)
-			
+
 			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "zizmor --format=json .github/workflows/ 2>/dev/null || echo '[]'"}).Return(mockContainer)
 			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerOutput, tt.containerError)
 
 			zizmor := NewZizmor(mockClient)
-			result, err := zizmor.CheckRemainingIssues(context.Background(), mockDirectory)
+			result, err := zizmor.CheckRemainingIssues(context.Background(), &dagger.Directory{})
 
 			assert.Equal(t, tt.expectedResult, result)
-			
+
 			if tt.expectedError != "" {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedError, err.Error())
@@ -82,35 +82,35 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 
 	mockClient := mocks.NewMockClient(ctrl)
 	mockContainer := mocks.NewMockContainer(ctrl)
-	mockDirectory := mocks.NewMockDirectory(ctrl)
+	resultDir := &dagger.Directory{}
 
 	tests := []struct {
-		name           string
+		name            string
 		containerOutput string
 		containerError  error
-		expectedOutput string
-		expectedError  string
+		expectedOutput  string
+		expectedError   string
 	}{
 		{
-			name:           "successful auto-fix execution",
+			name:            "successful auto-fix execution",
 			containerOutput: "Fixed 3 security vulnerabilities in workflows",
 			containerError:  nil,
-			expectedOutput: "Fixed 3 security vulnerabilities in workflows",
-			expectedError:  "",
+			expectedOutput:  "Fixed 3 security vulnerabilities in workflows",
+			expectedError:   "",
 		},
 		{
-			name:           "auto-fix with no changes",
+			name:            "auto-fix with no changes",
 			containerOutput: "No security issues found to fix",
 			containerError:  nil,
-			expectedOutput: "No security issues found to fix",
-			expectedError:  "",
+			expectedOutput:  "No security issues found to fix",
+			expectedError:   "",
 		},
 		{
-			name:           "container execution fails",
+			name:            "container execution fails",
 			containerOutput: "",
 			containerError:  errors.New("auto-fix execution failed"),
-			expectedOutput: "",
-			expectedError:  "failed to run ZIZMOR: auto-fix execution failed",
+			expectedOutput:  "",
+			expectedError:   "failed to run ZIZMOR: auto-fix execution failed",
 		},
 	}
 
@@ -120,23 +120,22 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 			mockContainer.EXPECT().From("python:3.12-slim").Return(mockContainer)
 			mockContainer.EXPECT().WithExec([]string{"pip", "install", "zizmor"}).Return(mockContainer)
 			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}).Return(mockContainer)
-			mockContainer.EXPECT().WithDirectory("/workspace", mockDirectory).Return(mockContainer)
+			mockContainer.EXPECT().WithDirectory("/workspace", gomock.Any()).Return(mockContainer)
 			mockContainer.EXPECT().WithWorkdir("/workspace").Return(mockContainer)
-			
+
 			// Setup the auto-fix execution
 			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"}).Return(mockContainer)
 			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerOutput, tt.containerError)
-			
+
 			if tt.containerError == nil {
-				resultDir := mocks.NewMockDirectory(ctrl)
 				mockContainer.EXPECT().Directory("/workspace").Return(resultDir)
 			}
 
 			zizmor := NewZizmor(mockClient)
-			fixedDirectory, output, err := zizmor.RunZizmorAutoFix(context.Background(), mockDirectory)
+			fixedDirectory, output, err := zizmor.RunZizmorAutoFix(context.Background(), &dagger.Directory{})
 
 			assert.Equal(t, tt.expectedOutput, output)
-			
+
 			if tt.expectedError != "" {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedError, err.Error())
