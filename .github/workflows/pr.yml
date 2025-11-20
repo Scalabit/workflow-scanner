@@ -1,0 +1,16 @@
+name: Verify semver
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify semver label exists
+      run: |
+        semver=$(echo ${{ join(github.event.pull_request.labels.*.name, '|') }} | grep -Po "semver-(major|minor|patch)")
+        if ! [[ "$(echo ${semver} | wc -l)" -eq 1 ]]; then
+            echo "Bad number of semver labels given: ${semver}"
+            return 1
+        fi
