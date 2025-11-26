@@ -9,12 +9,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	"github.com/stripe/stripe-go/v76"
+	"github.com/stripe/stripe-go/v76/checkout/session"
+	"github.com/stripe/stripe-go/v76/webhook"
 )
 
 type Config struct {
-	ClientID     string
-	ClientSecret string
-	Port         string
+	ClientID          string
+	ClientSecret      string
+	StripeKey         string
+	StripePublishable string
+	StripeWebhookKey  string
+	Port              string
 }
 
 type GitHubUser struct {
@@ -34,11 +42,19 @@ type GitHubTokenResponse struct {
 	Scope       string `json:"scope"`
 }
 
+var (
+	premiumUsers = make(map[string]bool)
+	premiumMutex = sync.RWMutex{}
+)
+
 func loadConfig() *Config {
 	return &Config{
-		ClientID:     getEnv("GH_APP_ID", ""),
-		ClientSecret: getEnv("GH_APP_SECRET", ""),
-		Port:         getEnv("PORT", "8080"),
+		ClientID:          getEnv("GH_APP_ID", ""),
+		ClientSecret:      getEnv("GH_APP_SECRET", ""),
+		StripeKey:         getEnv("TEST_STRIPE", ""),
+		StripePublishable: getEnv("TEST_STRIPE_PK", ""),
+		StripeWebhookKey:  getEnv("TEST_STRIPE_WEBHOOK_SECRET", ""),
+		Port:              getEnv("PORT", "8080"),
 	}
 }
 
@@ -313,7 +329,8 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 func (c *Config) getConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]string{
-		"client_id": c.ClientID,
+		"client_id":           c.ClientID,
+		"stripe_publishable":  c.StripePublishable,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -331,10 +348,133 @@ func (c *Config) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	premiumMutex.RLock()
+	isPremium := premiumUsers[user.Email]
+	premiumMutex.RUnlock()
+
+	response := map[string]interface{}{
+		"login":     user.Login,
+		"id":        user.ID,
+		"email":     user.Email,
+		"isPremium": isPremium,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(response)
 }
 
+func (c *Config) createCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get user info from token
+	authHeader := r.Header.Get("Authorization")
+	token := authHeader[7:]
+	client := &http.Client{}
+	user, err := c.fetchGitHubUserWithEmail(client, token)
+	if err != nil {
+		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+		return
+	}
+
+	// Set Stripe API key
+	stripe.Key = c.StripeKey
+
+	// Create checkout session for €10
+	params := &stripe.CheckoutSessionParams{
+		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+					Currency: stripe.String("eur"),
+					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+						Name: stripe.String("flowsniffer Premium"),
+					},
+					UnitAmount: stripe.Int64(1000), // €10.00 in cents
+				},
+				Quantity: stripe.Int64(1),
+			},
+		},
+		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL: stripe.String("http://localhost:8080/"),
+		CancelURL:  stripe.String("http://localhost:8080/"),
+		CustomerEmail: stripe.String(user.Email),
+		Metadata: map[string]string{
+			"github_user": user.Login,
+			"github_email": user.Email,
+		},
+	}
+
+	s, err := session.New(params)
+	if err != nil {
+		log.Printf("Stripe error: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to create checkout session: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return checkout session URL
+	response := map[string]string{
+		"checkout_url": s.URL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (c *Config) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	signature := r.Header.Get("Stripe-Signature")
+	if signature == "" {
+		http.Error(w, "Missing Stripe signature", http.StatusBadRequest)
+		return
+	}
+
+	event, err := webhook.ConstructEventWithOptions(body, signature, c.StripeWebhookKey, webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
+	if err != nil {
+		log.Printf("Webhook signature verification failed: %v", err)
+		http.Error(w, "Invalid signature", http.StatusBadRequest)
+		return
+	}
+
+	switch event.Type {
+	case "checkout.session.completed":
+		var session stripe.CheckoutSession
+		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+			log.Printf("Failed to parse checkout session: %v", err)
+			http.Error(w, "Invalid event data", http.StatusBadRequest)
+			return
+		}
+		
+		log.Printf("Payment successful for session: %s", session.ID)
+		
+		// Use metadata to get GitHub user info
+		if githubEmail, exists := session.Metadata["github_email"]; exists {
+			premiumMutex.Lock()
+			premiumUsers[githubEmail] = true
+			premiumMutex.Unlock()
+			log.Printf("User %s upgraded to premium", githubEmail)
+		}
+		
+	default:
+		log.Printf("Unhandled event type: %s", event.Type)
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 func main() {
 	config := loadConfig()
@@ -349,6 +489,8 @@ func main() {
 	mux.HandleFunc("/auth/github", config.githubAuth)
 	mux.HandleFunc("/api/config", config.getConfig)
 	mux.HandleFunc("/api/user", config.verifyToken(config.getUser))
+	mux.HandleFunc("/api/create-checkout-session", config.verifyToken(config.createCheckoutSession))
+	mux.HandleFunc("/webhook/stripe", config.handleStripeWebhook)
 	
 	// Static file serving (landing page)
 	mux.HandleFunc("/", serveStatic)
