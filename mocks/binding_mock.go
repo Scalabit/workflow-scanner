@@ -11,8 +11,8 @@ package mocks
 
 import (
 	context "context"
-	dagger "dagger/workflow-scanner/pkg/dagger"
 	reflect "reflect"
+	dagger "workflow-scanner/pkg/dagger"
 
 	gomock "go.uber.org/mock/gomock"
 )

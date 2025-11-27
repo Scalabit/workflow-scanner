@@ -10,8 +10,8 @@
 package mocks
 
 import (
-	dagger "dagger/workflow-scanner/internal/dagger"
 	reflect "reflect"
+	dagger "workflow-scanner/internal/dagger"
 
 	gomock "go.uber.org/mock/gomock"
 )

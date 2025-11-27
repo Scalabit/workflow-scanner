@@ -1,0 +1,21 @@
+version: 2
+
+linters:
+  default: fast
+  disable:
+    - depguard
+    - wsl
+    - funlen
+    - lll
+  exclusions:
+    rules:
+      - path: pkg/zizmor/zizmor.go
+        linters:
+          - modernize
+      - path: go.mod
+        linters:
+          - gomoddirectives
+    paths:
+      - internal
+run:
+  tests: false

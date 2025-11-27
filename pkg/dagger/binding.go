@@ -4,7 +4,7 @@ package dagger
 
 import (
 	"context"
-	"dagger/workflow-scanner/internal/dagger"
+	"workflow-scanner/internal/dagger"
 )
 
 type Binding interface {

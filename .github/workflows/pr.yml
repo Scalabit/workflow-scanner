@@ -1,0 +1,21 @@
+name: Verify semver
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    name: Check semver exists
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+    - name: Verify semver label exists
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        labels="$(gh api -X GET repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} --jq '.labels.[].name')"
+        if ! [[ "$(echo "${labels}" | grep -Po "semver-(major|minor|patch)" | wc -l)" -eq 1 ]]; then
+            echo "Bad number of semver labels given: ${semver}"
+            exit 1
+        fi

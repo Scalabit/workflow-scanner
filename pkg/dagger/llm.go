@@ -2,7 +2,7 @@ package dagger
 
 //go:generate mockgen -source=llm.go -destination=../../mocks/llm_mock.go -package=mocks LLM
 
-import "dagger/workflow-scanner/internal/dagger"
+import "workflow-scanner/internal/dagger"
 
 type LLM interface {
 	WithEnv(env Env) LLM

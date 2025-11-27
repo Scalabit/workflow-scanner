@@ -3,7 +3,7 @@ package dagger
 //go:generate mockgen -source=client.go -destination=../../mocks/client_mock.go -package=mocks Client
 
 import (
-	"dagger/workflow-scanner/internal/dagger"
+	"workflow-scanner/internal/dagger"
 )
 
 type Client interface {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"dagger/workflow-scanner/internal/dagger"
-	"dagger/workflow-scanner/mocks"
-	pkgDagger "dagger/workflow-scanner/pkg/dagger"
+	"workflow-scanner/internal/dagger"
+	"workflow-scanner/mocks"
+	pkgDagger "workflow-scanner/pkg/dagger"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"

@@ -1,0 +1,87 @@
+version: 3
+
+vars:
+  DAGGER_VERSION: v0.19.6
+
+tasks:
+  dagger:
+    cmds: 
+      - |
+        dagger develop --sdk=go --compat=skip
+        (
+          cd workspace
+          dagger develop --sdk=go --compat=skip
+        )
+  mocks:
+    cmds:
+      - |
+        go generate $(pwd)/pkg/dagger
+        go generate $(pwd)/pkg/github
+        go generate $(pwd)/pkg/zizmor
+        go generate $(pwd)/pkg/agent
+  generate:
+    cmds:
+      - task: dagger
+      - task: mocks
+  # necessary for running tests out of vscode ui
+  dotenv:
+    cmds:
+      - |
+        echo "DAGGER_SESSION_PORT=123" > .env
+        echo "DAGGER_SESSION_TOKEN=123" >> .env
+  tidy:
+    cmds: 
+      - |
+        go mod tidy
+        (
+          cd workspace
+          go mod tidy
+        )
+  unit-tests:
+    cmds: 
+      - |
+        task dotenv
+        set -a
+        source .env
+        set +a
+        task tidy
+        go test ./... -v run *_test.go
+
+  install-mockgen:
+    cmd: go install go.uber.org/mock/mockgen@latest
+    
+
+  tools:
+    cmds: 
+      - |
+        if ! which dagger ; then
+          echo "dagger not found, installing..."
+          curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION={{ .DAGGER_VERSION }} BIN_DIR=$HOME/.local/bin sh
+        fi
+        task install-mockgen
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.2
+
+  fmt:
+    cmds: 
+      - |
+        # autofix locally, output issue in action
+        if [ "${CI}" == "true" ]; then
+          golangci-lint fmt -d ./...
+        else
+          golangci-lint fmt ./...
+        fi
+
+  lint:
+    cmd: golangci-lint run ./...
+
+  gosec:
+    cmds:
+      - |
+        gosec -exclude-dir internal -exclude-dir workspace -exclude-generated -nosec ./...
+        (
+          cd workspace
+          gosec -exclude-dir internal -exclude-generated -nosec ./...
+        )
+        
+        

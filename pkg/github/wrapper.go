@@ -1,8 +1,10 @@
 package github
 
+//go:generate mockgen -source=wrapper.go -destination=../../mocks/github_wrapper_mock.go -package=mocks WrapperIssueClient
+
 import (
 	"context"
-	"dagger/workflow-scanner/internal/dagger"
+	"workflow-scanner/internal/dagger"
 )
 
 type WrapperIssueClient interface {
