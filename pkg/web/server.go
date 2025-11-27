@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
@@ -42,9 +45,22 @@ type GitHubTokenResponse struct {
 	Scope       string `json:"scope"`
 }
 
+type PremiumUser struct {
+	GitHubID       int       `json:"github_id"`
+	GitHubLogin    string    `json:"github_login"`
+	Email          string    `json:"email"`
+	APIToken       string    `json:"api_token"`
+	SubscribedAt   time.Time `json:"subscribed_at"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	StripeSession  string    `json:"stripe_session"`
+}
+
 var (
-	premiumUsers = make(map[string]bool)
+	premiumUsers = make(map[int]*PremiumUser)
 	premiumMutex = sync.RWMutex{}
+	// Track valid tokens - only tokens in this map are accepted
+	validTokens = make(map[string]int) // token -> githubID
+	validTokensMutex = sync.RWMutex{}
 )
 
 func loadConfig() *Config {
@@ -63,6 +79,62 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func generateAPIToken() string {
+	bytes := make([]byte, 32)
+	rand.Read(bytes)
+	return "fs_" + hex.EncodeToString(bytes)
+}
+
+func isPremiumUser(githubID int) bool {
+	premiumMutex.RLock()
+	defer premiumMutex.RUnlock()
+	
+	user, exists := premiumUsers[githubID]
+	if !exists {
+		return false
+	}
+	
+	return time.Now().Before(user.ExpiresAt)
+}
+
+func isValidAPIToken(token string) (int, bool) {
+	validTokensMutex.RLock()
+	defer validTokensMutex.RUnlock()
+	
+	githubID, exists := validTokens[token]
+	if !exists {
+		return 0, false
+	}
+	
+	// Check if user is still premium
+	if !isPremiumUser(githubID) {
+		return 0, false
+	}
+	
+	return githubID, true
+}
+
+func addValidToken(token string, githubID int) {
+	validTokensMutex.Lock()
+	defer validTokensMutex.Unlock()
+	
+	validTokens[token] = githubID
+}
+
+func removeValidToken(token string) {
+	validTokensMutex.Lock()
+	defer validTokensMutex.Unlock()
+	
+	delete(validTokens, token)
+}
+
+func getPremiumUser(githubID int) *PremiumUser {
+	premiumMutex.RLock()
+	defer premiumMutex.RUnlock()
+	
+	return premiumUsers[githubID]
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
@@ -316,6 +388,12 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Serve the token page
+	if r.URL.Path == "/token" {
+		http.ServeFile(w, r, filepath.Join("frontend", "token.html"))
+		return
+	}
+	
 	// For any other path, try to serve from frontend directory
 	filePath := filepath.Join("frontend", r.URL.Path)
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -348,15 +426,77 @@ func (c *Config) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	premiumMutex.RLock()
-	isPremium := premiumUsers[user.Email]
-	premiumMutex.RUnlock()
-
+	isPremium := isPremiumUser(user.ID)
+	premiumUser := getPremiumUser(user.ID)
+	
 	response := map[string]interface{}{
 		"login":     user.Login,
 		"id":        user.ID,
 		"email":     user.Email,
 		"isPremium": isPremium,
+	}
+	
+	if premiumUser != nil {
+		response["apiToken"] = premiumUser.APIToken
+		response["expiresAt"] = premiumUser.ExpiresAt
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (c *Config) revokeAPIToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get user info from token
+	authHeader := r.Header.Get("Authorization")
+	token := authHeader[7:]
+	client := &http.Client{}
+	user, err := c.fetchGitHubUserWithEmail(client, token)
+	if err != nil {
+		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if user is premium
+	if !isPremiumUser(user.ID) {
+		http.Error(w, "Premium subscription required", http.StatusForbidden)
+		return
+	}
+
+	// Get current premium user
+	premiumMutex.Lock()
+	currentUser := premiumUsers[user.ID]
+	if currentUser == nil {
+		premiumMutex.Unlock()
+		http.Error(w, "Premium user not found", http.StatusNotFound)
+		return
+	}
+
+	// Remove old token from valid tokens
+	oldToken := currentUser.APIToken
+	removeValidToken(oldToken)
+
+	// Generate new token but keep same expiry date
+	newToken := generateAPIToken()
+	currentUser.APIToken = newToken
+	premiumUsers[user.ID] = currentUser
+	premiumMutex.Unlock()
+
+	// Add new token to valid tokens
+	addValidToken(newToken, user.ID)
+
+	log.Printf("Token revoked for user %s (%s). Old token invalidated, new token: %s", 
+		user.Login, user.Email, newToken[:10]+"...")
+
+	response := map[string]interface{}{
+		"success": true,
+		"apiToken": newToken,
+		"expiresAt": currentUser.ExpiresAt,
+		"message": "API token has been revoked and a new one generated",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -404,6 +544,7 @@ func (c *Config) createCheckoutSession(w http.ResponseWriter, r *http.Request) {
 		Metadata: map[string]string{
 			"github_user": user.Login,
 			"github_email": user.Email,
+			"github_id": fmt.Sprintf("%d", user.ID),
 		},
 	}
 
@@ -463,10 +604,41 @@ func (c *Config) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		
 		// Use metadata to get GitHub user info
 		if githubEmail, exists := session.Metadata["github_email"]; exists {
-			premiumMutex.Lock()
-			premiumUsers[githubEmail] = true
-			premiumMutex.Unlock()
-			log.Printf("User %s upgraded to premium", githubEmail)
+			if githubUser, userExists := session.Metadata["github_user"]; userExists {
+				if githubIDStr, idExists := session.Metadata["github_id"]; idExists {
+					
+					// Parse GitHub ID
+					var githubID int
+					fmt.Sscanf(githubIDStr, "%d", &githubID)
+					
+					// Create premium user with 30-day subscription
+					now := time.Now()
+					expiresAt := now.AddDate(0, 1, 0) // Add 1 month
+					
+					apiToken := generateAPIToken()
+					
+					premiumUser := &PremiumUser{
+						GitHubID:      githubID,
+						GitHubLogin:   githubUser,
+						Email:         githubEmail,
+						APIToken:      apiToken,
+						SubscribedAt:  now,
+						ExpiresAt:     expiresAt,
+						StripeSession: session.ID,
+					}
+					
+					// Store the premium user
+					premiumMutex.Lock()
+					premiumUsers[githubID] = premiumUser
+					premiumMutex.Unlock()
+					
+					// Add token to valid tokens list
+					addValidToken(apiToken, githubID)
+					
+					log.Printf("User %s (%s) upgraded to premium. Token: %s, Expires: %s", 
+						githubUser, githubEmail, apiToken[:10]+"...", expiresAt.Format(time.RFC3339))
+				}
+			}
 		}
 		
 	default:
@@ -490,6 +662,7 @@ func main() {
 	mux.HandleFunc("/api/config", config.getConfig)
 	mux.HandleFunc("/api/user", config.verifyToken(config.getUser))
 	mux.HandleFunc("/api/create-checkout-session", config.verifyToken(config.createCheckoutSession))
+	mux.HandleFunc("/api/revoke-token", config.verifyToken(config.revokeAPIToken))
 	mux.HandleFunc("/webhook/stripe", config.handleStripeWebhook)
 	
 	// Static file serving (landing page)
