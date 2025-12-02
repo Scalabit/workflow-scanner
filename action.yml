@@ -25,7 +25,7 @@ runs:
       with:
         version: "v0.19.6"
         verb: call
-        args: scan-and-fix-workflows-with-api-token --api-token=env:API_TOKEN --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
+        args: scan-and-fix-workflows --api-token=env:API_TOKEN --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
       env:
         API_TOKEN: ${{ inputs.api-token }}
         GITHUB_TOKEN: ${{ inputs.github-token }}

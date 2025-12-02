@@ -15,12 +15,12 @@ import (
 
 type WorkflowScanner struct{}
 
-// API token validation response struct
+// TokenValidationResponse represents the API token validation response.
 type TokenValidationResponse struct {
 	Valid bool `json:"valid"`
 }
 
-// validateAPIToken checks if the API token is valid by calling the web server
+// validateAPIToken checks if the API token is valid by calling the web server.
 func validateAPIToken(token string) bool {
 	// Get the server URL from environment, default to localhost for development
 	serverURL := os.Getenv("TOKEN_VALIDATION_URL")
@@ -29,7 +29,7 @@ func validateAPIToken(token string) bool {
 	}
 	
 	// Create request to validate token
-	req, err := http.NewRequest("GET", serverURL+"/api/validate-token", nil)
+	req, err := http.NewRequest(http.MethodGet, serverURL+"/api/validate-token", nil)
 	if err != nil {
 		return false
 	}
@@ -50,8 +50,19 @@ func validateAPIToken(token string) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// Original function for backward compatibility with dagger.gen.go
-func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
+// ScanAndFixWorkflows scans and fixes workflows with API token validation.
+func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dagger.Secret, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
+	// Extract and validate API token
+	tokenValue, err := apiToken.Plaintext(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract API token: %w", err)
+	}
+	
+	// Validate API token
+	if !validateAPIToken(tokenValue) {
+		return "", fmt.Errorf("invalid or expired API token - please check your subscription")
+	}
+	
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
@@ -108,20 +119,4 @@ func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagg
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }
 
-// ScanAndFixWorkflowsWithAPIToken validates API token and then runs the scan
-func (m *WorkflowScanner) ScanAndFixWorkflowsWithAPIToken(ctx context.Context, apiToken *dagger.Secret, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
-	// Extract and validate API token
-	tokenValue, err := apiToken.Plaintext(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to extract API token: %w", err)
-	}
-	
-	// Validate API token
-	if !validateAPIToken(tokenValue) {
-		return "", fmt.Errorf("invalid or expired API token - please check your subscription")
-	}
-	
-	// API token is valid, proceed with workflow scanning
-	return m.ScanAndFixWorkflows(ctx, githubToken, repository, source)
-}
 
