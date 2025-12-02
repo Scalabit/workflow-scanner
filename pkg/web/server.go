@@ -21,8 +21,11 @@ import (
 
 // Constants for magic numbers.
 const (
-	APITokenLength = 32
-	PriceInCents   = 1000 // €10.00 in cents
+	APITokenLength   = 32
+	PriceInCents     = 1000 // €10.00 in cents
+	ReadTimeoutSecs  = 15   // HTTP read timeout in seconds
+	WriteTimeoutSecs = 15   // HTTP write timeout in seconds
+	IdleTimeoutSecs  = 60   // HTTP idle timeout in seconds
 )
 
 type Config struct {
@@ -92,6 +95,7 @@ func generateAPIToken() string {
 	bytes := make([]byte, APITokenLength)
 	if _, err := rand.Read(bytes); err != nil {
 		log.Printf("Failed to generate random bytes: %v", err)
+
 		return "fs_fallback_" + fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 
@@ -689,6 +693,7 @@ func (c *Config) createPremiumUser(githubEmail, githubUser, githubIDStr, session
 	var githubID int
 	if _, err := fmt.Sscanf(githubIDStr, "%d", &githubID); err != nil {
 		log.Printf("Failed to parse GitHub ID '%s': %v", githubIDStr, err)
+
 		return
 	}
 
@@ -727,7 +732,7 @@ func (c *Config) validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
-		
+
 		return
 	}
 
@@ -766,9 +771,9 @@ func main() {
 	server := &http.Server{
 		Addr:         ":" + config.Port,
 		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  ReadTimeoutSecs * time.Second,
+		WriteTimeout: WriteTimeoutSecs * time.Second,
+		IdleTimeout:  IdleTimeoutSecs * time.Second,
 	}
 
 	log.Printf("Server starting on port %s", config.Port)

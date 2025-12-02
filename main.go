@@ -27,17 +27,17 @@ func validateAPIToken(token string) bool {
 	if serverURL == "" {
 		serverURL = "http://localhost:8080" // Default for local development
 	}
-	
+
 	// Create request to validate token
 	req, err := http.NewRequest(http.MethodGet, serverURL+"/api/validate-token", nil)
 	if err != nil {
 		return false
 	}
-	
+
 	// Set authorization header
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Make the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -45,7 +45,7 @@ func validateAPIToken(token string) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	// Check if token is valid (200 status means valid)
 	return resp.StatusCode == http.StatusOK
 }
@@ -57,13 +57,13 @@ func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dag
 	if err != nil {
 		return "", fmt.Errorf("failed to extract API token: %w", err)
 	}
-	
+
 	// Validate API token (temporarily disabled for testing)
 	_ = tokenValue // API token validation temporarily disabled
 	// if !validateAPIToken(tokenValue) {
 	//	return "", fmt.Errorf("invalid or expired API token - please check your subscription")
 	// }
-	
+
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
@@ -119,5 +119,3 @@ func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagg
 
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }
-
-
