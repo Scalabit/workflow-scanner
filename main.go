@@ -59,7 +59,7 @@ func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dag
 	}
 	
 	// Validate API token (temporarily disabled for testing)
-	_ = tokenValue // TODO: Re-enable validation once service is deployed
+	_ = tokenValue // API token validation temporarily disabled
 	// if !validateAPIToken(tokenValue) {
 	//	return "", fmt.Errorf("invalid or expired API token - please check your subscription")
 	// }
