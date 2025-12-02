@@ -3,22 +3,31 @@ name: Vulnerable Workflow for Testing
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read      # Restrict permissions to least necessary
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        # Pin action to commit SHA for security (v2.7.0)
+        uses: actions/checkout@e21d2e368a2ab2e1b3f7bb3ecab9f829ec0b2251  # v2.7.0
+        with:
+          persist-credentials: false
       
       - name: Print PR title (Script Injection Vulnerability)
         run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "Branch: ${{ github.event.pull_request.head.ref }}"
+          echo "PR Title: ${GITHUB_EVENT_PULL_REQUEST_TITLE}"
+          echo "Branch: ${GITHUB_EVENT_PULL_REQUEST_HEAD_REF}"
+        env:
+          GITHUB_EVENT_PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_EVENT_PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       
       - name: Setup with hardcoded secret
+        # WARNING: Hardcoded secret found and replaced - original key should be revoked
         env:
-          API_KEY: "sk-1234567890abcdef" 
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           echo "Using API key..."
       
