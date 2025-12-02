@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
 
 	"workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/agent"
@@ -13,6 +15,42 @@ import (
 
 type WorkflowScanner struct{}
 
+// API token validation response struct
+type TokenValidationResponse struct {
+	Valid bool `json:"valid"`
+}
+
+// validateAPIToken checks if the API token is valid by calling the web server
+func validateAPIToken(token string) bool {
+	// Get the server URL from environment, default to localhost for development
+	serverURL := os.Getenv("TOKEN_VALIDATION_URL")
+	if serverURL == "" {
+		serverURL = "http://localhost:8080" // Default for local development
+	}
+	
+	// Create request to validate token
+	req, err := http.NewRequest("GET", serverURL+"/api/validate-token", nil)
+	if err != nil {
+		return false
+	}
+	
+	// Set authorization header
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	
+	// Make the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	
+	// Check if token is valid (200 status means valid)
+	return resp.StatusCode == http.StatusOK
+}
+
+// Original function for backward compatibility with dagger.gen.go
 func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
@@ -69,3 +107,21 @@ func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagg
 
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }
+
+// ScanAndFixWorkflowsWithAPIToken validates API token and then runs the scan
+func (m *WorkflowScanner) ScanAndFixWorkflowsWithAPIToken(ctx context.Context, apiToken *dagger.Secret, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
+	// Extract and validate API token
+	tokenValue, err := apiToken.Plaintext(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract API token: %w", err)
+	}
+	
+	// Validate API token
+	if !validateAPIToken(tokenValue) {
+		return "", fmt.Errorf("invalid or expired API token - please check your subscription")
+	}
+	
+	// API token is valid, proceed with workflow scanning
+	return m.ScanAndFixWorkflows(ctx, githubToken, repository, source)
+}
+
