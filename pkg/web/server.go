@@ -648,6 +648,23 @@ func (c *Config) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (c *Config) validateAPIToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	// Get token from Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+		return
+	}
+
+	
+	// For testing: always return valid
+	// TODO: Use real validation logic: isValidAPIToken(token)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"valid": true})
+}
+
 func main() {
 	config := loadConfig()
 	
@@ -663,6 +680,7 @@ func main() {
 	mux.HandleFunc("/api/user", config.verifyToken(config.getUser))
 	mux.HandleFunc("/api/create-checkout-session", config.verifyToken(config.createCheckoutSession))
 	mux.HandleFunc("/api/revoke-token", config.verifyToken(config.revokeAPIToken))
+	mux.HandleFunc("/api/validate-token", config.validateAPIToken)
 	mux.HandleFunc("/webhook/stripe", config.handleStripeWebhook)
 	
 	// Static file serving (landing page)
