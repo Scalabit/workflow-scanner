@@ -16,10 +16,7 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
-
-# Build the web server
+# Build the web server (main application for Cloud Run)
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./pkg/web/server.go
 
 # Final stage
@@ -31,8 +28,7 @@ RUN apk --no-cache add ca-certificates
 # Create app directory
 WORKDIR /root/
 
-# Copy the binaries from builder stage
-COPY --from=builder /app/main .
+# Copy the web server binary from builder stage
 COPY --from=builder /app/server .
 
 # Copy frontend assets

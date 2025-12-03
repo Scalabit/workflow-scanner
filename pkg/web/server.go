@@ -64,6 +64,8 @@ type PremiumUser struct {
 	StripeSession string    `json:"stripe_session"`
 }
 
+
+
 var (
 	premiumUsers = make(map[int]*PremiumUser)
 	premiumMutex = sync.RWMutex{}
@@ -743,6 +745,7 @@ func (c *Config) validateAPIToken(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to encode JSON response: %v", err)
 	}
 }
+
 
 func main() {
 	config := loadConfig()

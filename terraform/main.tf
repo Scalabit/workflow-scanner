@@ -1,0 +1,236 @@
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+# Enable required APIs
+resource "google_project_service" "apis" {
+  for_each = toset([
+    "run.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "secretmanager.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "iam.googleapis.com"
+  ])
+  
+  project = var.project_id
+  service = each.value
+  
+  disable_on_destroy = false
+}
+
+# Create Artifact Registry repository for container images
+resource "google_artifact_registry_repository" "workflow_scanner" {
+  location      = var.region
+  repository_id = "workflow-scanner"
+  description   = "Container images for workflow scanner"
+  format        = "DOCKER"
+  
+  depends_on = [google_project_service.apis]
+}
+
+# Service account for Cloud Run
+resource "google_service_account" "cloud_run_sa" {
+  account_id   = "workflow-scanner-sa"
+  display_name = "Workflow Scanner Service Account"
+  description  = "Service account for workflow scanner Cloud Run service"
+}
+
+# IAM bindings for the service account
+resource "google_project_iam_member" "cloud_run_sa_bindings" {
+  for_each = toset([
+    "roles/secretmanager.secretAccessor",
+    "roles/artifactregistry.reader"
+  ])
+  
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+# Secrets in Secret Manager
+locals {
+  secrets = {
+    "gh-app-id"              = var.gh_app_id
+    "gh-app-secret"          = var.gh_app_secret
+    "stripe-key"             = var.stripe_key
+    "stripe-publishable-key" = var.stripe_publishable_key
+    "stripe-webhook-secret"  = var.stripe_webhook_secret
+    "openai-api-key"         = var.openai_api_key
+  }
+}
+
+resource "google_secret_manager_secret" "secrets" {
+  for_each = local.secrets
+  
+  secret_id = each.key
+  
+  replication {
+    auto {}
+  }
+  
+  depends_on = [google_project_service.apis]
+}
+
+# Create secret versions with actual values
+resource "google_secret_manager_secret_version" "secret_versions" {
+  for_each = local.secrets
+  
+  secret      = google_secret_manager_secret.secrets[each.key].id
+  secret_data = each.value
+}
+
+# Grant Cloud Run service account access to secrets
+resource "google_secret_manager_secret_iam_member" "secret_access" {
+  for_each = google_secret_manager_secret.secrets
+  
+  secret_id = each.value.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+# Cloud Run service
+resource "google_cloud_run_v2_service" "workflow_scanner" {
+  name     = "workflow-scanner"
+  location = var.region
+  
+  template {
+    service_account = google_service_account.cloud_run_sa.email
+    
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 10
+    }
+    
+    containers {
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/workflow-scanner:latest"
+      
+      ports {
+        container_port = 8080
+      }
+      
+      resources {
+        limits = {
+          cpu    = "2000m"
+          memory = "2Gi"
+        }
+      }
+      
+      env {
+        name  = "PORT"
+        value = "8080"
+      }
+      
+      env {
+        name  = "TOKEN_VALIDATION_URL"
+        value = google_cloud_run_v2_service.workflow_scanner.uri
+      }
+      
+      # GitHub OAuth secrets
+      env {
+        name = "GH_APP_ID"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["gh-app-id"].secret_id
+            version = "latest"
+          }
+        }
+      }
+      
+      env {
+        name = "GH_APP_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["gh-app-secret"].secret_id
+            version = "latest"
+          }
+        }
+      }
+      
+      # Stripe secrets
+      env {
+        name = "TEST_STRIPE"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["stripe-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+      
+      env {
+        name = "TEST_STRIPE_PK"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["stripe-publishable-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+      
+      env {
+        name = "TEST_STRIPE_WEBHOOK_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["stripe-webhook-secret"].secret_id
+            version = "latest"
+          }
+        }
+      }
+      
+      # LLM API secrets
+      env {
+        name = "OPENAI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["openai-api-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+  }
+  
+  traffic {
+    percent = 100
+  }
+  
+  depends_on = [
+    google_project_service.apis,
+    google_artifact_registry_repository.workflow_scanner
+  ]
+}
+
+
+# Allow unauthenticated access to Cloud Run (needed for GitHub Actions and webhooks)
+resource "google_cloud_run_service_iam_member" "public_access" {
+  service  = google_cloud_run_v2_service.workflow_scanner.name
+  location = google_cloud_run_v2_service.workflow_scanner.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# Cloud Storage bucket for Terraform state (must be created manually first)
+# This is commented out because it should be created before running terraform
+# resource "google_storage_bucket" "terraform_state" {
+#   name     = "workflow-scanner-terraform-state"
+#   location = var.region
+# }
