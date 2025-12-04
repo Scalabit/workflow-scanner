@@ -16,8 +16,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the web server (main application for Cloud Run)
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./pkg/web/server.go
+# Build the unified server (main application for Cloud Run)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
 
 # Final stage
 FROM alpine:3.18
@@ -28,7 +28,7 @@ RUN apk --no-cache add ca-certificates
 # Create app directory
 WORKDIR /root/
 
-# Copy the web server binary from builder stage
+# Copy the unified server binary from builder stage
 COPY --from=builder /app/server .
 
 # Copy frontend assets
@@ -37,5 +37,5 @@ COPY --from=builder /app/frontend ./frontend
 # Expose port
 EXPOSE 8080
 
-# Run the web server
+# Run the unified server
 CMD ["./server"]
