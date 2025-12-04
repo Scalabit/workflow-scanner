@@ -27,7 +27,7 @@ import (
 	"workflow-scanner/pkg/zizmor"
 )
 
-// Access to global dag from dagger.gen.go
+// Access to global dag from dagger.gen.go.
 var dag = dagger.Connect()
 
 // Constants for magic numbers.
@@ -75,10 +75,10 @@ type PremiumUser struct {
 	StripeSession string    `json:"stripe_session"`
 }
 
-// WorkflowScanner struct for Dagger integration
+// WorkflowScanner struct for Dagger integration.
 type WorkflowScanner struct{}
 
-// Workflow scanning request/response types
+// WorkflowScanRequest represents a workflow scanning request.
 type WorkflowScanRequest struct {
 	GithubToken  string `json:"github_token"`
 	Repository   string `json:"repository"`
@@ -196,7 +196,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// ScanAndFixWorkflows implements the Dagger workflow scanning
+// ScanAndFixWorkflows implements the Dagger workflow scanning.
 func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dagger.Secret, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
 	// Extract and validate API token
 	tokenValue, err := apiToken.Plaintext(ctx)
@@ -581,24 +581,53 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func scanWorkflows(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
+func validateRequestMethod(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+
+		return false
 	}
 
-	// Get API token from Authorization header
+	return true
+}
+
+func validateRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanRequest, bool) {
+	var req WorkflowScanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+
+		return nil, false
+	}
+
+	if req.Repository == "" || req.GithubToken == "" || req.SourceBase64 == "" {
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Missing required fields: repository, github_token, source_base64",
+		}
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return nil, false
+	}
+
+	return &req, true
+}
+
+func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanRequest, int, bool) {
+	if !validateRequestMethod(w, r) {
+		return "", nil, 0, false
+	}
+
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
-		return
+
+		return "", nil, 0, false
 	}
 
-	apiToken := authHeader[7:] // Remove "Bearer " prefix
-
-	// Validate API token
+	apiToken := authHeader[7:]
 	githubID, valid := isValidAPIToken(apiToken)
 	if !valid {
 		response := WorkflowScanResponse{
@@ -609,39 +638,20 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
-		return
+
+		return "", nil, 0, false
 	}
 
-	var req WorkflowScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	req, ok := validateRequestBody(w, r)
+	if !ok {
+		return "", nil, 0, false
 	}
 
-	// Validate required fields
-	if req.Repository == "" || req.GithubToken == "" || req.SourceBase64 == "" {
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Missing required fields: repository, github_token, source_base64",
-		}
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-		return
-	}
+	return apiToken, req, githubID, true
+}
 
-	// Log the scan request for audit purposes
-	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
-
-	ctx := context.Background()
-
-	// Create proper Dagger secrets
-	apiTokenSecret := dag.SetSecret("api-token", apiToken)
-	githubTokenSecret := dag.SetSecret("github-token", req.GithubToken)
-
-	// Decode source data
-	sourceData, err := base64.StdEncoding.DecodeString(req.SourceBase64)
+func decodeSourceData(w http.ResponseWriter, sourceBase64 string) ([]byte, bool) {
+	sourceData, err := base64.StdEncoding.DecodeString(sourceBase64)
 	if err != nil {
 		response := WorkflowScanResponse{
 			Success: false,
@@ -651,20 +661,20 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
-		return
+
+		return nil, false
 	}
 
-	// Create source directory from uploaded data
-	sourceDir := dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
+	return sourceData, true
+}
 
-	// Initialize the WorkflowScanner
-	scanner := &WorkflowScanner{}
+func executeScan(w http.ResponseWriter, ctx context.Context, scanner *WorkflowScanner, apiToken, repository string, githubToken string, sourceDir *dagger.Directory, githubID int) {
+	apiTokenSecret := dag.SetSecret("api-token", apiToken)
+	githubTokenSecret := dag.SetSecret("github-token", githubToken)
 
-	// Call the actual scanning function with proper secrets
-	prURL, err := scanner.ScanAndFixWorkflows(ctx, apiTokenSecret, githubTokenSecret, req.Repository, sourceDir)
-
+	prURL, err := scanner.ScanAndFixWorkflows(ctx, apiTokenSecret, githubTokenSecret, repository, sourceDir)
 	if err != nil {
-		log.Printf("Workflow scan failed for user %d, repo %s: %v", githubID, req.Repository, err)
+		log.Printf("Workflow scan failed for user %d, repo %s: %v", githubID, repository, err)
 		response := WorkflowScanResponse{
 			Success: false,
 			Error:   fmt.Sprintf("Scan failed: %v", err),
@@ -673,11 +683,11 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
+
 		return
 	}
 
-	log.Printf("Workflow scan completed successfully for user %d, repo %s, PR: %s", githubID, req.Repository, prURL)
-
+	log.Printf("Workflow scan completed successfully for user %d, repo %s, PR: %s", githubID, repository, prURL)
 	response := WorkflowScanResponse{
 		Success:        true,
 		Message:        "Workflow scan completed successfully",
@@ -688,6 +698,28 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
 	}
+}
+
+func scanWorkflows(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	apiToken, req, githubID, ok := validateScanRequest(w, r)
+	if !ok {
+		return
+	}
+
+	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
+
+	sourceData, ok := decodeSourceData(w, req.SourceBase64)
+	if !ok {
+		return
+	}
+
+	ctx := context.Background()
+	sourceDir := dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
+	scanner := &WorkflowScanner{}
+
+	executeScan(w, ctx, scanner, apiToken, req.Repository, req.GithubToken, sourceDir, githubID)
 }
 
 func serveStatic(w http.ResponseWriter, r *http.Request) {
@@ -849,12 +881,14 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 func handleStripeWebhook(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
 		return
 	}
 
 	event, err := validateStripeWebhook(config, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+
 		return
 	}
 
@@ -878,6 +912,7 @@ func validateStripeWebhook(config *Config, r *http.Request) (stripe.Event, error
 	})
 	if err != nil {
 		log.Printf("Webhook signature verification failed: %v", err)
+
 		return stripe.Event{}, fmt.Errorf("Invalid signature")
 	}
 
