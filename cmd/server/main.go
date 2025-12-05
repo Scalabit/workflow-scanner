@@ -833,7 +833,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	// Set Stripe API key
 	stripe.Key = config.StripeKey
 
-	// Create checkout session for €10
+	// Create checkout session for 10 euros
 	params := &stripe.CheckoutSessionParams{
 		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
