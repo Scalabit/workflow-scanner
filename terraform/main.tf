@@ -37,6 +37,65 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
+# Create Workload Identity Pool for GitHub Actions
+resource "google_iam_workload_identity_pool" "github_pool" {
+  workload_identity_pool_id = "github-pool"
+  display_name              = "GitHub Actions Pool"
+  description               = "Identity pool for GitHub Actions"
+  
+  depends_on = [google_project_service.apis]
+}
+
+# Create Workload Identity Provider for GitHub Actions
+resource "google_iam_workload_identity_pool_provider" "github_provider" {
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+  display_name                       = "GitHub Actions Provider"
+  description                        = "OIDC identity pool provider for GitHub Actions"
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+  }
+
+  attribute_condition = "assertion.repository=='Scalabit/workflow-scanner'"
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+# Allow GitHub Actions to impersonate the service account
+resource "google_service_account_iam_member" "workload_identity_user" {
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${google_service_account.github_actions_sa.email}"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github_pool.workload_identity_pool_id}/attribute.repository/Scalabit/workflow-scanner"
+}
+
+# GitHub Actions service account (separate from Cloud Run)
+resource "google_service_account" "github_actions_sa" {
+  account_id   = "github-actions-sa"
+  display_name = "GitHub Actions Service Account"
+  description  = "Service account for GitHub Actions CI/CD"
+}
+
+# Grant permissions to GitHub Actions service account
+resource "google_project_iam_member" "github_actions_permissions" {
+  for_each = toset([
+    "roles/run.admin",
+    "roles/artifactregistry.admin", 
+    "roles/secretmanager.admin",
+    "roles/serviceusage.serviceUsageAdmin",
+    "roles/iam.serviceAccountAdmin",
+    "roles/resourcemanager.projectIamAdmin"
+  ])
+  
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.github_actions_sa.email}"
+}
+
 # Create Artifact Registry repository for container images
 resource "google_artifact_registry_repository" "workflow_scanner" {
   location      = var.region

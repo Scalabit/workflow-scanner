@@ -32,3 +32,14 @@ output "region" {
   description = "GCP Region"
   value       = var.region
 }
+
+# Workload Identity Federation outputs for GitHub secrets
+output "wif_provider" {
+  description = "Workload Identity Provider for GitHub Actions"
+  value       = google_iam_workload_identity_pool_provider.github_provider.name
+}
+
+output "wif_service_account" {
+  description = "Service account email for GitHub Actions"
+  value       = google_service_account.github_actions_sa.email
+}
