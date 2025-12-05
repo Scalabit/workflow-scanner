@@ -58,7 +58,7 @@ func GetPrTitleBody(finalValidation string, zizmorOut, llmOut, summaryFindings s
 		result = failed
 	}
 
-	return title, fmt.Sprintf(bodyFmt,
+	body := fmt.Sprintf(bodyFmt,
 		zizmorOut,
 		llmOut,
 		result.status,
@@ -66,4 +66,12 @@ func GetPrTitleBody(finalValidation string, zizmorOut, llmOut, summaryFindings s
 		validationStatus,
 		summaryFindings,
 	)
+
+	// GitHub PR body limit is 65,536 characters
+	const maxPRBodyLength = 65000 // Leave some margin
+	if len(body) > maxPRBodyLength {
+		body = body[:maxPRBodyLength] + "\n\n... (truncated due to length - see full results in workflow logs)"
+	}
+
+	return title, body
 }

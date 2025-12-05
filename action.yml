@@ -1,6 +1,9 @@
 name: 'Workflow Security Scanner'
 description: 'AI agent that analyzes and fixes GitHub workflows'
 inputs:
+  api-token:
+    description: 'API token for workflow scanner service (get from your dashboard)'
+    required: true
   github-token:
     description: 'GitHub token with repo permissions'
     required: true
@@ -22,8 +25,9 @@ runs:
       with:
         version: "v0.19.6"
         verb: call
-        args: scan-and-fix-workflows --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
+        args: scan-and-fix-workflows --api-token=env:API_TOKEN --github-token=env:GITHUB_TOKEN --repository=${{ inputs.repository }} --source=.
       env:
+        API_TOKEN: ${{ inputs.api-token }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
         OPENAI_API_KEY: ${{ inputs.llm-api-key }}
         ANTHROPIC_API_KEY: ${{ inputs.llm-api-key }}

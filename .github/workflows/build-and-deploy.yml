@@ -1,0 +1,100 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ main, container-test ]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: workflow-scanner
+  REGION: europe-north1
+  SERVICE: workflow-scanner
+  REGISTRY: europe-north1-docker.pkg.dev
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+        
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: Configure Docker to use gcloud as credential helper
+      run: gcloud auth configure-docker ${{ env.REGISTRY }}
+      
+    - name: Build and push Docker image
+      run: |
+        # Build the image
+        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }} .
+        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest .
+        
+        # Push the images
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest
+        
+  deploy-terraform:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      id-token: write
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+        
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.6.0"
+        
+    - name: Terraform Init
+      working-directory: ./terraform
+      run: terraform init
+      
+    - name: Terraform Plan
+      working-directory: ./terraform
+      run: |
+        terraform plan \
+          -var="project_id=${{ env.PROJECT_ID }}" \
+          -var="region=${{ env.REGION }}" \
+          -var="gh_app_id=${{ secrets.GH_APP_ID }}" \
+          -var="gh_app_secret=${{ secrets.GH_APP_SECRET }}" \
+          -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
+          -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
+          -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}"
+          
+    - name: Terraform Apply
+      working-directory: ./terraform
+      run: |
+        terraform apply -auto-approve \
+          -var="project_id=${{ env.PROJECT_ID }}" \
+          -var="region=${{ env.REGION }}" \
+          -var="gh_app_id=${{ secrets.GH_APP_ID }}" \
+          -var="gh_app_secret=${{ secrets.GH_APP_SECRET }}" \
+          -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
+          -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
+          -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}"
