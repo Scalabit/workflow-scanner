@@ -122,9 +122,9 @@ resource "google_secret_manager_secret_version" "secret_versions" {
 
 # Grant Cloud Run service account access to secrets
 resource "google_secret_manager_secret_iam_member" "secret_access" {
-  for_each = google_secret_manager_secret.secrets
+  for_each = local.secrets
   
-  secret_id = each.value.secret_id
+  secret_id = each.key
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
@@ -154,11 +154,6 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
           cpu    = "2000m"
           memory = "2Gi"
         }
-      }
-      
-      env {
-        name  = "PORT"
-        value = "8080"
       }
       
       env {
