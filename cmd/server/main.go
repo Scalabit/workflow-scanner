@@ -27,8 +27,24 @@ import (
 	"workflow-scanner/pkg/zizmor"
 )
 
-// Access to global dag from dagger.gen.go.
-var dag = dagger.Connect()
+// Lazy initialization of Dagger client
+var (
+	daggerClient *dagger.Client
+	daggerOnce   sync.Once
+	daggerErr    error
+)
+
+func getDaggerClient() (*dagger.Client, error) {
+	daggerOnce.Do(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				daggerErr = fmt.Errorf("Dagger not available in this environment: %v", r)
+			}
+		}()
+		daggerClient = dagger.Connect()
+	})
+	return daggerClient, daggerErr
+}
 
 // Constants for magic numbers.
 const (
@@ -209,6 +225,12 @@ func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dag
 	// if !validateAPIToken(tokenValue) {
 	//	return "", fmt.Errorf("invalid or expired API token - please check your subscription")
 	// }
+
+	// Get Dagger client
+	dag, err := getDaggerClient()
+	if err != nil {
+		return "", fmt.Errorf("workflow scanning not available in this environment: %w", err)
+	}
 
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
@@ -669,6 +691,21 @@ func decodeSourceData(w http.ResponseWriter, sourceBase64 string) ([]byte, bool)
 }
 
 func executeScan(w http.ResponseWriter, ctx context.Context, scanner *WorkflowScanner, apiToken, repository string, githubToken string, sourceDir *dagger.Directory, githubID int) {
+	// Get Dagger client
+	dag, err := getDaggerClient()
+	if err != nil {
+		log.Printf("Dagger not available for user %d: %v", githubID, err)
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Workflow scanning not available in this environment",
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+		return
+	}
+
 	apiTokenSecret := dag.SetSecret("api-token", apiToken)
 	githubTokenSecret := dag.SetSecret("github-token", githubToken)
 
@@ -716,6 +753,22 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
+	
+	// Get Dagger client
+	dag, err := getDaggerClient()
+	if err != nil {
+		log.Printf("Dagger not available: %v", err)
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Workflow scanning not available in this environment",
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+		return
+	}
+	
 	sourceDir := dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
 	scanner := &WorkflowScanner{}
 

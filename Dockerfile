@@ -16,7 +16,6 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-
 # Build the unified server (main application for Cloud Run)
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
 
@@ -34,6 +33,10 @@ COPY --from=builder /app/server .
 
 # Copy frontend assets
 COPY --from=builder /app/frontend ./frontend
+
+# Set environment variables for Dagger (dummy values for Cloud Run)
+ENV DAGGER_SESSION_PORT=1234
+ENV DAGGER_SESSION_TOKEN=dummy
 
 # Expose port
 EXPOSE 8080

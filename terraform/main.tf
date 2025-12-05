@@ -34,7 +34,9 @@ resource "google_project_service" "apis" {
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
     "cloudbuild.googleapis.com",
-    "iam.googleapis.com"
+    "iam.googleapis.com",
+    "batch.googleapis.com",
+    "storage.googleapis.com"
   ])
   
   project = var.project_id
@@ -86,7 +88,9 @@ resource "google_service_account" "cloud_run_sa" {
 resource "google_project_iam_member" "cloud_run_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
-    "roles/artifactregistry.reader"
+    "roles/artifactregistry.reader",
+    "roles/batch.jobsAdmin",
+    "roles/storage.objectAdmin"
   ])
   
   project = var.project_id
@@ -250,6 +254,57 @@ resource "google_cloud_run_service_iam_member" "public_access" {
   location = google_cloud_run_v2_service.workflow_scanner.location
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# Cloud Storage bucket for workflow data
+resource "google_storage_bucket" "workflow_data" {
+  name     = "workflow-scanner-data-${random_id.bucket_suffix.hex}"
+  location = var.region
+  
+  uniform_bucket_level_access = true
+  
+  lifecycle_rule {
+    condition {
+      age = 30
+    }
+    action {
+      type = "Delete"
+    }
+  }
+  
+  depends_on = [google_project_service.apis]
+}
+
+# Random suffix for bucket name uniqueness
+resource "random_id" "bucket_suffix" {
+  byte_length = 8
+}
+
+# Service account for Cloud Batch jobs
+resource "google_service_account" "batch_sa" {
+  account_id   = "workflow-scanner-batch"
+  display_name = "Workflow Scanner Batch Service Account"
+  description  = "Service account for Cloud Batch workflow scanning jobs"
+}
+
+# IAM bindings for batch service account
+resource "google_project_iam_member" "batch_sa_bindings" {
+  for_each = toset([
+    "roles/secretmanager.secretAccessor",
+    "roles/artifactregistry.reader",
+    "roles/storage.objectAdmin"
+  ])
+  
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.batch_sa.email}"
+}
+
+# Grant batch service account access to storage bucket
+resource "google_storage_bucket_iam_member" "batch_bucket_access" {
+  bucket = google_storage_bucket.workflow_data.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.batch_sa.email}"
 }
 
 # Cloud Storage bucket for Terraform state (must be created manually first)
