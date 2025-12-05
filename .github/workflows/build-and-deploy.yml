@@ -13,6 +13,7 @@ env:
 
 jobs:
   build-and-push:
+    needs: deploy-infrastructure
     runs-on: ubuntu-latest
     
     permissions:
@@ -45,8 +46,7 @@ jobs:
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest
         
-  deploy-terraform:
-    needs: build-and-push
+  deploy-infrastructure:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
