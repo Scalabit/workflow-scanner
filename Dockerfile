@@ -16,6 +16,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Generate Dagger files inside container
+RUN go run github.com/dagger/dagger/cmd/dagger@latest develop
+
 # Build the unified server (main application for Cloud Run)
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
 
