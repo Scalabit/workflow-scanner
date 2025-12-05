@@ -1,0 +1,13 @@
+# Override .gitignore for Docker builds
+# We need Dagger files for container builds
+!dagger.gen.go
+!internal/dagger
+!internal/querybuilder
+!internal/telemetry
+
+# Standard Docker ignores
+.git
+.github
+*.md
+.env
+terraform/
