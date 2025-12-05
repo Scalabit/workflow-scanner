@@ -740,7 +740,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 	// For any other path, try to serve from frontend directory
 	filePath := filepath.Join("frontend", r.URL.Path)
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		// Serve index.html for client-side routing (SPA)
+		// Serve index.html for client-side routing 
 		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
 
 		return
