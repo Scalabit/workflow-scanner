@@ -13,7 +13,6 @@ env:
 
 jobs:
   build-and-push:
-    needs: deploy-infrastructure
     runs-on: ubuntu-latest
     
     permissions:
@@ -47,6 +46,7 @@ jobs:
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest
         
   deploy-infrastructure:
+    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
