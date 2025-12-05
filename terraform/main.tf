@@ -37,25 +37,6 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-# Reference existing Workload Identity Pool
-data "google_iam_workload_identity_pool" "github_pool" {
-  workload_identity_pool_id = "github-actions-pool"
-  location                  = "global"
-}
-
-# Reference existing Workload Identity Provider
-data "google_iam_workload_identity_pool_provider" "github_provider" {
-  workload_identity_pool_id          = data.google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
-  workload_identity_pool_provider_id = "github-provider"
-  location                           = "global"
-}
-
-# Allow GitHub Actions to impersonate the service account
-resource "google_service_account_iam_member" "workload_identity_user" {
-  service_account_id = "projects/${var.project_id}/serviceAccounts/${data.google_service_account.github_actions_sa.email}"
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${data.google_iam_workload_identity_pool.github_pool.workload_identity_pool_id}/attribute.repository/Scalabit/workflow-scanner"
-}
 
 # Reference existing GitHub Actions service account
 data "google_service_account" "github_actions_sa" {

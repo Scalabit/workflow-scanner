@@ -33,10 +33,10 @@ output "region" {
   value       = var.region
 }
 
-# Workload Identity Federation outputs for GitHub secrets
+# Workload Identity Federation outputs (manual values)
 output "wif_provider" {
   description = "Workload Identity Provider for GitHub Actions"
-  value       = data.google_iam_workload_identity_pool_provider.github_provider.name
+  value       = "projects/34659588692/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
 }
 
 output "wif_service_account" {
