@@ -29,12 +29,11 @@ RUN apk --no-cache add bash curl ca-certificates
 RUN curl -L https://dl.dagger.io/dagger/install.sh | sh && \
     mv bin/dagger /usr/local/bin/
 
-# Install Google Cloud SDK for accessing storage and secrets
-RUN curl https://sdk.cloud.google.com | bash
-ENV PATH $PATH:/root/google-cloud-sdk/bin
-
 # Copy the batch scanner binary
 COPY --from=builder /app/batch-scanner /usr/local/bin/
 
-# Start Docker daemon and run scanner
+# Make sure the binary is executable
+RUN chmod +x /usr/local/bin/batch-scanner
+
+# Start Docker daemon in background and run scanner
 CMD ["sh", "-c", "dockerd & sleep 10 && batch-scanner"]

@@ -2,7 +2,7 @@ name: Build and Deploy to Cloud Run
 
 on:
   push:
-    branches: [ main, container-test ]
+    branches: [ main, batch-cloud-imp ]
   workflow_dispatch:
 
 env:
@@ -35,15 +35,21 @@ jobs:
     - name: Configure Docker to use gcloud as credential helper
       run: gcloud auth configure-docker ${{ env.REGISTRY }}
       
-    - name: Build and push Docker image
+    - name: Build and push Docker images
       run: |
-        # Build the image
+        # Build the Cloud Run image (web server)
         docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }} .
         docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest .
         
-        # Push the images
+        # Build the Cloud Batch image (scanner)
+        docker build -f Dockerfile.batch -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:${{ github.sha }} .
+        docker build -f Dockerfile.batch -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:latest .
+        
+        # Push all images
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:latest
         
   deploy-infrastructure:
     needs: build-and-push

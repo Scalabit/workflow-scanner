@@ -84,18 +84,26 @@ resource "google_service_account" "cloud_run_sa" {
   description  = "Service account for workflow scanner Cloud Run service"
 }
 
-# IAM bindings for the service account
+# IAM bindings for Cloud Run service account (following GCP Batch requirements)
 resource "google_project_iam_member" "cloud_run_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
     "roles/artifactregistry.reader",
-    "roles/batch.jobsAdmin",
-    "roles/storage.objectAdmin"
+    "roles/batch.jobsEditor",           # Required to create Batch jobs
+    "roles/storage.objectAdmin",
+    "roles/iam.serviceAccountUser"      # Required to use batch service account
   ])
   
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+# Grant Cloud Run service account permission to use batch service account
+resource "google_service_account_iam_member" "cloud_run_use_batch_sa" {
+  service_account_id = google_service_account.batch_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
 # Secrets in Secret Manager
@@ -169,6 +177,32 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
       env {
         name  = "TOKEN_VALIDATION_URL"
         value = "https://${var.service_name}-${substr(sha256(var.project_id), 0, 8)}-${substr(var.region, 0, 2)}.a.run.app"
+      }
+      
+      # Cloud Batch configuration
+      env {
+        name  = "BATCH_PROJECT_ID"
+        value = var.project_id
+      }
+      
+      env {
+        name  = "BATCH_REGION"
+        value = var.region
+      }
+      
+      env {
+        name  = "BATCH_BUCKET"
+        value = google_storage_bucket.batch_jobs.name
+      }
+      
+      env {
+        name  = "BATCH_SERVICE_ACCOUNT"
+        value = google_service_account.batch_sa.email
+      }
+      
+      env {
+        name  = "BATCH_IMAGE"
+        value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/batch-scanner:latest"
       }
       
       # GitHub OAuth secrets
@@ -287,12 +321,14 @@ resource "google_service_account" "batch_sa" {
   description  = "Service account for Cloud Batch workflow scanning jobs"
 }
 
-# IAM bindings for batch service account
+# IAM bindings for batch service account (following GCP Batch requirements)
 resource "google_project_iam_member" "batch_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
-    "roles/artifactregistry.reader",
-    "roles/storage.objectAdmin"
+    "roles/artifactregistry.reader", 
+    "roles/storage.objectAdmin",
+    "roles/batch.agentReporter",     # Required for Batch jobs
+    "roles/logging.logWriter"        # Required for job logs
   ])
   
   project = var.project_id
@@ -313,3 +349,37 @@ resource "google_storage_bucket_iam_member" "batch_bucket_access" {
 #   name     = "workflow-scanner-terraform-state"
 #   location = var.region
 # }
+
+# Cloud Storage bucket for batch job data exchange
+resource "google_storage_bucket" "batch_jobs" {
+  name     = "workflow-scanner-batch-${random_id.bucket_suffix.hex}"
+  location = var.region
+  
+  uniform_bucket_level_access = true
+  
+  # Auto-delete job data after 7 days
+  lifecycle_rule {
+    condition {
+      age = 7
+    }
+    action {
+      type = "Delete"
+    }
+  }
+  
+  depends_on = [google_project_service.apis]
+}
+
+# Grant Cloud Run service account access to batch bucket
+resource "google_storage_bucket_iam_member" "cloud_run_batch_access" {
+  bucket = google_storage_bucket.batch_jobs.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+# Grant batch service account access to batch bucket
+resource "google_storage_bucket_iam_member" "batch_batch_access" {
+  bucket = google_storage_bucket.batch_jobs.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.batch_sa.email}"
+}
