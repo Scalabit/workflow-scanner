@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// Lazy initialization of Batch client
+// Lazy initialization of Batch client.
 var (
 	batchClient *batch.Client
 	batchOnce   sync.Once
@@ -35,6 +35,7 @@ func getBatchClient() (*batch.Client, error) {
 		ctx := context.Background()
 		batchClient, batchErr = batch.NewClient(ctx)
 	})
+
 	return batchClient, batchErr
 }
 
@@ -45,6 +46,11 @@ const (
 	ReadTimeoutSecs  = 15   // HTTP read timeout in seconds
 	WriteTimeoutSecs = 15   // HTTP write timeout in seconds
 	IdleTimeoutSecs  = 60   // HTTP idle timeout in seconds
+	
+	// Cloud Batch resource constants
+	BatchCPUMilli    = 2000 // 2 CPU
+	BatchMemoryMib   = 4096 // 4GB RAM
+	BatchTimeoutSecs = 3600 // 1 hour timeout
 )
 
 type Config struct {
@@ -590,7 +596,6 @@ func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *Workf
 	return apiToken, req, githubID, true
 }
 
-
 func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, sourceBase64 string, githubID int) {
 	// Get Batch client
 	batchClient, err := getBatchClient()
@@ -601,7 +606,10 @@ func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repositor
 			Error:   "Workflow scanning not available in this environment",
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
 		return
 	}
 
@@ -614,7 +622,10 @@ func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repositor
 			Error:   fmt.Sprintf("Failed to submit scan job: %v", err),
 		}
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
 		return
 	}
 
@@ -625,7 +636,9 @@ func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repositor
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
 }
 
 func submitBatchJob(ctx context.Context, batchClient *batch.Client, repository, githubToken, sourceBase64 string) (string, error) {
@@ -663,11 +676,11 @@ func submitBatchJob(ctx context.Context, batchClient *batch.Client, repository, 
 						},
 					},
 					ComputeResource: &batchpb.ComputeResource{
-						CpuMilli:     2000, // 2 CPU
-						MemoryMib:    4096, // 4GB RAM
+						CpuMilli:  BatchCPUMilli,
+						MemoryMib: BatchMemoryMib,
 					},
 					MaxRetryCount:  1,
-					MaxRunDuration: durationpb.New(3600 * time.Second), // 1 hour
+					MaxRunDuration: durationpb.New(BatchTimeoutSecs * time.Second),
 				},
 				TaskCount:   1,
 				Parallelism: 1,
@@ -710,12 +723,15 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 			Error:   "Missing source data",
 		}
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
 		return
 	}
 
 	ctx := context.Background()
-	
+
 	// Submit to Cloud Batch (no need to decode source data here, pass it directly to batch job)
 	executeScan(w, ctx, apiToken, req.Repository, req.GithubToken, req.SourceBase64, githubID)
 }
