@@ -27,7 +27,7 @@ func main() {
 	log.Printf("Batch scanner processing repository: %s", repository)
 
 	ctx := context.Background()
-	
+
 	// Connect to Dagger (works in VM with Docker)
 	dag := dagger.Connect()
 
@@ -54,7 +54,7 @@ func main() {
 	log.Printf("Scan completed successfully - PR: %s", prURL)
 }
 
-// Same as scanAndFixWorflowsImpl from main.go
+// Same as scanAndFixWorflowsImpl from main.go.
 func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
 	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
@@ -95,5 +95,6 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 	}
 
 	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, llmExplanations, summaryExternalFindings)
+
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }

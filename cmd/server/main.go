@@ -47,7 +47,6 @@ const (
 	WriteTimeoutSecs = 15   // HTTP write timeout in seconds
 	IdleTimeoutSecs  = 60   // HTTP idle timeout in seconds
 	
-	// Cloud Batch resource constants
 	BatchCPUMilli    = 2000 // 2 CPU
 	BatchMemoryMib   = 4096 // 4GB RAM
 	BatchTimeoutSecs = 3600 // 1 hour timeout
