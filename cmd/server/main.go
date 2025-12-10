@@ -246,9 +246,9 @@ func githubAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 	// Handle GET requests (GitHub callback) - redirect to homepage with auth data
 	if r.Method == http.MethodGet {
 		// Redirect to homepage with auth data in URL fragment for frontend to handle
-		redirectURL := fmt.Sprintf("/?access_token=%s&user_login=%s&user_id=%d&user_email=%s", 
-			accessToken, user.Login, user.ID, user.Email)
+		redirectURL := fmt.Sprintf("/?access_token=%s&user_login=%s&user_id=%d&user_email=%s", accessToken, user.Login, user.ID, user.Email)
 		http.Redirect(w, r, redirectURL, http.StatusFound)
+		
 		return
 	}
 
