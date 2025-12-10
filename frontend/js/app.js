@@ -32,8 +32,27 @@ class flowsnifferApp {
     handleOAuthCallback() {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
+        const accessToken = urlParams.get('access_token');
         
-        if (code) {
+        if (accessToken) {
+            // Handle direct auth data from OAuth callback redirect
+            const userLogin = urlParams.get('user_login');
+            const userId = urlParams.get('user_id');
+            const userEmail = urlParams.get('user_email');
+            
+            if (userLogin && userId && userEmail) {
+                const user = {
+                    login: userLogin,
+                    id: parseInt(userId),
+                    email: userEmail
+                };
+                this.auth.storeAuthData(accessToken, user);
+                this.showLoggedInState(user.login);
+                
+                // Clear URL parameters
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } else if (code) {
             this.processAuthCallback(code);
         }
     }
