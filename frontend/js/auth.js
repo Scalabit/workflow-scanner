@@ -29,7 +29,7 @@ class GitHubAuth {
             return;
         }
         
-        const redirectUri = `${window.location.origin}/`;
+        const redirectUri = `${window.location.origin}/auth/github`;
         const scope = 'user:email,repo';
         const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
         

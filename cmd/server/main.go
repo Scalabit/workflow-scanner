@@ -1053,6 +1053,6 @@ func main() {
 	}
 
 	log.Printf("Server starting on port %s", config.Port)
-	log.Printf("OAuth callback URL: http://localhost:%s/auth/github", config.Port)
+	log.Printf("OAuth callback URL: /auth/github")
 	log.Fatal(server.ListenAndServe())
 }
