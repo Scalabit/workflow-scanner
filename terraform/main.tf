@@ -161,7 +161,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
     }
     
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/workflow-scanner:latest"
+      image = var.container_image != "" ? var.container_image : "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/workflow-scanner:latest"
       
       ports {
         container_port = 8080
