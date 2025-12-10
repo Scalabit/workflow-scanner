@@ -176,7 +176,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
       
       env {
         name  = "TOKEN_VALIDATION_URL"
-        value = "https://${var.service_name}-${substr(sha256(var.project_id), 0, 8)}-${substr(var.region, 0, 2)}.a.run.app"
+        value = google_cloud_run_v2_service.workflow_scanner.uri
       }
       
       # Cloud Batch configuration
