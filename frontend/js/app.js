@@ -16,7 +16,7 @@ class flowsnifferApp {
         // Check for OAuth callback
         this.handleOAuthCallback();
         
-        // Update UI based on auth status
+        // Update UI based on auth status (after OAuth processing)
         this.updateUI();
         
         // Set up event listeners
@@ -31,14 +31,15 @@ class flowsnifferApp {
 
     handleOAuthCallback() {
         const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const code = urlParams.get('code');
-        const accessToken = urlParams.get('access_token');
+        const accessToken = hashParams.get('access_token');
         
         if (accessToken) {
-            // Handle direct auth data from OAuth callback redirect
-            const userLogin = urlParams.get('user_login');
-            const userId = urlParams.get('user_id');
-            const userEmail = urlParams.get('user_email');
+            // Handle direct auth data from OAuth callback redirect (from hash)
+            const userLogin = hashParams.get('user_login');
+            const userId = hashParams.get('user_id');
+            const userEmail = hashParams.get('user_email');
             
             if (userLogin && userId && userEmail) {
                 const user = {
@@ -47,9 +48,8 @@ class flowsnifferApp {
                     email: userEmail
                 };
                 this.auth.storeAuthData(accessToken, user);
-                this.showLoggedInState(user.login);
                 
-                // Clear URL parameters
+                // Clear URL hash
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         } else if (code) {
