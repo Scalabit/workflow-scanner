@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,19 +15,29 @@ import (
 	"sync"
 	"time"
 
+	batch "cloud.google.com/go/batch/apiv1"
+	"cloud.google.com/go/batch/apiv1/batchpb"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
-
-	"workflow-scanner/internal/dagger"
-	"workflow-scanner/pkg/agent"
-	daggerImpl "workflow-scanner/pkg/dagger"
-	"workflow-scanner/pkg/github"
-	"workflow-scanner/pkg/zizmor"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// Access to global dag from dagger.gen.go.
-var dag = dagger.Connect()
+// Lazy initialization of Batch client.
+var (
+	batchClient *batch.Client
+	batchOnce   sync.Once
+	batchErr    error
+)
+
+func getBatchClient() (*batch.Client, error) {
+	batchOnce.Do(func() {
+		ctx := context.Background()
+		batchClient, batchErr = batch.NewClient(ctx)
+	})
+
+	return batchClient, batchErr
+}
 
 // Constants for magic numbers.
 const (
@@ -37,6 +46,10 @@ const (
 	ReadTimeoutSecs  = 15   // HTTP read timeout in seconds
 	WriteTimeoutSecs = 15   // HTTP write timeout in seconds
 	IdleTimeoutSecs  = 60   // HTTP idle timeout in seconds
+
+	BatchCPUMilli    = 2000 // 2 CPU
+	BatchMemoryMib   = 4096 // 4GB RAM
+	BatchTimeoutSecs = 3600 // 1 hour timeout
 )
 
 type Config struct {
@@ -196,75 +209,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// ScanAndFixWorkflows implements the Dagger workflow scanning.
-func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dagger.Secret, githubToken *dagger.Secret, repository string, source *dagger.Directory) (string, error) {
-	// Extract and validate API token
-	tokenValue, err := apiToken.Plaintext(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to extract API token: %w", err)
-	}
-
-	// Validate API token (temporarily disabled for testing)
-	_ = tokenValue // API token validation temporarily disabled
-	// if !validateAPIToken(tokenValue) {
-	//	return "", fmt.Errorf("invalid or expired API token - please check your subscription")
-	// }
-
-	daggerClient := daggerImpl.NewClient(dag)
-	zizmor := zizmor.NewZizmor(daggerClient)
-	agentImpl := agent.NewAgent(daggerClient)
-	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubToken}))
-
-	return scanAndFixWorkflowsImpl(ctx, repository, source, zizmor, agentImpl, githubClient)
-}
-
-func scanAndFixWorkflowsImpl(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
-	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("failed to run ZIZMOR auto-fix: %w", err)
-	}
-
-	remainingIssues, err := zizmor.CheckRemainingIssues(ctx, autoFixedDirectory)
-	if err != nil {
-		return "", fmt.Errorf("failed to check remaining issues: %w", err)
-	}
-
-	finalDirectory := autoFixedDirectory
-
-	llmExplanations := ""
-	if remainingIssues != "" && remainingIssues != "[]" && remainingIssues != "[]\\n" {
-		finalDirectory, llmExplanations, err = agent.FixRemainingIssues(ctx, autoFixedDirectory, remainingIssues)
-		if err != nil {
-			return "", fmt.Errorf("failed to fix remaining issues with LLM: %w", err)
-		}
-	} else {
-		llmExplanations = "No remaining security issues found after ZIZMOR auto-fix"
-	}
-
-	// Run final validation scan on the fixed code
-	finalValidation, err := zizmor.CheckRemainingIssues(ctx, finalDirectory)
-	if err != nil {
-		return "", fmt.Errorf("failed to run final validation scan: %w", err)
-	}
-
-	// Scan external repositories used in workflows
-	fullRepoFindings, err := zizmor.ScanExternalDependencies(ctx, finalDirectory)
-	summaryExternalFindings := zizmor.SummarizeExternalFindings(fullRepoFindings)
-	if err != nil {
-		summaryExternalFindings = fmt.Sprintf("Failed to scan external dependencies: %s", err.Error())
-	}
-
-	// Truncate external findings if too long to fit GitHub's 65,536 char limit
-	maxExternalLength := 20000 // Leave room for other content
-	if len(summaryExternalFindings) > maxExternalLength {
-		summaryExternalFindings = summaryExternalFindings[:maxExternalLength] +
-			"\\n\\n... (truncated due to length - see full scan in workflow logs)"
-	}
-
-	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, llmExplanations, summaryExternalFindings)
-
-	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
-}
+// WorkflowScanner struct is now only used for API compatibility (no longer uses Dagger directly)
 
 // HTTP Handlers
 
@@ -650,34 +595,30 @@ func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *Workf
 	return apiToken, req, githubID, true
 }
 
-func decodeSourceData(w http.ResponseWriter, sourceBase64 string) ([]byte, bool) {
-	sourceData, err := base64.StdEncoding.DecodeString(sourceBase64)
+func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, sourceBase64 string, githubID int) {
+	// Get Batch client
+	batchClient, err := getBatchClient()
 	if err != nil {
+		log.Printf("Cloud Batch not available for user %d: %v", githubID, err)
 		response := WorkflowScanResponse{
 			Success: false,
-			Error:   "Invalid source data encoding",
+			Error:   "Workflow scanning not available in this environment",
 		}
-		http.Error(w, "Invalid source data", http.StatusBadRequest)
+		w.WriteHeader(http.StatusServiceUnavailable)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
 
-		return nil, false
+		return
 	}
 
-	return sourceData, true
-}
-
-func executeScan(w http.ResponseWriter, ctx context.Context, scanner *WorkflowScanner, apiToken, repository string, githubToken string, sourceDir *dagger.Directory, githubID int) {
-	apiTokenSecret := dag.SetSecret("api-token", apiToken)
-	githubTokenSecret := dag.SetSecret("github-token", githubToken)
-
-	prURL, err := scanner.ScanAndFixWorkflows(ctx, apiTokenSecret, githubTokenSecret, repository, sourceDir)
+	// Submit Cloud Batch job
+	jobID, err := submitBatchJob(ctx, batchClient, repository, githubToken, sourceBase64)
 	if err != nil {
-		log.Printf("Workflow scan failed for user %d, repo %s: %v", githubID, repository, err)
+		log.Printf("Failed to submit batch job for user %d, repo %s: %v", githubID, repository, err)
 		response := WorkflowScanResponse{
 			Success: false,
-			Error:   fmt.Sprintf("Scan failed: %v", err),
+			Error:   fmt.Sprintf("Failed to submit scan job: %v", err),
 		}
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -687,17 +628,81 @@ func executeScan(w http.ResponseWriter, ctx context.Context, scanner *WorkflowSc
 		return
 	}
 
-	log.Printf("Workflow scan completed successfully for user %d, repo %s, PR: %s", githubID, repository, prURL)
+	log.Printf("Batch job submitted for user %d, repo %s, job ID: %s", githubID, repository, jobID)
 	response := WorkflowScanResponse{
-		Success:        true,
-		Message:        "Workflow scan completed successfully",
-		PullRequestURL: prURL,
+		Success: true,
+		Message: fmt.Sprintf("Scan job submitted successfully. Job ID: %s", jobID),
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusAccepted)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
 	}
+}
+
+func submitBatchJob(ctx context.Context, batchClient *batch.Client, repository, githubToken, sourceBase64 string) (string, error) {
+	// Get configuration from environment
+	projectID := os.Getenv("BATCH_PROJECT_ID")
+	region := os.Getenv("BATCH_REGION")
+	batchImage := os.Getenv("BATCH_IMAGE")
+
+	if projectID == "" || region == "" || batchImage == "" {
+		return "", fmt.Errorf("missing batch configuration environment variables")
+	}
+
+	// Generate unique job ID
+	jobID := fmt.Sprintf("workflow-scan-%d", time.Now().Unix())
+
+	// Create simplified batch job
+	job := &batchpb.Job{
+		TaskGroups: []*batchpb.TaskGroup{
+			{
+				TaskSpec: &batchpb.TaskSpec{
+					Runnables: []*batchpb.Runnable{
+						{
+							Executable: &batchpb.Runnable_Container_{
+								Container: &batchpb.Runnable_Container{
+									ImageUri: batchImage,
+								},
+							},
+							Environment: &batchpb.Environment{
+								Variables: map[string]string{
+									"REPOSITORY":    repository,
+									"GITHUB_TOKEN":  githubToken,
+									"SOURCE_BASE64": sourceBase64,
+								},
+							},
+						},
+					},
+					ComputeResource: &batchpb.ComputeResource{
+						CpuMilli:  BatchCPUMilli,
+						MemoryMib: BatchMemoryMib,
+					},
+					MaxRetryCount:  1,
+					MaxRunDuration: durationpb.New(BatchTimeoutSecs * time.Second),
+				},
+				TaskCount:   1,
+				Parallelism: 1,
+			},
+		},
+		LogsPolicy: &batchpb.LogsPolicy{
+			Destination: batchpb.LogsPolicy_CLOUD_LOGGING,
+		},
+	}
+
+	// Submit the job
+	req := &batchpb.CreateJobRequest{
+		Parent: fmt.Sprintf("projects/%s/locations/%s", projectID, region),
+		JobId:  jobID,
+		Job:    job,
+	}
+
+	_, err := batchClient.CreateJob(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("failed to create batch job: %w", err)
+	}
+
+	return jobID, nil
 }
 
 func scanWorkflows(w http.ResponseWriter, r *http.Request) {
@@ -710,16 +715,24 @@ func scanWorkflows(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
 
-	sourceData, ok := decodeSourceData(w, req.SourceBase64)
-	if !ok {
+	// Validate source data is present
+	if req.SourceBase64 == "" {
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Missing source data",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
 		return
 	}
 
 	ctx := context.Background()
-	sourceDir := dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
-	scanner := &WorkflowScanner{}
 
-	executeScan(w, ctx, scanner, apiToken, req.Repository, req.GithubToken, sourceDir, githubID)
+	// Submit to Cloud Batch (no need to decode source data here, pass it directly to batch job)
+	executeScan(w, ctx, apiToken, req.Repository, req.GithubToken, req.SourceBase64, githubID)
 }
 
 func serveStatic(w http.ResponseWriter, r *http.Request) {
