@@ -90,7 +90,8 @@ jobs:
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
-          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}"
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
           
     - name: Terraform Apply
       working-directory: ./terraform
@@ -103,4 +104,5 @@ jobs:
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
-          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}"
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
