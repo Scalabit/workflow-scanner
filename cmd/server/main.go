@@ -847,6 +847,11 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	stripe.Key = config.StripeKey
 
 	// Create checkout session for 10 euros
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
+	}
+
 	params := &stripe.CheckoutSessionParams{
 		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
@@ -862,8 +867,8 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 			},
 		},
 		Mode:          stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:    stripe.String("http://localhost:8080/"),
-		CancelURL:     stripe.String("http://localhost:8080/"),
+		SuccessURL:    stripe.String(baseURL + "/"),
+		CancelURL:     stripe.String(baseURL + "/"),
 		CustomerEmail: stripe.String(user.Email),
 		Metadata: map[string]string{
 			"github_user":  user.Login,
