@@ -248,7 +248,7 @@ func githubAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 		// Redirect to homepage with auth data in URL fragment for frontend to handle
 		redirectURL := fmt.Sprintf("/?access_token=%s&user_login=%s&user_id=%d&user_email=%s", accessToken, user.Login, user.ID, user.Email)
 		http.Redirect(w, r, redirectURL, http.StatusFound)
-		
+
 		return
 	}
 
