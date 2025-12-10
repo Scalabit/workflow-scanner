@@ -851,7 +851,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	if baseURL == "" {
 		baseURL = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
 	}
-	
+
 	params := &stripe.CheckoutSessionParams{
 		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
