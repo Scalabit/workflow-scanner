@@ -868,7 +868,7 @@ func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
-	
+
 		return
 	}
 
