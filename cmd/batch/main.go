@@ -14,39 +14,118 @@ import (
 	"workflow-scanner/pkg/zizmor"
 )
 
+type batchConfig struct {
+	repository   string
+	githubToken  string
+	llmAPIKey    string
+	commitSHA    string
+	sourceBase64 string
+	useGitClone  bool
+}
+
 func main() {
-	// Get parameters from environment variables set by Cloud Batch
+	config := loadConfig()
+	validateConfig(config)
+	
+	ctx := context.Background()
+	dag := dagger.Connect()
+	
+	sourceDir := getSourceDirectory(dag, config)
+	runScan(ctx, dag, config, sourceDir)
+}
+
+func loadConfig() batchConfig {
 	repository := os.Getenv("REPOSITORY")
 	githubToken := os.Getenv("GITHUB_TOKEN")
+	llmAPIKey := os.Getenv("LLM_API_KEY")
+	commitSHA := os.Getenv("COMMIT_SHA")
 	sourceBase64 := os.Getenv("SOURCE_BASE64")
-
-	if repository == "" || githubToken == "" || sourceBase64 == "" {
-		log.Fatal("Missing required environment variables: REPOSITORY, GITHUB_TOKEN, SOURCE_BASE64")
+	
+	useGitClone := sourceBase64 == "" && llmAPIKey != ""
+	
+	return batchConfig{
+		repository:   repository,
+		githubToken:  githubToken,
+		llmAPIKey:    llmAPIKey,
+		commitSHA:    commitSHA,
+		sourceBase64: sourceBase64,
+		useGitClone:  useGitClone,
 	}
+}
 
-	log.Printf("Batch scanner processing repository: %s", repository)
+func validateConfig(config batchConfig) {
+	if config.repository == "" || config.githubToken == "" {
+		log.Fatal("Missing required environment variables: REPOSITORY, GITHUB_TOKEN")
+	}
+	
+	if !config.useGitClone && config.sourceBase64 == "" {
+		log.Fatal("Missing SOURCE_BASE64 for legacy mode")
+	}
+	
+	if config.useGitClone && config.llmAPIKey == "" {
+		log.Fatal("Missing LLM_API_KEY for git clone mode")
+	}
+}
 
-	ctx := context.Background()
+func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Directory {
+	mode := "source-upload"
+	if config.useGitClone {
+		mode = "git-clone"
+	}
+	
+	log.Printf("Batch scanner processing repository: %s (mode: %s)", config.repository, mode)
+	
+	if config.useGitClone {
+		return cloneRepository(dag, config)
+	}
+	
+	return decodeSourceData(dag, config.sourceBase64)
+}
 
-	// Connect to Dagger (works in VM with Docker)
-	dag := dagger.Connect()
+func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
+	log.Printf("Cloning repository %s", config.repository)
+	
+	cloneURL := fmt.Sprintf("https://%s@github.com/%s.git", config.githubToken, config.repository)
+	
+	container := dag.Container().
+		From("alpine/git:latest").
+		WithExec([]string{"git", "clone", cloneURL, "/workspace"})
+	
+	if config.commitSHA != "" && config.commitSHA != "undefined" {
+		log.Printf("Checking out commit: %s", config.commitSHA)
+		container = container.WithWorkdir("/workspace").
+			WithExec([]string{"git", "checkout", config.commitSHA})
+	}
+	
+	setupLLMEnvironment(config.llmAPIKey)
 
-	// Decode source data and create directory
+	return container.Directory("/workspace")
+}
+
+func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory {
+	log.Printf("Using uploaded source data")
 	sourceData, err := base64.StdEncoding.DecodeString(sourceBase64)
 	if err != nil {
 		log.Fatalf("Failed to decode source data: %v", err)
 	}
-	sourceDir := dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
+	
+	return dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
+}
 
-	// Create clients (same as server implementation)
+func setupLLMEnvironment(llmAPIKey string) {
+	os.Setenv("OPENAI_API_KEY", llmAPIKey)
+	os.Setenv("ANTHROPIC_API_KEY", llmAPIKey)
+	os.Setenv("GEMINI_API_KEY", llmAPIKey)
+}
+
+func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, sourceDir *dagger.Directory) {
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
-	githubTokenSecret := dag.SetSecret("github-token", githubToken)
+	githubTokenSecret := dag.SetSecret("github-token", config.githubToken)
 	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubTokenSecret}))
 
-	// Run scan workflow (same logic as scanAndFixWorflowsImpl)
-	prURL, err := scanAndFixWorkflows(ctx, repository, sourceDir, zizmor, agent, githubClient)
+	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, githubClient)
 	if err != nil {
 		log.Fatalf("Scan failed: %v", err)
 	}
