@@ -90,7 +90,7 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	container := dag.Container().
 		From("alpine/git:latest").
 		WithExec([]string{"git", "clone", cloneURL, "/workspace"})
-	
+
 	if config.commitSHA != "" && config.commitSHA != "undefined" {
 		log.Printf("Checking out commit: %s", config.commitSHA)
 		container = container.WithWorkdir("/workspace").

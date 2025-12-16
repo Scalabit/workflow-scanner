@@ -787,10 +787,10 @@ func submitBatchJobGitClone(ctx context.Context, batchClient *batch.Client, repo
 							},
 							Environment: &batchpb.Environment{
 								Variables: map[string]string{
-									"REPOSITORY":    repository,
-									"GITHUB_TOKEN":  githubToken,
-									"LLM_API_KEY":   llmAPIKey,
-									"COMMIT_SHA":    commitSHA,
+									"REPOSITORY":   repository,
+									"GITHUB_TOKEN": githubToken,
+									"LLM_API_KEY":  llmAPIKey,
+									"COMMIT_SHA":   commitSHA,
 								},
 							},
 						},
@@ -868,7 +868,7 @@ func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
-		
+	
 		return
 	}
 
@@ -876,7 +876,7 @@ func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	// Execute git clone-based scan  
+	// Execute git clone-based scan
 	executeScanGitClone(w, ctx, apiToken, repository, githubToken, llmAPIKey, commitSHA, githubID)
 }
 
