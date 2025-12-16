@@ -113,9 +113,15 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 }
 
 func setupLLMEnvironment(llmAPIKey string) {
-	os.Setenv("OPENAI_API_KEY", llmAPIKey)
-	os.Setenv("ANTHROPIC_API_KEY", llmAPIKey)
-	os.Setenv("GEMINI_API_KEY", llmAPIKey)
+	if err := os.Setenv("OPENAI_API_KEY", llmAPIKey); err != nil {
+		log.Printf("Warning: Failed to set OPENAI_API_KEY: %v", err)
+	}
+	if err := os.Setenv("ANTHROPIC_API_KEY", llmAPIKey); err != nil {
+		log.Printf("Warning: Failed to set ANTHROPIC_API_KEY: %v", err)
+	}
+	if err := os.Setenv("GEMINI_API_KEY", llmAPIKey); err != nil {
+		log.Printf("Warning: Failed to set GEMINI_API_KEY: %v", err)
+	}
 }
 
 func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, sourceDir *dagger.Directory) {
