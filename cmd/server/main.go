@@ -728,6 +728,7 @@ func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, r
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
+
 		return
 	}
 
@@ -743,6 +744,7 @@ func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, r
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
+
 		return
 	}
 
@@ -831,6 +833,7 @@ func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+
 		return
 	}
 
@@ -845,6 +848,7 @@ func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
+
 		return
 	}
 
@@ -864,6 +868,7 @@ func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
+		
 		return
 	}
 

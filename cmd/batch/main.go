@@ -26,10 +26,10 @@ type batchConfig struct {
 func main() {
 	config := loadConfig()
 	validateConfig(config)
-	
+
 	ctx := context.Background()
 	dag := dagger.Connect()
-	
+
 	sourceDir := getSourceDirectory(dag, config)
 	runScan(ctx, dag, config, sourceDir)
 }
@@ -40,9 +40,9 @@ func loadConfig() batchConfig {
 	llmAPIKey := os.Getenv("LLM_API_KEY")
 	commitSHA := os.Getenv("COMMIT_SHA")
 	sourceBase64 := os.Getenv("SOURCE_BASE64")
-	
+
 	useGitClone := sourceBase64 == "" && llmAPIKey != ""
-	
+
 	return batchConfig{
 		repository:   repository,
 		githubToken:  githubToken,
@@ -57,11 +57,11 @@ func validateConfig(config batchConfig) {
 	if config.repository == "" || config.githubToken == "" {
 		log.Fatal("Missing required environment variables: REPOSITORY, GITHUB_TOKEN")
 	}
-	
+
 	if !config.useGitClone && config.sourceBase64 == "" {
 		log.Fatal("Missing SOURCE_BASE64 for legacy mode")
 	}
-	
+
 	if config.useGitClone && config.llmAPIKey == "" {
 		log.Fatal("Missing LLM_API_KEY for git clone mode")
 	}
@@ -72,21 +72,21 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 	if config.useGitClone {
 		mode = "git-clone"
 	}
-	
+
 	log.Printf("Batch scanner processing repository: %s (mode: %s)", config.repository, mode)
-	
+
 	if config.useGitClone {
 		return cloneRepository(dag, config)
 	}
-	
+
 	return decodeSourceData(dag, config.sourceBase64)
 }
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	log.Printf("Cloning repository %s", config.repository)
-	
+
 	cloneURL := fmt.Sprintf("https://%s@github.com/%s.git", config.githubToken, config.repository)
-	
+
 	container := dag.Container().
 		From("alpine/git:latest").
 		WithExec([]string{"git", "clone", cloneURL, "/workspace"})
@@ -96,7 +96,7 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 		container = container.WithWorkdir("/workspace").
 			WithExec([]string{"git", "checkout", config.commitSHA})
 	}
-	
+
 	setupLLMEnvironment(config.llmAPIKey)
 
 	return container.Directory("/workspace")
@@ -108,7 +108,7 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 	if err != nil {
 		log.Fatalf("Failed to decode source data: %v", err)
 	}
-	
+
 	return dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
 }
 
