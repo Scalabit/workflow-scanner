@@ -22,8 +22,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o batch-scanner ./c
 # Final stage with Docker support for Dagger
 FROM docker:dind
 
-# Install bash, curl, and ca-certificates
-RUN apk --no-cache add bash curl ca-certificates
+# Install bash, curl, git, and ca-certificates
+RUN apk --no-cache add bash curl git ca-certificates
 
 # Install Dagger CLI
 RUN curl -L https://dl.dagger.io/dagger/install.sh | sh && \

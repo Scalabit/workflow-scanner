@@ -98,6 +98,13 @@ type WorkflowScanRequest struct {
 	SourceBase64 string `json:"source_base64"` // Base64 encoded source directory
 }
 
+type WorkflowScanGitCloneRequest struct {
+	Repository  string `json:"repository"`
+	GithubToken string `json:"github_token"`
+	LLMAPIKey   string `json:"llm_api_key"`
+	CommitSHA   string `json:"commit_sha"`
+}
+
 type WorkflowScanResponse struct {
 	Success        bool   `json:"success"`
 	Message        string `json:"message,omitempty"`
@@ -570,16 +577,16 @@ func validateRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanR
 	return &req, true
 }
 
-func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanRequest, int, bool) {
+func validateTokenAndMethod(w http.ResponseWriter, r *http.Request) (string, int, bool) {
 	if !validateRequestMethod(w, r) {
-		return "", nil, 0, false
+		return "", 0, false
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
 
-		return "", nil, 0, false
+		return "", 0, false
 	}
 
 	apiToken := authHeader[7:]
@@ -594,6 +601,15 @@ func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *Workf
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
 
+		return "", 0, false
+	}
+
+	return apiToken, githubID, true
+}
+
+func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanRequest, int, bool) {
+	apiToken, githubID, ok := validateTokenAndMethod(w, r)
+	if !ok {
 		return "", nil, 0, false
 	}
 
@@ -713,6 +729,176 @@ func submitBatchJob(ctx context.Context, batchClient *batch.Client, repository, 
 	}
 
 	return jobID, nil
+}
+
+func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, llmAPIKey, commitSHA string, githubID int) {
+	// Get Batch client
+	batchClient, err := getBatchClient()
+	if err != nil {
+		log.Printf("Cloud Batch not available for user %d: %v", githubID, err)
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Workflow scanning not available in this environment",
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return
+	}
+
+	// Submit Cloud Batch job with git clone approach
+	jobID, err := submitBatchJobGitClone(ctx, batchClient, repository, githubToken, llmAPIKey, commitSHA)
+	if err != nil {
+		log.Printf("Failed to submit batch job for user %d, repo %s: %v", githubID, repository, err)
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to submit scan job: %v", err),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return
+	}
+
+	log.Printf("Batch job submitted for user %d, repo %s, job ID: %s", githubID, repository, jobID)
+	response := WorkflowScanResponse{
+		Success: true,
+		Message: fmt.Sprintf("Scan job submitted successfully. Job ID: %s", jobID),
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
+}
+
+func submitBatchJobGitClone(ctx context.Context, batchClient *batch.Client, repository, githubToken, llmAPIKey, commitSHA string) (string, error) {
+	// Get configuration from environment
+	projectID := os.Getenv("BATCH_PROJECT_ID")
+	region := os.Getenv("BATCH_REGION")
+	batchImage := os.Getenv("BATCH_IMAGE")
+
+	if projectID == "" || region == "" || batchImage == "" {
+		return "", fmt.Errorf("missing batch configuration environment variables")
+	}
+
+	// Generate unique job ID
+	jobID := fmt.Sprintf("workflow-scan-%d", time.Now().Unix())
+
+	// Create batch job for git clone approach
+	job := &batchpb.Job{
+		TaskGroups: []*batchpb.TaskGroup{
+			{
+				TaskSpec: &batchpb.TaskSpec{
+					Runnables: []*batchpb.Runnable{
+						{
+							Executable: &batchpb.Runnable_Container_{
+								Container: &batchpb.Runnable_Container{
+									ImageUri: batchImage,
+								},
+							},
+							Environment: &batchpb.Environment{
+								Variables: map[string]string{
+									"REPOSITORY":   repository,
+									"GITHUB_TOKEN": githubToken,
+									"LLM_API_KEY":  llmAPIKey,
+									"COMMIT_SHA":   commitSHA,
+								},
+							},
+						},
+					},
+					ComputeResource: &batchpb.ComputeResource{
+						CpuMilli:  BatchCPUMilli,
+						MemoryMib: BatchMemoryMib,
+					},
+					MaxRetryCount:  1,
+					MaxRunDuration: durationpb.New(BatchTimeoutSecs * time.Second),
+				},
+				TaskCount:   1,
+				Parallelism: 1,
+			},
+		},
+		LogsPolicy: &batchpb.LogsPolicy{
+			Destination: batchpb.LogsPolicy_CLOUD_LOGGING,
+		},
+	}
+
+	// Submit the job
+	req := &batchpb.CreateJobRequest{
+		Parent: fmt.Sprintf("projects/%s/locations/%s", projectID, region),
+		JobId:  jobID,
+		Job:    job,
+	}
+
+	_, err := batchClient.CreateJob(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("failed to create batch job: %w", err)
+	}
+
+	return jobID, nil
+}
+
+func validateGitCloneRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanGitCloneRequest, int, bool) {
+	apiToken, githubID, ok := validateTokenAndMethod(w, r)
+	if !ok {
+		return "", nil, 0, false
+	}
+
+	req, ok := parseGitCloneRequestBody(w, r)
+	if !ok {
+		return "", nil, 0, false
+	}
+
+	return apiToken, req, githubID, true
+}
+
+func parseGitCloneRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanGitCloneRequest, bool) {
+	var req WorkflowScanGitCloneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Invalid request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return nil, false
+	}
+
+	if req.Repository == "" || req.GithubToken == "" || req.LLMAPIKey == "" {
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Missing required fields: repository, github_token, llm_api_key",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return nil, false
+	}
+
+	return &req, true
+}
+
+func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	apiToken, req, githubID, ok := validateGitCloneRequest(w, r)
+	if !ok {
+		return
+	}
+
+	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
+
+	ctx := context.Background()
+	executeScanGitClone(w, ctx, apiToken, req.Repository, req.GithubToken, req.LLMAPIKey, req.CommitSHA, githubID)
 }
 
 func scanWorkflows(w http.ResponseWriter, r *http.Request) {
@@ -1042,7 +1228,10 @@ func main() {
 		validateAPIToken(w, r)
 	})
 	mux.HandleFunc("/api/scan-workflows", func(w http.ResponseWriter, r *http.Request) {
-		scanWorkflows(w, r)
+		scanWorkflows(w, r) // Legacy JSON format with base64 source
+	})
+	mux.HandleFunc("/api/scan-workflows-git", func(w http.ResponseWriter, r *http.Request) {
+		scanWorkflowsHeaders(w, r) // Git clone approach using request body
 	})
 	mux.HandleFunc("/webhook/stripe", func(w http.ResponseWriter, r *http.Request) {
 		handleStripeWebhook(config, w, r)
