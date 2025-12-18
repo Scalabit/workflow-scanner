@@ -50,6 +50,8 @@ const (
 	BatchCPUMilli    = 2000 // 2 CPU
 	BatchMemoryMib   = 4096 // 4GB RAM
 	BatchTimeoutSecs = 3600 // 1 hour timeout
+
+	DummyNum = 12345  		//this is only for testing purposes 
 )
 
 type Config struct {
@@ -163,20 +165,11 @@ func isPremiumUser(githubID int) bool {
 }
 
 func isValidAPIToken(token string) (int, bool) {
-	validTokensMutex.RLock()
-	defer validTokensMutex.RUnlock()
+	// TODO: Replace with CloudSQL validation
+	// For now, disable validation and return a dummy user ID
+	_ = token // Suppress unused parameter warning
 
-	githubID, exists := validTokens[token]
-	if !exists {
-		return 0, false
-	}
-
-	// Check if user is still premium
-	if !isPremiumUser(githubID) {
-		return 0, false
-	}
-
-	return githubID, true
+	return DummyNum, true // Always valid for testing
 }
 
 func addValidToken(token string, githubID int) {
@@ -535,8 +528,8 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For testing: always return valid
-	// Use real validation logic: isValidAPIToken(token)
+	// TODO: Replace with CloudSQL validation
+	// For now, always return valid (validation disabled)
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]bool{"valid": true}); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
