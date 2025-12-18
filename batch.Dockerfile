@@ -35,5 +35,10 @@ COPY --from=builder /app/batch-scanner /usr/local/bin/
 # Make sure the binary is executable
 RUN chmod +x /usr/local/bin/batch-scanner
 
-# Start Docker daemon in background and run scanner
-CMD ["sh", "-c", "dockerd & sleep 10 && batch-scanner"]
+# Start Docker daemon and Dagger engine in background, then run scanner
+CMD ["sh", "-c", "dockerd --host=unix:///var/run/docker.sock & \
+    echo 'Waiting for Docker to start...' && \
+    while ! docker info >/dev/null 2>&1; do sleep 1; done && \
+    echo 'Docker is ready!' && \
+    export DOCKER_HOST=unix:///var/run/docker.sock && \
+    batch-scanner"]
