@@ -98,6 +98,13 @@ type WorkflowScanRequest struct {
 	SourceBase64 string `json:"source_base64"` // Base64 encoded source directory
 }
 
+type WorkflowScanGitCloneRequest struct {
+	Repository  string `json:"repository"`
+	GithubToken string `json:"github_token"`
+	LLMAPIKey   string `json:"llm_api_key"`
+	CommitSHA   string `json:"commit_sha"`
+}
+
 type WorkflowScanResponse struct {
 	Success        bool   `json:"success"`
 	Message        string `json:"message,omitempty"`
@@ -570,16 +577,16 @@ func validateRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanR
 	return &req, true
 }
 
-func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanRequest, int, bool) {
+func validateTokenAndMethod(w http.ResponseWriter, r *http.Request) (string, int, bool) {
 	if !validateRequestMethod(w, r) {
-		return "", nil, 0, false
+		return "", 0, false
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
 
-		return "", nil, 0, false
+		return "", 0, false
 	}
 
 	apiToken := authHeader[7:]
@@ -594,6 +601,15 @@ func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *Workf
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
 
+		return "", 0, false
+	}
+
+	return apiToken, githubID, true
+}
+
+func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanRequest, int, bool) {
+	apiToken, githubID, ok := validateTokenAndMethod(w, r)
+	if !ok {
 		return "", nil, 0, false
 	}
 
@@ -826,58 +842,63 @@ func submitBatchJobGitClone(ctx context.Context, batchClient *batch.Client, repo
 	return jobID, nil
 }
 
-func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Validate API token
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
-
-		return
+func validateGitCloneRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanGitCloneRequest, int, bool) {
+	apiToken, githubID, ok := validateTokenAndMethod(w, r)
+	if !ok {
+		return "", nil, 0, false
 	}
 
-	apiToken := authHeader[7:]
-	githubID, valid := isValidAPIToken(apiToken)
-	if !valid {
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Invalid or expired API token",
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return
+	req, ok := parseGitCloneRequestBody(w, r)
+	if !ok {
+		return "", nil, 0, false
 	}
 
-	// Extract data from headers
-	repository := r.Header.Get("X-Repository")
-	githubToken := r.Header.Get("X-GitHub-Token")
-	llmAPIKey := r.Header.Get("X-LLM-API-Key")
-	commitSHA := r.Header.Get("X-Commit-SHA")
+	return apiToken, req, githubID, true
+}
 
-	// Validate required fields
-	if repository == "" || githubToken == "" || llmAPIKey == "" {
+func parseGitCloneRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanGitCloneRequest, bool) {
+	var req WorkflowScanGitCloneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response := WorkflowScanResponse{
 			Success: false,
-			Error:   "Missing required headers: X-Repository, X-GitHub-Token, X-LLM-API-Key",
+			Error:   "Invalid request body",
 		}
 		w.WriteHeader(http.StatusBadRequest)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			log.Printf("Failed to encode JSON response: %v", err)
 		}
 
+		return nil, false
+	}
+
+	if req.Repository == "" || req.GithubToken == "" || req.LLMAPIKey == "" {
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   "Missing required fields: repository, github_token, llm_api_key",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return nil, false
+	}
+
+	return &req, true
+}
+
+func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	apiToken, req, githubID, ok := validateGitCloneRequest(w, r)
+	if !ok {
 		return
 	}
 
-	log.Printf("Workflow scan requested by user %d for repository %s", githubID, repository)
+	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
 
 	ctx := context.Background()
-
-	// Execute git clone-based scan
-	executeScanGitClone(w, ctx, apiToken, repository, githubToken, llmAPIKey, commitSHA, githubID)
+	executeScanGitClone(w, ctx, apiToken, req.Repository, req.GithubToken, req.LLMAPIKey, req.CommitSHA, githubID)
 }
 
 func scanWorkflows(w http.ResponseWriter, r *http.Request) {
@@ -1207,12 +1228,10 @@ func main() {
 		validateAPIToken(w, r)
 	})
 	mux.HandleFunc("/api/scan-workflows", func(w http.ResponseWriter, r *http.Request) {
-		// Check if request has custom headers
-		if r.Header.Get("X-Repository") != "" {
-			scanWorkflowsHeaders(w, r)
-		} else {
-			scanWorkflows(w, r) // Legacy JSON format
-		}
+		scanWorkflows(w, r) // Legacy JSON format with base64 source
+	})
+	mux.HandleFunc("/api/scan-workflows-git", func(w http.ResponseWriter, r *http.Request) {
+		scanWorkflowsHeaders(w, r) // Git clone approach using request body
 	})
 	mux.HandleFunc("/webhook/stripe", func(w http.ResponseWriter, r *http.Request) {
 		handleStripeWebhook(config, w, r)
