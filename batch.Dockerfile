@@ -35,9 +35,6 @@ RUN apk --no-cache add \
 RUN curl -L https://dl.dagger.io/dagger/install.sh | sh && \
     mv bin/dagger /usr/local/bin/
 
-# Pre-pull Zizmor official image to avoid pulling it during execution
-RUN docker pull ghcr.io/zizmorcore/zizmor:1.18.0
-
 # Copy the batch scanner binary
 COPY --from=builder /app/batch-scanner /usr/local/bin/
 
@@ -49,5 +46,8 @@ CMD ["sh", "-c", "dockerd --host=unix:///var/run/docker.sock & \
     echo 'Waiting for Docker to start...' && \
     while ! docker info >/dev/null 2>&1; do sleep 1; done && \
     echo 'Docker is ready!' && \
+    echo 'Pre-pulling Zizmor image...' && \
+    docker pull ghcr.io/zizmorcore/zizmor:1.18.0 && \
+    echo 'Zizmor image ready!' && \
     export DOCKER_HOST=unix:///var/run/docker.sock && \
     batch-scanner"]
