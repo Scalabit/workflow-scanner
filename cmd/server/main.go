@@ -902,7 +902,7 @@ func parseGitCloneRequestBody(w http.ResponseWriter, r *http.Request) (*Workflow
 func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	log.Printf("scanWorkflowsHeaders called - Method: %s, Content-Type: %s, Authorization: %s", 
+	log.Printf("scanWorkflowsHeaders called - Method: %s, Content-Type: %s, Authorization: %s",
 		r.Method, r.Header.Get("Content-Type"), r.Header.Get("Authorization")[:20]+"...")
 
 	apiToken, req, githubID, ok := validateGitCloneRequest(w, r)
