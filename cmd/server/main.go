@@ -902,15 +902,8 @@ func parseGitCloneRequestBody(w http.ResponseWriter, r *http.Request) (*Workflow
 func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	authHeader := r.Header.Get("Authorization")
-	authPreview := "none"
-	if len(authHeader) > 20 {
-		authPreview = authHeader[:20] + "..."
-	} else if authHeader != "" {
-		authPreview = authHeader
-	}
 	log.Printf("scanWorkflowsHeaders called - Method: %s, Content-Type: %s, Authorization: %s",
-		r.Method, r.Header.Get("Content-Type"), authPreview)
+		r.Method, r.Header.Get("Content-Type"), r.Header.Get("Authorization")[:20]+"...")
 
 	apiToken, req, githubID, ok := validateGitCloneRequest(w, r)
 	if !ok {
