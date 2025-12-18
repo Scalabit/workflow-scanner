@@ -42,8 +42,8 @@ jobs:
         docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest .
         
         # Build the Cloud Batch image (scanner)
-        docker build -f Dockerfile.batch -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:${{ github.sha }} .
-        docker build -f Dockerfile.batch -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:latest .
+        docker build -f batch.Dockerfile -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:${{ github.sha }} .
+        docker build -f batch.Dockerfile -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/batch-scanner:latest .
         
         # Push all images
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}
