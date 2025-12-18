@@ -850,11 +850,30 @@ func validateGitCloneRequest(w http.ResponseWriter, r *http.Request) (string, *W
 }
 
 func parseGitCloneRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanGitCloneRequest, bool) {
-	var req WorkflowScanGitCloneRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Read and log the raw request body for debugging
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Failed to read request body: %v", err)
 		response := WorkflowScanResponse{
 			Success: false,
-			Error:   "Invalid request body",
+			Error:   "Failed to read request body",
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode JSON response: %v", err)
+		}
+
+		return nil, false
+	}
+
+	log.Printf("Raw request body: %s", string(bodyBytes))
+
+	var req WorkflowScanGitCloneRequest
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		log.Printf("JSON decode error: %v", err)
+		response := WorkflowScanResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Invalid request body: %v", err),
 		}
 		w.WriteHeader(http.StatusBadRequest)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
