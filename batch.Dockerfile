@@ -19,15 +19,24 @@ COPY . .
 # Build the batch scanner binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o batch-scanner ./cmd/batch
 
-# Final stage with Docker support for Dagger
+# Final stage with Docker support for Dagger + optimized tools
 FROM docker:dind
 
-# Install bash, curl, git, and ca-certificates
-RUN apk --no-cache add bash curl git ca-certificates
+# Install all required tools in one layer for efficiency  
+RUN apk --no-cache add \
+    bash \
+    curl \
+    git \
+    ca-certificates \
+    jq \
+    && rm -rf /var/cache/apk/*
 
 # Install Dagger CLI
 RUN curl -L https://dl.dagger.io/dagger/install.sh | sh && \
     mv bin/dagger /usr/local/bin/
+
+# Pre-pull Zizmor official image to avoid pulling it during execution
+RUN docker pull ghcr.io/zizmorcore/zizmor:1.18.0
 
 # Copy the batch scanner binary
 COPY --from=builder /app/batch-scanner /usr/local/bin/

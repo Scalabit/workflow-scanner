@@ -52,9 +52,7 @@ func TestZizmorImpl_CheckRemainingIssues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient.EXPECT().Container().Return(mockContainer)
-			mockContainer.EXPECT().From("python:3.12-slim").Return(mockContainer)
-			mockContainer.EXPECT().WithExec([]string{"pip", "install", "zizmor"}).Return(mockContainer)
-			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}).Return(mockContainer)
+			mockContainer.EXPECT().From("ghcr.io/zizmorcore/zizmor:1.18.0").Return(mockContainer)
 			mockContainer.EXPECT().WithDirectory("/workspace", gomock.Any()).Return(mockContainer)
 			mockContainer.EXPECT().WithWorkdir("/workspace").Return(mockContainer)
 
@@ -117,9 +115,7 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient.EXPECT().Container().Return(mockContainer)
-			mockContainer.EXPECT().From("python:3.12-slim").Return(mockContainer)
-			mockContainer.EXPECT().WithExec([]string{"pip", "install", "zizmor"}).Return(mockContainer)
-			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}).Return(mockContainer)
+			mockContainer.EXPECT().From("ghcr.io/zizmorcore/zizmor:1.18.0").Return(mockContainer)
 			mockContainer.EXPECT().WithDirectory("/workspace", gomock.Any()).Return(mockContainer)
 			mockContainer.EXPECT().WithWorkdir("/workspace").Return(mockContainer)
 
