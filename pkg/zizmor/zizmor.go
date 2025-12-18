@@ -62,14 +62,12 @@ func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source *interna
 }
 
 func (ziz *ZizmorImpl) ScanExternalDependencies(ctx context.Context, source *internalDagger.Directory) (string, error) {
-	// Create a container with git and ZIZMOR but NOT mount the source (we'll clone external repos)
+	// Create a container with git and ZIZMOR using official image
 	baseContainer := ziz.client.Container().
-		From("python:3.12-slim").
-		WithExec([]string{"pip", "install", "zizmor"}).
-		WithExec([]string{"apt-get", "update"}).
-		WithExec([]string{"apt-get", "install", "-y", "git"}).
-		WithDirectory("/workspace", source). // Only for extracting repo list
-		WithWorkdir("/tmp/external-scans")   // Work in temp dir for clones
+		From("ghcr.io/zizmorcore/zizmor:1.18.0").
+		WithExec([]string{"apk", "add", "--no-cache", "git"}). // Add git to official image
+		WithDirectory("/workspace", source).                   // Only for extracting repo list
+		WithWorkdir("/tmp/external-scans")                     // Work in temp dir for clones
 
 	// Find all external repositories used in workflows (run in workspace dir)
 	findReposCmd := `cd /workspace && find .github/workflows -name "*.yml" -o -name "*.yaml" | xargs grep -h "uses:" | grep -v "^#" | sed 's/.*uses: *//g' | sed 's/@.*//g' | grep "/" | sort -u`
@@ -179,11 +177,9 @@ func (ziz *ZizmorImpl) SummarizeExternalFindings(fullReport string) string {
 }
 
 func (ziz *ZizmorImpl) getZizmorContainer(source *internalDagger.Directory) dagger.Container {
-	// Use Python slim for reliable pip install - more predictable than Rust compilation
+
 	return ziz.client.Container().
-		From("python:3.12-slim").
-		WithExec([]string{"pip", "install", "zizmor"}).
-		WithExec([]string{"sh", "-c", "which zizmor && zizmor --version"}). // Verify installation
+		From("ghcr.io/zizmorcore/zizmor:1.18.0").
 		WithDirectory("/workspace", source).
 		WithWorkdir("/workspace")
 }
