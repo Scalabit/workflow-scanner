@@ -177,7 +177,6 @@ func (ziz *ZizmorImpl) SummarizeExternalFindings(fullReport string) string {
 }
 
 func (ziz *ZizmorImpl) getZizmorContainer(source *internalDagger.Directory) dagger.Container {
-
 	return ziz.client.Container().
 		From("ghcr.io/zizmorcore/zizmor:1.18.0").
 		WithDirectory("/workspace", source).
