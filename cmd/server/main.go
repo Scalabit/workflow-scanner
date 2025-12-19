@@ -15,28 +15,28 @@ import (
 	"sync"
 	"time"
 
-	batch "cloud.google.com/go/batch/apiv1"
-	"cloud.google.com/go/batch/apiv1/batchpb"
+	compute "cloud.google.com/go/compute/apiv1"
+	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
-	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/proto"
 )
 
-// Lazy initialization of Batch client.
+// Lazy initialization of Compute client.
 var (
-	batchClient *batch.Client
-	batchOnce   sync.Once
-	batchErr    error
+	computeClient *compute.InstancesClient
+	computeOnce   sync.Once
+	computeErr    error
 )
 
-func getBatchClient() (*batch.Client, error) {
-	batchOnce.Do(func() {
+func getComputeClient() (*compute.InstancesClient, error) {
+	computeOnce.Do(func() {
 		ctx := context.Background()
-		batchClient, batchErr = batch.NewClient(ctx)
+		computeClient, computeErr = compute.NewInstancesRESTClient(ctx)
 	})
 
-	return batchClient, batchErr
+	return computeClient, computeErr
 }
 
 // Constants for magic numbers.
@@ -47,9 +47,10 @@ const (
 	WriteTimeoutSecs = 15   // HTTP write timeout in seconds
 	IdleTimeoutSecs  = 60   // HTTP idle timeout in seconds
 
-	BatchCPUMilli    = 2000 // 2 CPU
-	BatchMemoryMib   = 4096 // 4GB RAM
-	BatchTimeoutSecs = 3600 // 1 hour timeout
+	ScannerCPUMilli    = 2000 // 2 CPU
+	ScannerMemoryMib   = 4096 // 4GB RAM
+	ScannerTimeoutSecs = 3600 // 1 hour timeout
+	ScannerDiskSizeGB  = 20   // 20GB boot disk
 
 	DummyNum = 12345 //this is only for testing purposes
 )
@@ -615,10 +616,10 @@ func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *Workf
 }
 
 func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, sourceBase64 string, githubID int) {
-	// Get Batch client
-	batchClient, err := getBatchClient()
+	// Get Compute client
+	computeClient, err := getComputeClient()
 	if err != nil {
-		log.Printf("Cloud Batch not available for user %d: %v", githubID, err)
+		log.Printf("Compute Engine not available for user %d: %v", githubID, err)
 		response := WorkflowScanResponse{
 			Success: false,
 			Error:   "Workflow scanning not available in this environment",
@@ -631,13 +632,13 @@ func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repositor
 		return
 	}
 
-	// Submit Cloud Batch job
-	jobID, err := submitBatchJob(ctx, batchClient, repository, githubToken, sourceBase64)
+	// Submit Compute Engine VM instance
+	instanceID, err := createComputeInstance(ctx, computeClient, repository, githubToken, sourceBase64)
 	if err != nil {
-		log.Printf("Failed to submit batch job for user %d, repo %s: %v", githubID, repository, err)
+		log.Printf("Failed to create compute instance for user %d, repo %s: %v", githubID, repository, err)
 		response := WorkflowScanResponse{
 			Success: false,
-			Error:   fmt.Sprintf("Failed to submit scan job: %v", err),
+			Error:   fmt.Sprintf("Failed to create scan instance: %v", err),
 		}
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -647,10 +648,10 @@ func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repositor
 		return
 	}
 
-	log.Printf("Batch job submitted for user %d, repo %s, job ID: %s", githubID, repository, jobID)
+	log.Printf("Compute instance created for user %d, repo %s, instance ID: %s", githubID, repository, instanceID)
 	response := WorkflowScanResponse{
 		Success: true,
-		Message: fmt.Sprintf("Scan job submitted successfully. Job ID: %s", jobID),
+		Message: fmt.Sprintf("Scan instance created successfully. Instance ID: %s", instanceID),
 	}
 
 	w.WriteHeader(http.StatusAccepted)
@@ -659,76 +660,101 @@ func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repositor
 	}
 }
 
-func submitBatchJob(ctx context.Context, batchClient *batch.Client, repository, githubToken, sourceBase64 string) (string, error) {
-	// Get configuration from environment
-	projectID := os.Getenv("BATCH_PROJECT_ID")
-	region := os.Getenv("BATCH_REGION")
-	batchImage := os.Getenv("BATCH_IMAGE")
-
-	if projectID == "" || region == "" || batchImage == "" {
-		return "", fmt.Errorf("missing batch configuration environment variables")
+func createComputeInstance(ctx context.Context, computeClient *compute.InstancesClient, repository, githubToken, sourceBase64 string) (string, error) {
+	envVars := map[string]string{
+		"REPOSITORY":    repository,
+		"GITHUB_TOKEN":  githubToken,
+		"SOURCE_BASE64": sourceBase64,
 	}
 
-	// Generate unique job ID
-	jobID := fmt.Sprintf("workflow-scan-%d", time.Now().Unix())
+	return createComputeInstanceWithEnv(ctx, computeClient, envVars)
+}
 
-	// Create simplified batch job
-	job := &batchpb.Job{
-		TaskGroups: []*batchpb.TaskGroup{
+func createComputeInstanceWithEnv(ctx context.Context, computeClient *compute.InstancesClient, envVars map[string]string) (string, error) {
+	// Get configuration from environment
+	projectID := os.Getenv("COMPUTE_PROJECT_ID")
+	region := os.Getenv("COMPUTE_REGION")
+	scannerImage := os.Getenv("SCANNER_IMAGE")
+
+	if projectID == "" || region == "" || scannerImage == "" {
+		return "", fmt.Errorf("missing compute configuration environment variables")
+	}
+
+	// Generate unique instance ID
+	instanceID := fmt.Sprintf("workflow-scan-%d", time.Now().Unix())
+	zone := region + "-a" // Use first zone in region
+
+	// Build environment variables for startup script
+	var envArgs strings.Builder
+	for key, value := range envVars {
+		envArgs.WriteString(fmt.Sprintf("  -e %s=%s \\\n", key, value))
+	}
+
+	// Create startup script for container-optimized VM
+	startupScript := fmt.Sprintf(`#!/bin/bash
+docker run --privileged --rm \
+%s  %s && shutdown -h now`, envArgs.String(), scannerImage)
+
+	// Create VM instance with container-optimized OS
+	instance := &computepb.Instance{
+		Name:        &instanceID,
+		MachineType: proto.String(fmt.Sprintf("zones/%s/machineTypes/e2-standard-2", zone)),
+		Disks: []*computepb.AttachedDisk{
 			{
-				TaskSpec: &batchpb.TaskSpec{
-					Runnables: []*batchpb.Runnable{
-						{
-							Executable: &batchpb.Runnable_Container_{
-								Container: &batchpb.Runnable_Container{
-									ImageUri: batchImage,
-								},
-							},
-							Environment: &batchpb.Environment{
-								Variables: map[string]string{
-									"REPOSITORY":    repository,
-									"GITHUB_TOKEN":  githubToken,
-									"SOURCE_BASE64": sourceBase64,
-								},
-							},
-						},
-					},
-					ComputeResource: &batchpb.ComputeResource{
-						CpuMilli:  BatchCPUMilli,
-						MemoryMib: BatchMemoryMib,
-					},
-					MaxRetryCount:  1,
-					MaxRunDuration: durationpb.New(BatchTimeoutSecs * time.Second),
+				Boot:       proto.Bool(true),
+				AutoDelete: proto.Bool(true),
+				InitializeParams: &computepb.AttachedDiskInitializeParams{
+					SourceImage: proto.String("projects/cos-cloud/global/images/family/cos-stable"),
+					DiskSizeGb:  proto.Int64(ScannerDiskSizeGB),
 				},
-				TaskCount:   1,
-				Parallelism: 1,
 			},
 		},
-		LogsPolicy: &batchpb.LogsPolicy{
-			Destination: batchpb.LogsPolicy_CLOUD_LOGGING,
+		NetworkInterfaces: []*computepb.NetworkInterface{
+			{
+				Network: proto.String(fmt.Sprintf("projects/%s/global/networks/default", projectID)),
+				AccessConfigs: []*computepb.AccessConfig{
+					{
+						Type: proto.String("ONE_TO_ONE_NAT"),
+						Name: proto.String("External NAT"),
+					},
+				},
+			},
+		},
+		Metadata: &computepb.Metadata{
+			Items: []*computepb.Items{
+				{
+					Key:   proto.String("startup-script"),
+					Value: proto.String(startupScript),
+				},
+			},
+		},
+		Scheduling: &computepb.Scheduling{
+			Preemptible: proto.Bool(false),
 		},
 	}
 
-	// Submit the job
-	req := &batchpb.CreateJobRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s", projectID, region),
-		JobId:  jobID,
-		Job:    job,
+	req := &computepb.InsertInstanceRequest{
+		Project:          projectID,
+		Zone:             zone,
+		InstanceResource: instance,
 	}
 
-	_, err := batchClient.CreateJob(ctx, req)
+	_, err := computeClient.Insert(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("failed to create batch job: %w", err)
+		return "", fmt.Errorf("failed to create compute instance: %w", err)
 	}
 
-	return jobID, nil
+	// Log operation status
+	log.Printf("Creating compute instance %s", instanceID)
+
+	return instanceID, nil
 }
 
 func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, llmAPIKey, commitSHA string, githubID int) {
-	// Get Batch client
-	batchClient, err := getBatchClient()
+	// Get Compute client
+	computeClient, err := getComputeClient()
 	if err != nil {
-		log.Printf("Cloud Batch not available for user %d: %v", githubID, err)
+		log.Printf("Compute Engine not available for user %d: %v", githubID, err)
 		response := WorkflowScanResponse{
 			Success: false,
 			Error:   "Workflow scanning not available in this environment",
@@ -741,13 +767,13 @@ func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, r
 		return
 	}
 
-	// Submit Cloud Batch job with git clone approach
-	jobID, err := submitBatchJobGitClone(ctx, batchClient, repository, githubToken, llmAPIKey, commitSHA)
+	// Submit Compute Engine VM instance with git clone approach
+	instanceID, err := createComputeInstanceGitClone(ctx, computeClient, repository, githubToken, llmAPIKey, commitSHA)
 	if err != nil {
-		log.Printf("Failed to submit batch job for user %d, repo %s: %v", githubID, repository, err)
+		log.Printf("Failed to create compute instance for user %d, repo %s: %v", githubID, repository, err)
 		response := WorkflowScanResponse{
 			Success: false,
-			Error:   fmt.Sprintf("Failed to submit scan job: %v", err),
+			Error:   fmt.Sprintf("Failed to create scan instance: %v", err),
 		}
 		w.WriteHeader(http.StatusInternalServerError)
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -757,10 +783,10 @@ func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, r
 		return
 	}
 
-	log.Printf("Batch job submitted for user %d, repo %s, job ID: %s", githubID, repository, jobID)
+	log.Printf("Compute instance created for user %d, repo %s, instance ID: %s", githubID, repository, instanceID)
 	response := WorkflowScanResponse{
 		Success: true,
-		Message: fmt.Sprintf("Scan job submitted successfully. Job ID: %s", jobID),
+		Message: fmt.Sprintf("Scan instance created successfully. Instance ID: %s", instanceID),
 	}
 
 	w.WriteHeader(http.StatusAccepted)
@@ -769,70 +795,15 @@ func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, r
 	}
 }
 
-func submitBatchJobGitClone(ctx context.Context, batchClient *batch.Client, repository, githubToken, llmAPIKey, commitSHA string) (string, error) {
-	// Get configuration from environment
-	projectID := os.Getenv("BATCH_PROJECT_ID")
-	region := os.Getenv("BATCH_REGION")
-	batchImage := os.Getenv("BATCH_IMAGE")
-
-	if projectID == "" || region == "" || batchImage == "" {
-		return "", fmt.Errorf("missing batch configuration environment variables")
+func createComputeInstanceGitClone(ctx context.Context, computeClient *compute.InstancesClient, repository, githubToken, llmAPIKey, commitSHA string) (string, error) {
+	envVars := map[string]string{
+		"REPOSITORY":   repository,
+		"GITHUB_TOKEN": githubToken,
+		"LLM_API_KEY":  llmAPIKey,
+		"COMMIT_SHA":   commitSHA,
 	}
 
-	// Generate unique job ID
-	jobID := fmt.Sprintf("workflow-scan-%d", time.Now().Unix())
-
-	// Create batch job for git clone approach
-	job := &batchpb.Job{
-		TaskGroups: []*batchpb.TaskGroup{
-			{
-				TaskSpec: &batchpb.TaskSpec{
-					Runnables: []*batchpb.Runnable{
-						{
-							Executable: &batchpb.Runnable_Container_{
-								Container: &batchpb.Runnable_Container{
-									ImageUri: batchImage,
-								},
-							},
-							Environment: &batchpb.Environment{
-								Variables: map[string]string{
-									"REPOSITORY":   repository,
-									"GITHUB_TOKEN": githubToken,
-									"LLM_API_KEY":  llmAPIKey,
-									"COMMIT_SHA":   commitSHA,
-								},
-							},
-						},
-					},
-					ComputeResource: &batchpb.ComputeResource{
-						CpuMilli:  BatchCPUMilli,
-						MemoryMib: BatchMemoryMib,
-					},
-					MaxRetryCount:  1,
-					MaxRunDuration: durationpb.New(BatchTimeoutSecs * time.Second),
-				},
-				TaskCount:   1,
-				Parallelism: 1,
-			},
-		},
-		LogsPolicy: &batchpb.LogsPolicy{
-			Destination: batchpb.LogsPolicy_CLOUD_LOGGING,
-		},
-	}
-
-	// Submit the job
-	req := &batchpb.CreateJobRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s", projectID, region),
-		JobId:  jobID,
-		Job:    job,
-	}
-
-	_, err := batchClient.CreateJob(ctx, req)
-	if err != nil {
-		return "", fmt.Errorf("failed to create batch job: %w", err)
-	}
-
-	return jobID, nil
+	return createComputeInstanceWithEnv(ctx, computeClient, envVars)
 }
 
 func validateGitCloneRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanGitCloneRequest, int, bool) {
