@@ -675,8 +675,9 @@ func createComputeInstanceWithEnv(ctx context.Context, computeClient *compute.In
 	projectID := os.Getenv("COMPUTE_PROJECT_ID")
 	region := os.Getenv("COMPUTE_REGION")
 	scannerImage := os.Getenv("SCANNER_IMAGE")
+	serviceAccount := os.Getenv("COMPUTE_SERVICE_ACCOUNT")
 
-	if projectID == "" || region == "" || scannerImage == "" {
+	if projectID == "" || region == "" || scannerImage == "" || serviceAccount == "" {
 		return "", fmt.Errorf("missing compute configuration environment variables")
 	}
 
@@ -730,6 +731,14 @@ docker run --privileged --rm \
 		},
 		Scheduling: &computepb.Scheduling{
 			Preemptible: proto.Bool(false),
+		},
+		ServiceAccounts: []*computepb.ServiceAccount{
+			{
+				Email: proto.String(serviceAccount),
+				Scopes: []string{
+					"https://www.googleapis.com/auth/cloud-platform",
+				},
+			},
 		},
 	}
 
