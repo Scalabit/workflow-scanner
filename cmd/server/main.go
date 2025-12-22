@@ -693,6 +693,11 @@ func createComputeInstanceWithEnv(ctx context.Context, computeClient *compute.In
 
 	// Create startup script for container-optimized VM
 	startupScript := fmt.Sprintf(`#!/bin/bash
+# Authenticate Docker to Artifact Registry
+TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | jq -r '.access_token')
+echo $TOKEN | docker login -u oauth2accesstoken --password-stdin https://europe-north1-docker.pkg.dev
+
+# Run the scanner container
 docker run --privileged --rm \
 %s  %s && shutdown -h now`, envArgs.String(), scannerImage)
 
