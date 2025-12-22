@@ -36,6 +36,7 @@ resource "google_project_service" "apis" {
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
     "batch.googleapis.com",
+    "compute.googleapis.com",
     "storage.googleapis.com"
   ])
   
@@ -89,9 +90,9 @@ resource "google_project_iam_member" "cloud_run_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
     "roles/artifactregistry.reader",
-    "roles/batch.jobsEditor",           # Required to create Batch jobs
+    "roles/compute.instanceAdmin.v1",   # Required to create Compute instances
     "roles/storage.objectAdmin",
-    "roles/iam.serviceAccountUser"      # Required to use batch service account
+    "roles/iam.serviceAccountUser"      # Required to use scanner service account
   ])
   
   project = var.project_id
@@ -99,9 +100,9 @@ resource "google_project_iam_member" "cloud_run_sa_bindings" {
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
-# Grant Cloud Run service account permission to use batch service account
-resource "google_service_account_iam_member" "cloud_run_use_batch_sa" {
-  service_account_id = google_service_account.batch_sa.name
+# Grant Cloud Run service account permission to use scanner service account
+resource "google_service_account_iam_member" "cloud_run_use_scanner_sa" {
+  service_account_id = google_service_account.scanner_sa.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
@@ -179,29 +180,29 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         value = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
       }
       
-      # Cloud Batch configuration
+      # Compute Engine configuration
       env {
-        name  = "BATCH_PROJECT_ID"
+        name  = "COMPUTE_PROJECT_ID"
         value = var.project_id
       }
       
       env {
-        name  = "BATCH_REGION"
+        name  = "COMPUTE_REGION"
         value = var.region
       }
       
       env {
-        name  = "BATCH_BUCKET"
-        value = google_storage_bucket.batch_jobs.name
+        name  = "COMPUTE_BUCKET"
+        value = google_storage_bucket.scanner_jobs.name
       }
       
       env {
-        name  = "BATCH_SERVICE_ACCOUNT"
-        value = google_service_account.batch_sa.email
+        name  = "COMPUTE_SERVICE_ACCOUNT"
+        value = google_service_account.scanner_sa.email
       }
       
       env {
-        name  = "BATCH_IMAGE"
+        name  = "SCANNER_IMAGE"
         value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/batch-scanner:latest"
       }
       
@@ -314,33 +315,33 @@ resource "random_id" "bucket_suffix" {
   byte_length = 8
 }
 
-# Service account for Cloud Batch jobs
-resource "google_service_account" "batch_sa" {
-  account_id   = "workflow-scanner-batch"
-  display_name = "Workflow Scanner Batch Service Account"
-  description  = "Service account for Cloud Batch workflow scanning jobs"
+# Service account for Compute Engine scanner instances
+resource "google_service_account" "scanner_sa" {
+  account_id   = "workflow-scanner-compute"
+  display_name = "Workflow Scanner Compute Service Account"
+  description  = "Service account for Compute Engine workflow scanning instances"
 }
 
-# IAM bindings for batch service account (following GCP Batch requirements)
-resource "google_project_iam_member" "batch_sa_bindings" {
+# IAM bindings for scanner service account (following GCP Compute requirements)
+resource "google_project_iam_member" "scanner_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
     "roles/artifactregistry.reader", 
     "roles/storage.objectAdmin",
-    "roles/batch.agentReporter",     # Required for Batch jobs
+    "roles/compute.serviceAgent",     # Required for Compute instances
     "roles/logging.logWriter"        # Required for job logs
   ])
   
   project = var.project_id
   role    = each.value
-  member  = "serviceAccount:${google_service_account.batch_sa.email}"
+  member  = "serviceAccount:${google_service_account.scanner_sa.email}"
 }
 
-# Grant batch service account access to storage bucket
-resource "google_storage_bucket_iam_member" "batch_bucket_access" {
+# Grant scanner service account access to storage bucket
+resource "google_storage_bucket_iam_member" "scanner_bucket_access" {
   bucket = google_storage_bucket.workflow_data.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.batch_sa.email}"
+  member = "serviceAccount:${google_service_account.scanner_sa.email}"
 }
 
 # Cloud Storage bucket for Terraform state (must be created manually first)
@@ -350,9 +351,9 @@ resource "google_storage_bucket_iam_member" "batch_bucket_access" {
 #   location = var.region
 # }
 
-# Cloud Storage bucket for batch job data exchange
-resource "google_storage_bucket" "batch_jobs" {
-  name     = "workflow-scanner-batch-${random_id.bucket_suffix.hex}"
+# Cloud Storage bucket for scanner job data exchange
+resource "google_storage_bucket" "scanner_jobs" {
+  name     = "workflow-scanner-compute-${random_id.bucket_suffix.hex}"
   location = var.region
   
   uniform_bucket_level_access = true
@@ -370,16 +371,16 @@ resource "google_storage_bucket" "batch_jobs" {
   depends_on = [google_project_service.apis]
 }
 
-# Grant Cloud Run service account access to batch bucket
-resource "google_storage_bucket_iam_member" "cloud_run_batch_access" {
-  bucket = google_storage_bucket.batch_jobs.name
+# Grant Cloud Run service account access to scanner bucket
+resource "google_storage_bucket_iam_member" "cloud_run_scanner_access" {
+  bucket = google_storage_bucket.scanner_jobs.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
-# Grant batch service account access to batch bucket
-resource "google_storage_bucket_iam_member" "batch_batch_access" {
-  bucket = google_storage_bucket.batch_jobs.name
+# Grant scanner service account access to scanner bucket
+resource "google_storage_bucket_iam_member" "scanner_scanner_access" {
+  bucket = google_storage_bucket.scanner_jobs.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.batch_sa.email}"
+  member = "serviceAccount:${google_service_account.scanner_sa.email}"
 }
