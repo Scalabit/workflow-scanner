@@ -41,11 +41,7 @@ COPY --from=builder /app/workflow-scanner /usr/local/bin/
 # Make sure the binary is executable
 RUN chmod +x /usr/local/bin/workflow-scanner
 
-# Set environment variables for Dagger (dummy values for local Docker)
-ENV DAGGER_SESSION_PORT=1234
-ENV DAGGER_SESSION_TOKEN=dummy
-
-# Start Docker daemon and Dagger engine in background, then run scanner
+# Start Docker daemon in background, then run scanner with Dagger session
 CMD ["sh", "-c", "dockerd --host=unix:///var/run/docker.sock & \
     echo 'Waiting for Docker to start...' && \
     export DOCKER_HOST=unix:///var/run/docker.sock && \
@@ -60,4 +56,5 @@ CMD ["sh", "-c", "dockerd --host=unix:///var/run/docker.sock & \
     echo 'Pre-pulling Zizmor image...' && \
     docker pull ghcr.io/zizmorcore/zizmor:1.18.0 && \
     echo 'Zizmor image ready!' && \
-    workflow-scanner"]
+    echo 'Starting Dagger session and workflow scanner...' && \
+    dagger run workflow-scanner"]
