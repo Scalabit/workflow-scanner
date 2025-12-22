@@ -44,8 +44,14 @@ RUN chmod +x /usr/local/bin/workflow-scanner
 # Start Docker daemon and Dagger engine in background, then run scanner
 CMD ["sh", "-c", "dockerd --host=unix:///var/run/docker.sock & \
     echo 'Waiting for Docker to start...' && \
-    while ! docker info >/dev/null 2>&1; do sleep 1; done && \
-    echo 'Docker is ready!' && \
+    for i in $(seq 1 30); do \
+        if docker info >/dev/null 2>&1; then \
+            echo 'Docker is ready!'; \
+            break; \
+        fi; \
+        echo \"Docker not ready yet, waiting... ($i/30)\"; \
+        sleep 2; \
+    done && \
     echo 'Pre-pulling Zizmor image...' && \
     docker pull ghcr.io/zizmorcore/zizmor:1.18.0 && \
     echo 'Zizmor image ready!' && \
