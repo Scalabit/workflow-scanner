@@ -693,6 +693,10 @@ func createComputeInstanceWithEnv(ctx context.Context, computeClient *compute.In
 
 	// Create startup script for container-optimized VM
 	startupScript := fmt.Sprintf(`#!/bin/bash
+# Set Docker config to writable directory (Container-Optimized OS has read-only /root)
+export DOCKER_CONFIG=/tmp/.docker
+mkdir -p $DOCKER_CONFIG
+
 # Authenticate Docker to Artifact Registry
 TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | jq -r '.access_token')
 echo $TOKEN | docker login -u oauth2accesstoken --password-stdin https://europe-north1-docker.pkg.dev
