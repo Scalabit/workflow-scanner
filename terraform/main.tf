@@ -40,7 +40,8 @@ resource "google_project_service" "apis" {
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
     "sqladmin.googleapis.com",
-    "storage.googleapis.com"
+    "storage.googleapis.com",
+    "compute.googleapis.com"
   ])
   
   project = var.project_id
