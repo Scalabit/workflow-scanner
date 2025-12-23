@@ -64,12 +64,10 @@ resource "google_secret_manager_secret" "db_password" {
   project   = var.project_id
 
   replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
+    auto {}
   }
+  
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_secret_manager_secret_version" "db_password" {
@@ -88,29 +86,13 @@ resource "google_secret_manager_secret" "database_url" {
   project   = var.project_id
 
   replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
+    auto {}
   }
+  
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_secret_manager_secret_version" "database_url" {
   secret      = google_secret_manager_secret.database_url.id
   secret_data = local.database_url
-}
-
-# IAM binding for Cloud Run to access CloudSQL
-resource "google_project_iam_member" "cloud_run_sql_client" {
-  project = var.project_id
-  role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
-}
-
-# IAM binding for Cloud Run to access Secret Manager
-resource "google_project_iam_member" "cloud_run_secret_accessor" {
-  project = var.project_id
-  role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
