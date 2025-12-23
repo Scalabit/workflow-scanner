@@ -10,3 +10,11 @@ terraform/.terraform.lock.hcl
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/*.tfvars
+
+
+build/
+out
+main
+script.sh
+workflow-scanner
+server
