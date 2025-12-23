@@ -25,7 +25,11 @@ resource "google_sql_database_instance" "workflow_scanner_db" {
     }
 
     ip_configuration {
-      ipv4_enabled = false
+      ipv4_enabled = true
+      authorized_networks {
+        name  = "all"
+        value = "0.0.0.0/0"
+      }
     }
 
     database_flags {
