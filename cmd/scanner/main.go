@@ -183,7 +183,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubTokenSecret}))
 
 	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, githubClient)
-	
+
 	// Increment usage regardless of scan success/failure (user still consumed quota)
 	usageErr := incrementUsage(config.repository, err == nil)
 	if usageErr != nil {

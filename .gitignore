@@ -14,7 +14,6 @@ terraform/*.tfvars
 
 build/
 out
-main
 script.sh
 workflow-scanner
 server

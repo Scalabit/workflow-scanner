@@ -15,10 +15,10 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
-	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 // Lazy initialization of database.
@@ -35,20 +35,20 @@ func getDatabase() (*sql.DB, error) {
 			dbErr = fmt.Errorf("DATABASE_URL environment variable not set")
 			return
 		}
-		
+
 		db, dbErr = sql.Open("postgres", databaseURL)
 		if dbErr != nil {
 			return
 		}
-		
+
 		// Test the connection
 		if dbErr = db.Ping(); dbErr != nil {
 			return
 		}
-		
+
 		log.Printf("Connected to CloudSQL database")
 	})
-	
+
 	return db, dbErr
 }
 
@@ -550,17 +550,17 @@ func incrementAPIKeyUsage(apiKey, repository string, success bool) error {
 		SET usage_count = usage_count + 1 
 		WHERE api_key = $1 AND is_active = true
 	`
-	
+
 	result, err := tx.Exec(updateQuery, apiKey)
 	if err != nil {
 		return fmt.Errorf("failed to update usage count: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	if rowsAffected == 0 {
 		return fmt.Errorf("no active API key found or usage not incremented")
 	}
@@ -570,7 +570,7 @@ func incrementAPIKeyUsage(apiKey, repository string, success bool) error {
 		INSERT INTO api_usage (api_key, repository, used_at, success)
 		VALUES ($1, $2, CURRENT_TIMESTAMP, $3)
 	`
-	
+
 	_, err = tx.Exec(logQuery, apiKey, repository, success)
 	if err != nil {
 		return fmt.Errorf("failed to log usage: %w", err)
@@ -587,7 +587,7 @@ func incrementAPIKeyUsage(apiKey, repository string, success bool) error {
 
 func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -607,7 +607,7 @@ func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
 		Repository string `json:"repository"`
 		Success    bool   `json:"success"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
@@ -690,10 +690,10 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 
 	// Return success with usage info
 	response := map[string]interface{}{
-		"valid": true,
+		"valid":       true,
 		"usage_count": usageCount,
 		"usage_limit": usageLimit,
-		"remaining": usageLimit - usageCount,
+		"remaining":   usageLimit - usageCount,
 	}
 
 	w.WriteHeader(http.StatusOK)
