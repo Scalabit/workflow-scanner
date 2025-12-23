@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"workflow-scanner/internal/dagger"
@@ -128,6 +131,51 @@ func setupLLMEnvironment(llmAPIKey string) {
 	}
 }
 
+func incrementUsage(repository string, success bool) error {
+	serviceURL := os.Getenv("SERVICE_URL")
+	if serviceURL == "" {
+		serviceURL = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
+	}
+
+	apiKey := os.Getenv("API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("API_KEY environment variable not set")
+	}
+
+	requestBody := map[string]interface{}{
+		"repository": repository,
+		"success":    success,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, serviceURL+"/api/increment-usage", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("increment usage failed with status: %d", resp.StatusCode)
+	}
+
+	log.Printf("Usage incremented successfully for repository: %s", repository)
+
+	return nil
+}
+
 func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, sourceDir *dagger.Directory) {
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
@@ -136,6 +184,14 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubTokenSecret}))
 
 	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, githubClient)
+
+	// Increment usage regardless of scan success/failure (user still consumed quota)
+	usageErr := incrementUsage(config.repository, err == nil)
+	if usageErr != nil {
+		log.Printf("Warning: Failed to increment usage: %v", usageErr)
+		// Don't fail the scan for usage tracking errors
+	}
+
 	if err != nil {
 		log.Fatalf("Scan failed: %v", err)
 	}

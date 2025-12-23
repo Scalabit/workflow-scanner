@@ -1,8 +1,8 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,28 +15,42 @@ import (
 	"sync"
 	"time"
 
-	compute "cloud.google.com/go/compute/apiv1"
-	"cloud.google.com/go/compute/apiv1/computepb"
-	"github.com/stripe/stripe-go/v76"
+	_ "github.com/lib/pq" // PostgreSQL driver
+	stripe "github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
-	"google.golang.org/protobuf/proto"
 )
 
-// Lazy initialization of Compute client.
+// Lazy initialization of database.
 var (
-	computeClient *compute.InstancesClient
-	computeOnce   sync.Once
-	computeErr    error
+	db     *sql.DB
+	dbOnce sync.Once
+	dbErr  error
 )
 
-func getComputeClient() (*compute.InstancesClient, error) {
-	computeOnce.Do(func() {
-		ctx := context.Background()
-		computeClient, computeErr = compute.NewInstancesRESTClient(ctx)
+func getDatabase() (*sql.DB, error) {
+	dbOnce.Do(func() {
+		databaseURL := os.Getenv("DATABASE_URL")
+		if databaseURL == "" {
+			dbErr = fmt.Errorf("DATABASE_URL environment variable not set")
+
+			return
+		}
+
+		db, dbErr = sql.Open("postgres", databaseURL)
+		if dbErr != nil {
+			return
+		}
+
+		// Test the connection
+		if dbErr = db.Ping(); dbErr != nil {
+			return
+		}
+
+		log.Printf("Connected to CloudSQL database")
 	})
 
-	return computeClient, computeErr
+	return db, dbErr
 }
 
 // Constants for magic numbers.
@@ -518,6 +532,118 @@ func getUserHandler(config *Config, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func incrementAPIKeyUsage(apiKey, repository string, success bool) error {
+	database, err := getDatabase()
+	if err != nil {
+		return fmt.Errorf("database connection error: %w", err)
+	}
+
+	// Start a transaction for atomic operations
+	tx, err := database.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Increment usage count in api_keys table
+	updateQuery := `
+		UPDATE api_keys 
+		SET usage_count = usage_count + 1 
+		WHERE api_key = $1 AND is_active = true
+	`
+
+	result, err := tx.Exec(updateQuery, apiKey)
+	if err != nil {
+		return fmt.Errorf("failed to update usage count: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no active API key found or usage not incremented")
+	}
+
+	// Log usage in api_usage table for detailed tracking
+	logQuery := `
+		INSERT INTO api_usage (api_key, repository, used_at, success)
+		VALUES ($1, $2, CURRENT_TIMESTAMP, $3)
+	`
+
+	_, err = tx.Exec(logQuery, apiKey, repository, success)
+	if err != nil {
+		return fmt.Errorf("failed to log usage: %w", err)
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Printf("Usage incremented for API key %s, repository: %s, success: %t", apiKey, repository, success)
+
+	return nil
+}
+
+func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	// Get token from Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+
+		return
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Parse request body
+	var req struct {
+		Repository string `json:"repository"`
+		Success    bool   `json:"success"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+
+		return
+	}
+
+	if req.Repository == "" {
+		http.Error(w, "Repository is required", http.StatusBadRequest)
+
+		return
+	}
+
+	// Increment usage
+	if err := incrementAPIKeyUsage(token, req.Repository, req.Success); err != nil {
+		log.Printf("Failed to increment usage: %v", err)
+		http.Error(w, "Failed to increment usage", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Return success
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Usage incremented successfully",
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
+}
+
 func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -529,438 +655,64 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// CloudSQL validation: Check token against database of valid premium user tokens
-	// For now, always return valid (validation disabled)
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Get database connection
+	database, err := getDatabase()
+	if err != nil {
+		log.Printf("Database connection error: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Check if API key exists and is active with available usage
+	var usageCount, usageLimit int
+	var isActive bool
+	query := `
+		SELECT usage_count, usage_limit, is_active 
+		FROM api_keys 
+		WHERE api_key = $1
+	`
+
+	err = database.QueryRow(query, token).Scan(&usageCount, &usageLimit, &isActive)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Invalid API key", http.StatusUnauthorized)
+
+			return
+		}
+		log.Printf("Database query error: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Check if key is active and has usage remaining
+	if !isActive {
+		http.Error(w, "API key is inactive", http.StatusForbidden)
+
+		return
+	}
+
+	if usageCount >= usageLimit {
+		http.Error(w, "API key usage limit exceeded", http.StatusTooManyRequests)
+
+		return
+	}
+
+	// Return success with usage info
+	response := map[string]interface{}{
+		"valid":       true,
+		"usage_count": usageCount,
+		"usage_limit": usageLimit,
+		"remaining":   usageLimit - usageCount,
+	}
+
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]bool{"valid": true}); err != nil {
-		log.Printf("Failed to encode JSON response: %v", err)
-	}
-}
-
-func validateRequestMethod(w http.ResponseWriter, r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-
-		return false
-	}
-
-	return true
-}
-
-func validateRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanRequest, bool) {
-	var req WorkflowScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-
-		return nil, false
-	}
-
-	if req.Repository == "" || req.GithubToken == "" || req.SourceBase64 == "" {
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Missing required fields: repository, github_token, source_base64",
-		}
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return nil, false
-	}
-
-	return &req, true
-}
-
-func validateTokenAndMethod(w http.ResponseWriter, r *http.Request) (string, int, bool) {
-	if !validateRequestMethod(w, r) {
-		return "", 0, false
-	}
-
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
-
-		return "", 0, false
-	}
-
-	apiToken := authHeader[7:]
-	githubID, valid := isValidAPIToken(apiToken)
-	if !valid {
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Invalid or expired API token",
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return "", 0, false
-	}
-
-	return apiToken, githubID, true
-}
-
-func validateScanRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanRequest, int, bool) {
-	apiToken, githubID, ok := validateTokenAndMethod(w, r)
-	if !ok {
-		return "", nil, 0, false
-	}
-
-	req, ok := validateRequestBody(w, r)
-	if !ok {
-		return "", nil, 0, false
-	}
-
-	return apiToken, req, githubID, true
-}
-
-func executeScan(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, sourceBase64 string, githubID int) {
-	// Get Compute client
-	computeClient, err := getComputeClient()
-	if err != nil {
-		log.Printf("Compute Engine not available for user %d: %v", githubID, err)
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Workflow scanning not available in this environment",
-		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return
-	}
-
-	// Submit Compute Engine VM instance
-	instanceID, err := createComputeInstance(ctx, computeClient, repository, githubToken, sourceBase64)
-	if err != nil {
-		log.Printf("Failed to create compute instance for user %d, repo %s: %v", githubID, repository, err)
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   fmt.Sprintf("Failed to create scan instance: %v", err),
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return
-	}
-
-	log.Printf("Compute instance created for user %d, repo %s, instance ID: %s", githubID, repository, instanceID)
-	response := WorkflowScanResponse{
-		Success: true,
-		Message: fmt.Sprintf("Scan instance created successfully. Instance ID: %s", instanceID),
-	}
-
-	w.WriteHeader(http.StatusAccepted)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
 	}
-}
-
-func createComputeInstance(ctx context.Context, computeClient *compute.InstancesClient, repository, githubToken, sourceBase64 string) (string, error) {
-	envVars := map[string]string{
-		"REPOSITORY":    repository,
-		"GITHUB_TOKEN":  githubToken,
-		"SOURCE_BASE64": sourceBase64,
-	}
-
-	return createComputeInstanceWithEnv(ctx, computeClient, envVars)
-}
-
-func createComputeInstanceWithEnv(ctx context.Context, computeClient *compute.InstancesClient, envVars map[string]string) (string, error) {
-	// Get configuration from environment
-	projectID := os.Getenv("COMPUTE_PROJECT_ID")
-	region := os.Getenv("COMPUTE_REGION")
-	scannerImage := os.Getenv("SCANNER_IMAGE")
-	serviceAccount := os.Getenv("COMPUTE_SERVICE_ACCOUNT")
-
-	if projectID == "" || region == "" || scannerImage == "" || serviceAccount == "" {
-		return "", fmt.Errorf("missing compute configuration environment variables")
-	}
-
-	// Generate unique instance ID
-	instanceID := fmt.Sprintf("workflow-scan-%d", time.Now().Unix())
-	zone := region + "-a" // Use first zone in region
-
-	// Build environment variables for startup script
-	var envArgs strings.Builder
-	for key, value := range envVars {
-		envArgs.WriteString(fmt.Sprintf("  -e %s=%s \\\n", key, value))
-	}
-
-	// Create startup script for container-optimized VM
-	startupScript := fmt.Sprintf(`#!/bin/bash
-# Set Docker config to writable directory (Container-Optimized OS has read-only /root)
-export DOCKER_CONFIG=/tmp/.docker
-mkdir -p $DOCKER_CONFIG
-
-# Authenticate Docker to Artifact Registry
-TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | jq -r '.access_token')
-echo $TOKEN | docker login -u oauth2accesstoken --password-stdin https://europe-north1-docker.pkg.dev
-
-# Run the scanner container
-docker run --privileged --rm \
-%s  %s && shutdown -h now`, envArgs.String(), scannerImage)
-
-	// Create VM instance with container-optimized OS
-	instance := &computepb.Instance{
-		Name:        &instanceID,
-		MachineType: proto.String(fmt.Sprintf("zones/%s/machineTypes/e2-standard-2", zone)),
-		Disks: []*computepb.AttachedDisk{
-			{
-				Boot:       proto.Bool(true),
-				AutoDelete: proto.Bool(true),
-				InitializeParams: &computepb.AttachedDiskInitializeParams{
-					SourceImage: proto.String("projects/cos-cloud/global/images/family/cos-stable"),
-					DiskSizeGb:  proto.Int64(ScannerDiskSizeGB),
-				},
-			},
-		},
-		NetworkInterfaces: []*computepb.NetworkInterface{
-			{
-				Network: proto.String(fmt.Sprintf("projects/%s/global/networks/default", projectID)),
-				AccessConfigs: []*computepb.AccessConfig{
-					{
-						Type: proto.String("ONE_TO_ONE_NAT"),
-						Name: proto.String("External NAT"),
-					},
-				},
-			},
-		},
-		Metadata: &computepb.Metadata{
-			Items: []*computepb.Items{
-				{
-					Key:   proto.String("startup-script"),
-					Value: proto.String(startupScript),
-				},
-			},
-		},
-		Scheduling: &computepb.Scheduling{
-			Preemptible: proto.Bool(false),
-		},
-		ServiceAccounts: []*computepb.ServiceAccount{
-			{
-				Email: proto.String(serviceAccount),
-				Scopes: []string{
-					"https://www.googleapis.com/auth/cloud-platform",
-				},
-			},
-		},
-	}
-
-	req := &computepb.InsertInstanceRequest{
-		Project:          projectID,
-		Zone:             zone,
-		InstanceResource: instance,
-	}
-
-	_, err := computeClient.Insert(ctx, req)
-	if err != nil {
-		return "", fmt.Errorf("failed to create compute instance: %w", err)
-	}
-
-	// Log operation status
-	log.Printf("Creating compute instance %s", instanceID)
-
-	return instanceID, nil
-}
-
-func executeScanGitClone(w http.ResponseWriter, ctx context.Context, apiToken, repository, githubToken, llmAPIKey, commitSHA string, githubID int) {
-	// Get Compute client
-	computeClient, err := getComputeClient()
-	if err != nil {
-		log.Printf("Compute Engine not available for user %d: %v", githubID, err)
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Workflow scanning not available in this environment",
-		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return
-	}
-
-	// Submit Compute Engine VM instance with git clone approach
-	instanceID, err := createComputeInstanceGitClone(ctx, computeClient, repository, githubToken, llmAPIKey, commitSHA)
-	if err != nil {
-		log.Printf("Failed to create compute instance for user %d, repo %s: %v", githubID, repository, err)
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   fmt.Sprintf("Failed to create scan instance: %v", err),
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return
-	}
-
-	log.Printf("Compute instance created for user %d, repo %s, instance ID: %s", githubID, repository, instanceID)
-	response := WorkflowScanResponse{
-		Success: true,
-		Message: fmt.Sprintf("Scan instance created successfully. Instance ID: %s", instanceID),
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Failed to encode JSON response: %v", err)
-	}
-}
-
-func createComputeInstanceGitClone(ctx context.Context, computeClient *compute.InstancesClient, repository, githubToken, llmAPIKey, commitSHA string) (string, error) {
-	envVars := map[string]string{
-		"REPOSITORY":   repository,
-		"GITHUB_TOKEN": githubToken,
-		"LLM_API_KEY":  llmAPIKey,
-		"COMMIT_SHA":   commitSHA,
-	}
-
-	return createComputeInstanceWithEnv(ctx, computeClient, envVars)
-}
-
-func validateGitCloneRequest(w http.ResponseWriter, r *http.Request) (string, *WorkflowScanGitCloneRequest, int, bool) {
-	apiToken, githubID, ok := validateTokenAndMethod(w, r)
-	if !ok {
-		return "", nil, 0, false
-	}
-
-	req, ok := parseGitCloneRequestBody(w, r)
-	if !ok {
-		return "", nil, 0, false
-	}
-
-	return apiToken, req, githubID, true
-}
-
-func parseGitCloneRequestBody(w http.ResponseWriter, r *http.Request) (*WorkflowScanGitCloneRequest, bool) {
-	// Read and log the raw request body for debugging
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("Failed to read request body: %v", err)
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Failed to read request body",
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return nil, false
-	}
-
-	log.Printf("Raw request body: %s", string(bodyBytes))
-
-	var req WorkflowScanGitCloneRequest
-	if err := json.Unmarshal(bodyBytes, &req); err != nil {
-		log.Printf("JSON decode error: %v", err)
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   fmt.Sprintf("Invalid request body: %v", err),
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return nil, false
-	}
-
-	if req.Repository == "" || req.GithubToken == "" || req.LLMAPIKey == "" {
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Missing required fields: repository, github_token, llm_api_key",
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return nil, false
-	}
-
-	return &req, true
-}
-
-func scanWorkflowsHeaders(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	log.Printf("scanWorkflowsHeaders called - Method: %s, Content-Type: %s, Authorization: %s",
-		r.Method, r.Header.Get("Content-Type"), r.Header.Get("Authorization")[:20]+"...")
-
-	apiToken, req, githubID, ok := validateGitCloneRequest(w, r)
-	if !ok {
-		log.Printf("validateGitCloneRequest failed")
-
-		return
-	}
-
-	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
-
-	ctx := context.Background()
-	executeScanGitClone(w, ctx, apiToken, req.Repository, req.GithubToken, req.LLMAPIKey, req.CommitSHA, githubID)
-}
-
-func scanWorkflows(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	apiToken, req, githubID, ok := validateScanRequest(w, r)
-	if !ok {
-		return
-	}
-
-	log.Printf("Workflow scan requested by user %d for repository %s", githubID, req.Repository)
-
-	// Validate source data is present
-	if req.SourceBase64 == "" {
-		response := WorkflowScanResponse{
-			Success: false,
-			Error:   "Missing source data",
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Failed to encode JSON response: %v", err)
-		}
-
-		return
-	}
-
-	ctx := context.Background()
-
-	// Submit to Cloud Batch (no need to decode source data here, pass it directly to batch job)
-	executeScan(w, ctx, apiToken, req.Repository, req.GithubToken, req.SourceBase64, githubID)
-}
-
-func serveStatic(w http.ResponseWriter, r *http.Request) {
-	// Serve the HTML file for root and index.html
-	if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
-
-		return
-	}
-
-	// Serve the token page
-	if r.URL.Path == "/token" {
-		http.ServeFile(w, r, filepath.Join("frontend", "token.html"))
-
-		return
-	}
-
-	// For any other path, try to serve from frontend directory
-	filePath := filepath.Join("frontend", r.URL.Path)
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		// Serve index.html for client-side routing
-		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
-
-		return
-	}
-	http.ServeFile(w, r, filePath)
 }
 
 func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
@@ -1010,6 +762,9 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 
 	// Add new token to valid tokens
 	addValidToken(newToken, user.ID)
+
+	// Update API key in CloudSQL database
+	updateTokenInDatabase(oldToken, newToken, currentUser.StripeSession, user.Login)
 
 	log.Printf("Token revoked for user %s (%s). Old token invalidated, new token: %s",
 		user.Login, user.Email, newToken[:10]+"...")
@@ -1193,16 +948,62 @@ func createPremiumUser(githubEmail, githubUser, githubIDStr, sessionID string) {
 		StripeSession: sessionID,
 	}
 
-	// Store the premium user
+	// Store the premium user in memory (for backward compatibility)
 	premiumMutex.Lock()
 	premiumUsers[githubID] = premiumUser
 	premiumMutex.Unlock()
 
-	// Add token to valid tokens list
+	// Add token to valid tokens list (for backward compatibility)
 	addValidToken(apiToken, githubID)
+
+	// Store API key in CloudSQL database
+	database, err := getDatabase()
+	if err != nil {
+		log.Printf("Database connection error when creating premium user: %v", err)
+	} else {
+		insertQuery := `
+			INSERT INTO api_keys (api_key, subscription_id, usage_count, usage_limit, is_active, created_at)
+			VALUES ($1, $2, 0, 100, true, CURRENT_TIMESTAMP)
+			ON CONFLICT (api_key) DO UPDATE SET
+				subscription_id = EXCLUDED.subscription_id,
+				is_active = EXCLUDED.is_active
+		`
+		_, err = database.Exec(insertQuery, apiToken, sessionID)
+		if err != nil {
+			log.Printf("Failed to store API key in database: %v", err)
+		} else {
+			log.Printf("API key stored in CloudSQL for user %s", githubUser)
+		}
+	}
 
 	log.Printf("User %s (%s) upgraded to premium. Token: %s, Expires: %s",
 		githubUser, githubEmail, apiToken[:10]+"...", expiresAt.Format(time.RFC3339))
+}
+
+func serveStatic(w http.ResponseWriter, r *http.Request) {
+	// Serve the HTML file for root and index.html
+	if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+
+		return
+	}
+
+	// Serve the token page
+	if r.URL.Path == "/token" {
+		http.ServeFile(w, r, filepath.Join("frontend", "token.html"))
+
+		return
+	}
+
+	// For any other path, try to serve from frontend directory
+	filePath := filepath.Join("frontend", r.URL.Path)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		// Serve index.html for client-side routing
+		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+
+		return
+	}
+	http.ServeFile(w, r, filePath)
 }
 
 func main() {
@@ -1233,12 +1034,10 @@ func main() {
 	mux.HandleFunc("/api/validate-token", func(w http.ResponseWriter, r *http.Request) {
 		validateAPIToken(w, r)
 	})
-	mux.HandleFunc("/api/scan-workflows", func(w http.ResponseWriter, r *http.Request) {
-		scanWorkflows(w, r) // Legacy JSON format with base64 source
+	mux.HandleFunc("/api/increment-usage", func(w http.ResponseWriter, r *http.Request) {
+		incrementUsageHandler(w, r)
 	})
-	mux.HandleFunc("/api/scan-workflows-git", func(w http.ResponseWriter, r *http.Request) {
-		scanWorkflowsHeaders(w, r) // Git clone approach using request body
-	})
+	// Scan endpoints removed - scanning is now handled by binary via GitHub Actions
 	mux.HandleFunc("/webhook/stripe", func(w http.ResponseWriter, r *http.Request) {
 		handleStripeWebhook(config, w, r)
 	})
@@ -1260,4 +1059,55 @@ func main() {
 	log.Printf("Server starting on port %s", config.Port)
 	log.Printf("OAuth callback URL: /auth/github")
 	log.Fatal(server.ListenAndServe())
+}
+
+// updateTokenInDatabase handles the database operations for token revocation.
+func updateTokenInDatabase(oldToken, newToken, subscriptionID, userLogin string) {
+	database, err := getDatabase()
+	if err != nil {
+		log.Printf("Database connection error when revoking token: %v", err)
+
+		return
+	}
+
+	err = revokeAndReplaceToken(database, oldToken, newToken, subscriptionID)
+	if err != nil {
+		log.Printf("Failed to revoke and replace token: %v", err)
+
+		return
+	}
+
+	log.Printf("Token revocation updated in CloudSQL for user %s", userLogin)
+}
+
+// revokeAndReplaceToken performs the actual database transaction.
+func revokeAndReplaceToken(db *sql.DB, oldToken, newToken, subscriptionID string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Deactivate old token
+	_, err = tx.Exec("UPDATE api_keys SET is_active = false WHERE api_key = $1", oldToken)
+	if err != nil {
+		return fmt.Errorf("failed to deactivate old token: %w", err)
+	}
+
+	// Insert new token
+	insertQuery := `
+		INSERT INTO api_keys (api_key, subscription_id, usage_count, usage_limit, is_active, created_at)
+		VALUES ($1, $2, 0, 100, true, CURRENT_TIMESTAMP)
+	`
+	_, err = tx.Exec(insertQuery, newToken, subscriptionID)
+	if err != nil {
+		return fmt.Errorf("failed to insert new token: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }

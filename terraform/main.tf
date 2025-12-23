@@ -35,8 +35,7 @@ resource "google_project_service" "apis" {
     "secretmanager.googleapis.com",
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
-    "batch.googleapis.com",
-    "compute.googleapis.com",
+    "sqladmin.googleapis.com",
     "storage.googleapis.com"
   ])
   
@@ -85,14 +84,13 @@ resource "google_service_account" "cloud_run_sa" {
   description  = "Service account for workflow scanner Cloud Run service"
 }
 
-# IAM bindings for Cloud Run service account (following GCP Batch requirements)
+# IAM bindings for Cloud Run service account
 resource "google_project_iam_member" "cloud_run_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
     "roles/artifactregistry.reader",
-    "roles/compute.instanceAdmin.v1",   # Required to create Compute instances
-    "roles/storage.objectAdmin",
-    "roles/iam.serviceAccountUser"      # Required to use scanner service account
+    "roles/cloudsql.client",           # Required for CloudSQL access
+    "roles/storage.objectAdmin"
   ])
   
   project = var.project_id
@@ -100,12 +98,6 @@ resource "google_project_iam_member" "cloud_run_sa_bindings" {
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
-# Grant Cloud Run service account permission to use scanner service account
-resource "google_service_account_iam_member" "cloud_run_use_scanner_sa" {
-  service_account_id = google_service_account.scanner_sa.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.cloud_run_sa.email}"
-}
 
 # Secrets in Secret Manager
 locals {
@@ -156,6 +148,14 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
   template {
     service_account = google_service_account.cloud_run_sa.email
     
+    # Add CloudSQL connection
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.workflow_scanner_db.connection_name]
+      }
+    }
+    
     scaling {
       min_instance_count = 0
       max_instance_count = 10
@@ -174,36 +174,27 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
           memory = "2Gi"
         }
       }
+
+      # Mount CloudSQL volume
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
       
       env {
         name  = "BASE_URL"
         value = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
       }
       
-      # Compute Engine configuration
+      # Database configuration
       env {
-        name  = "COMPUTE_PROJECT_ID"
-        value = var.project_id
-      }
-      
-      env {
-        name  = "COMPUTE_REGION"
-        value = var.region
-      }
-      
-      env {
-        name  = "COMPUTE_BUCKET"
-        value = google_storage_bucket.scanner_jobs.name
-      }
-      
-      env {
-        name  = "COMPUTE_SERVICE_ACCOUNT"
-        value = google_service_account.scanner_sa.email
-      }
-      
-      env {
-        name  = "SCANNER_IMAGE"
-        value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/batch-scanner:latest"
+        name = "DATABASE_URL"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.database_url.secret_id
+            version = "latest"
+          }
+        }
       }
       
       # GitHub OAuth secrets
@@ -278,7 +269,8 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
   
   depends_on = [
     google_project_service.apis,
-    google_artifact_registry_repository.workflow_scanner
+    google_artifact_registry_repository.workflow_scanner,
+    google_sql_database_instance.workflow_scanner_db
   ]
 }
 
@@ -291,96 +283,7 @@ resource "google_cloud_run_service_iam_member" "public_access" {
   member   = "allUsers"
 }
 
-# Cloud Storage bucket for workflow data
-resource "google_storage_bucket" "workflow_data" {
-  name     = "workflow-scanner-data-${random_id.bucket_suffix.hex}"
-  location = var.region
-  
-  uniform_bucket_level_access = true
-  
-  lifecycle_rule {
-    condition {
-      age = 30
-    }
-    action {
-      type = "Delete"
-    }
-  }
-  
-  depends_on = [google_project_service.apis]
-}
-
 # Random suffix for bucket name uniqueness
 resource "random_id" "bucket_suffix" {
   byte_length = 8
-}
-
-# Service account for Compute Engine scanner instances
-resource "google_service_account" "scanner_sa" {
-  account_id   = "workflow-scanner-compute"
-  display_name = "Workflow Scanner Compute Service Account"
-  description  = "Service account for Compute Engine workflow scanning instances"
-}
-
-# IAM bindings for scanner service account (following GCP Compute requirements)
-resource "google_project_iam_member" "scanner_sa_bindings" {
-  for_each = toset([
-    "roles/secretmanager.secretAccessor",
-    "roles/artifactregistry.reader", 
-    "roles/storage.objectAdmin",
-    "roles/compute.serviceAgent",     # Required for Compute instances
-    "roles/logging.logWriter"        # Required for job logs
-  ])
-  
-  project = var.project_id
-  role    = each.value
-  member  = "serviceAccount:${google_service_account.scanner_sa.email}"
-}
-
-# Grant scanner service account access to storage bucket
-resource "google_storage_bucket_iam_member" "scanner_bucket_access" {
-  bucket = google_storage_bucket.workflow_data.name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.scanner_sa.email}"
-}
-
-# Cloud Storage bucket for Terraform state (must be created manually first)
-# This is commented out because it should be created before running terraform
-# resource "google_storage_bucket" "terraform_state" {
-#   name     = "workflow-scanner-terraform-state"
-#   location = var.region
-# }
-
-# Cloud Storage bucket for scanner job data exchange
-resource "google_storage_bucket" "scanner_jobs" {
-  name     = "workflow-scanner-compute-${random_id.bucket_suffix.hex}"
-  location = var.region
-  
-  uniform_bucket_level_access = true
-  
-  # Auto-delete job data after 7 days
-  lifecycle_rule {
-    condition {
-      age = 7
-    }
-    action {
-      type = "Delete"
-    }
-  }
-  
-  depends_on = [google_project_service.apis]
-}
-
-# Grant Cloud Run service account access to scanner bucket
-resource "google_storage_bucket_iam_member" "cloud_run_scanner_access" {
-  bucket = google_storage_bucket.scanner_jobs.name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.cloud_run_sa.email}"
-}
-
-# Grant scanner service account access to scanner bucket
-resource "google_storage_bucket_iam_member" "scanner_scanner_access" {
-  bucket = google_storage_bucket.scanner_jobs.name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.scanner_sa.email}"
 }

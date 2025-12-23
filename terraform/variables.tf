@@ -47,6 +47,13 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "db_password" {
+  description = "Database password for CloudSQL"
+  type        = string
+  sensitive   = true
+  default     = null # Will use random password if not provided
+}
+
 variable "service_name" {
   description = "Name of the Cloud Run service"
   type        = string
