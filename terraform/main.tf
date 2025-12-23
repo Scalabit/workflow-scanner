@@ -274,10 +274,12 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
   }
   
   depends_on = [
-    google_project_service.apis,
-    google_artifact_registry_repository.workflow_scanner,
-    google_sql_database_instance.workflow_scanner_db
-  ]
+      google_project_service.apis,
+      google_artifact_registry_repository.workflow_scanner,
+      google_sql_database_instance.workflow_scanner_db,
+      google_secret_manager_secret_version.database_url,
+      google_secret_manager_secret_version.secret_versions
+    ]
 }
 
 
