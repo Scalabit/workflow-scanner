@@ -35,10 +35,10 @@ jobs:
     - name: Build and push binary scanner to Docker Hub
       run: |
         # Build for release tag
-        docker build -f binary.Dockerfile -t scalabit/workflow-scanner:${{ env.TAG }} .
-        docker build -f binary.Dockerfile -t scalabit/workflow-scanner:latest .
+        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:${{ env.TAG }} .
+        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:latest .
         
         # Push to Docker Hub
-        docker push scalabit/workflow-scanner:${{ env.TAG }}
-        docker push scalabit/workflow-scanner:latest
+        docker push mariominhava04/workflow-scanner:${{ env.TAG }}
+        docker push mariominhava04/workflow-scanner:latest
 

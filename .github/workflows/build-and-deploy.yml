@@ -54,12 +54,12 @@ jobs:
     - name: Build and push binary scanner to Docker Hub
       run: |
         # Build the binary scanner image for Docker Hub
-        docker build -f binary.Dockerfile -t scalabit/workflow-scanner:${{ github.sha }} .
-        docker build -f binary.Dockerfile -t scalabit/workflow-scanner:latest .
+        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:${{ github.sha }} .
+        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:latest .
         
         # Push to Docker Hub
-        docker push scalabit/workflow-scanner:${{ github.sha }}
-        docker push scalabit/workflow-scanner:latest
+        docker push mariominhava04/workflow-scanner:${{ github.sha }}
+        docker push mariominhava04/workflow-scanner:latest
         
   deploy-infrastructure:
     needs: build-and-push
