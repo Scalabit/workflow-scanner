@@ -16,7 +16,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
-	"github.com/stripe/stripe-go/v76"
+	stripe "github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
@@ -39,13 +39,11 @@ func getDatabase() (*sql.DB, error) {
 
 		db, dbErr = sql.Open("postgres", databaseURL)
 		if dbErr != nil {
-
 			return
 		}
 
 		// Test the connection
 		if dbErr = db.Ping(); dbErr != nil {
-
 			return
 		}
 
@@ -594,6 +592,7 @@ func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
 		return
 	}
 
@@ -601,6 +600,7 @@ func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+
 		return
 	}
 
@@ -614,11 +614,13 @@ func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+
 		return
 	}
 
 	if req.Repository == "" {
 		http.Error(w, "Repository is required", http.StatusBadRequest)
+
 		return
 	}
 
@@ -626,6 +628,7 @@ func incrementUsageHandler(w http.ResponseWriter, r *http.Request) {
 	if err := incrementAPIKeyUsage(token, req.Repository, req.Success); err != nil {
 		log.Printf("Failed to increment usage: %v", err)
 		http.Error(w, "Failed to increment usage", http.StatusInternalServerError)
+
 		return
 	}
 
