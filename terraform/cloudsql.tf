@@ -40,7 +40,7 @@ resource "google_sql_database" "workflow_scanner" {
 resource "google_sql_user" "workflow_user" {
   name     = "workflow_user"
   instance = google_sql_database_instance.workflow_scanner_db.name
-  password = var.db_password != null ? var.db_password : random_password.db_password.result
+  password = random_password.db_password.result
   project  = var.project_id
 }
 
