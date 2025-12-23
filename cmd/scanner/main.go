@@ -152,7 +152,7 @@ func incrementUsage(repository string, success bool) error {
 		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", serviceURL+"/api/increment-usage", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest(http.MethodPost, serviceURL+"/api/increment-usage", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -172,6 +172,7 @@ func incrementUsage(repository string, success bool) error {
 	}
 
 	log.Printf("Usage incremented successfully for repository: %s", repository)
+
 	return nil
 }
 

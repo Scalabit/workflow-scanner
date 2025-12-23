@@ -33,16 +33,19 @@ func getDatabase() (*sql.DB, error) {
 		databaseURL := os.Getenv("DATABASE_URL")
 		if databaseURL == "" {
 			dbErr = fmt.Errorf("DATABASE_URL environment variable not set")
+
 			return
 		}
 
 		db, dbErr = sql.Open("postgres", databaseURL)
 		if dbErr != nil {
+
 			return
 		}
 
 		// Test the connection
 		if dbErr = db.Ping(); dbErr != nil {
+
 			return
 		}
 
@@ -582,6 +585,7 @@ func incrementAPIKeyUsage(apiKey, repository string, success bool) error {
 	}
 
 	log.Printf("Usage incremented for API key %s, repository: %s, success: %t", apiKey, repository, success)
+
 	return nil
 }
 
@@ -702,16 +706,6 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func validateRequestMethod(w http.ResponseWriter, r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-
-		return false
-	}
-
-	return true
-}
-
 func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -760,41 +754,7 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 	addValidToken(newToken, user.ID)
 
 	// Update API key in CloudSQL database
-	database, err := getDatabase()
-	if err != nil {
-		log.Printf("Database connection error when revoking token: %v", err)
-	} else {
-		// Deactivate old token and insert new one
-		tx, err := database.Begin()
-		if err != nil {
-			log.Printf("Failed to start transaction for token revocation: %v", err)
-		} else {
-			// Deactivate old token
-			_, err = tx.Exec("UPDATE api_keys SET is_active = false WHERE api_key = $1", oldToken)
-			if err != nil {
-				log.Printf("Failed to deactivate old token: %v", err)
-				tx.Rollback()
-			} else {
-				// Insert new token
-				insertQuery := `
-					INSERT INTO api_keys (api_key, subscription_id, usage_count, usage_limit, is_active, created_at)
-					VALUES ($1, $2, 0, 100, true, CURRENT_TIMESTAMP)
-				`
-				_, err = tx.Exec(insertQuery, newToken, currentUser.StripeSession)
-				if err != nil {
-					log.Printf("Failed to insert new token: %v", err)
-					tx.Rollback()
-				} else {
-					err = tx.Commit()
-					if err != nil {
-						log.Printf("Failed to commit token revocation: %v", err)
-					} else {
-						log.Printf("Token revocation updated in CloudSQL for user %s", user.Login)
-					}
-				}
-			}
-		}
-	}
+	updateTokenInDatabase(oldToken, newToken, currentUser.StripeSession, user.Login)
 
 	log.Printf("Token revoked for user %s (%s). Old token invalidated, new token: %s",
 		user.Login, user.Email, newToken[:10]+"...")
@@ -1086,4 +1046,59 @@ func main() {
 	log.Printf("Server starting on port %s", config.Port)
 	log.Printf("OAuth callback URL: /auth/github")
 	log.Fatal(server.ListenAndServe())
+}
+
+// updateTokenInDatabase handles the database operations for token revocation
+func updateTokenInDatabase(oldToken, newToken, subscriptionID, userLogin string) {
+	database, err := getDatabase()
+	if err != nil {
+		log.Printf("Database connection error when revoking token: %v", err)
+
+		return
+	}
+
+	err = revokeAndReplaceToken(database, oldToken, newToken, subscriptionID)
+	if err != nil {
+		log.Printf("Failed to revoke and replace token: %v", err)
+
+		return
+	}
+
+	log.Printf("Token revocation updated in CloudSQL for user %s", userLogin)
+}
+
+// revokeAndReplaceToken performs the actual database transaction
+func revokeAndReplaceToken(db *sql.DB, oldToken, newToken, subscriptionID string) error {
+	tx, err := db.Begin()
+	if err != nil {
+
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Deactivate old token
+	_, err = tx.Exec("UPDATE api_keys SET is_active = false WHERE api_key = $1", oldToken)
+	if err != nil {
+
+		return fmt.Errorf("failed to deactivate old token: %w", err)
+	}
+
+	// Insert new token
+	insertQuery := `
+		INSERT INTO api_keys (api_key, subscription_id, usage_count, usage_limit, is_active, created_at)
+		VALUES ($1, $2, 0, 100, true, CURRENT_TIMESTAMP)
+	`
+	_, err = tx.Exec(insertQuery, newToken, subscriptionID)
+	if err != nil {
+
+		return fmt.Errorf("failed to insert new token: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
