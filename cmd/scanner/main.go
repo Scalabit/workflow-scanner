@@ -96,7 +96,7 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	gitAuth := dag.SetSecret("git-auth", config.githubToken)
 	gitRepo := dag.Git(cloneURL, dagger.GitOpts{
 		KeepGitDir:       true,
-		HTTPAuthUsername: config.githubToken, // For GitHub, token can be username
+		HTTPAuthUsername: config.githubToken, // For GitHub, this token can be username
 		HTTPAuthToken:    gitAuth,
 	})
 
