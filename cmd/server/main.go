@@ -651,6 +651,7 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 		http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+
 		return
 	}
 
@@ -661,6 +662,7 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Database connection error: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+
 		return
 	}
 
@@ -677,21 +679,25 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Invalid API key", http.StatusUnauthorized)
+
 			return
 		}
 		log.Printf("Database query error: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+
 		return
 	}
 
 	// Check if key is active and has usage remaining
 	if !isActive {
 		http.Error(w, "API key is inactive", http.StatusForbidden)
+
 		return
 	}
 
 	if usageCount >= usageLimit {
 		http.Error(w, "API key usage limit exceeded", http.StatusTooManyRequests)
+
 		return
 	}
 
@@ -712,6 +718,7 @@ func validateAPIToken(w http.ResponseWriter, r *http.Request) {
 func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
 		return
 	}
 
@@ -977,12 +984,14 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 	// Serve the HTML file for root and index.html
 	if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+
 		return
 	}
 
 	// Serve the token page
 	if r.URL.Path == "/token" {
 		http.ServeFile(w, r, filepath.Join("frontend", "token.html"))
+
 		return
 	}
 
@@ -991,6 +1000,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		// Serve index.html for client-side routing
 		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+
 		return
 	}
 	http.ServeFile(w, r, filePath)
@@ -1051,7 +1061,7 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
-// updateTokenInDatabase handles the database operations for token revocation
+// updateTokenInDatabase handles the database operations for token revocation.
 func updateTokenInDatabase(oldToken, newToken, subscriptionID, userLogin string) {
 	database, err := getDatabase()
 	if err != nil {
@@ -1070,11 +1080,10 @@ func updateTokenInDatabase(oldToken, newToken, subscriptionID, userLogin string)
 	log.Printf("Token revocation updated in CloudSQL for user %s", userLogin)
 }
 
-// revokeAndReplaceToken performs the actual database transaction
+// revokeAndReplaceToken performs the actual database transaction.
 func revokeAndReplaceToken(db *sql.DB, oldToken, newToken, subscriptionID string) error {
 	tx, err := db.Begin()
 	if err != nil {
-
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
@@ -1082,7 +1091,6 @@ func revokeAndReplaceToken(db *sql.DB, oldToken, newToken, subscriptionID string
 	// Deactivate old token
 	_, err = tx.Exec("UPDATE api_keys SET is_active = false WHERE api_key = $1", oldToken)
 	if err != nil {
-
 		return fmt.Errorf("failed to deactivate old token: %w", err)
 	}
 
@@ -1093,13 +1101,11 @@ func revokeAndReplaceToken(db *sql.DB, oldToken, newToken, subscriptionID string
 	`
 	_, err = tx.Exec(insertQuery, newToken, subscriptionID)
 	if err != nil {
-
 		return fmt.Errorf("failed to insert new token: %w", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
