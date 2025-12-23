@@ -59,8 +59,7 @@ resource "google_sql_user" "workflow_user" {
 # Random password for database user
 resource "random_password" "db_password" {
   length  = 16
-  special = true
-  override_special = "!#$%&*()-_=+[]{}<>?"
+  special = false
 }
 
 # Store database password in Secret Manager
