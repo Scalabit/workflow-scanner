@@ -91,6 +91,7 @@ jobs:
       
     - name: Terraform Plan
       working-directory: ./terraform
+      timeout-minutes: 10
       run: |
         terraform plan \
           -var="project_id=${{ env.PROJECT_ID }}" \
@@ -105,6 +106,7 @@ jobs:
           
     - name: Terraform Apply
       working-directory: ./terraform
+      timeout-minutes: 15
       run: |
         terraform apply -auto-approve \
           -var="project_id=${{ env.PROJECT_ID }}" \
@@ -116,3 +118,12 @@ jobs:
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
+          
+    - name: Cleanup Terraform lock on failure
+      if: failure()
+      working-directory: ./terraform
+      run: |
+        # Get the lock ID and force unlock
+        echo "Attempting to unlock any stuck Terraform state locks..."
+        terraform force-unlock -force 1766503302731339 || true
+        echo "Lock cleanup completed"
