@@ -1,9 +1,17 @@
+# Wait for SQL Admin API to propagate
+resource "time_sleep" "wait_for_sql_api" {
+  depends_on = [google_project_service.apis]
+  create_duration = "60s"
+}
+
 # CloudSQL PostgreSQL instance
 resource "google_sql_database_instance" "workflow_scanner_db" {
   name             = "workflow-scanner-db"
   database_version = "POSTGRES_15"
   region          = var.region
   project         = var.project_id
+  
+  depends_on = [time_sleep.wait_for_sql_api]
 
   settings {
     tier              = "db-f1-micro"
