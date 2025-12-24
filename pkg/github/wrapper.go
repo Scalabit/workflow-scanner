@@ -41,8 +41,8 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	// Step 2: Get the main branch
 	mainBranch := gitRepo.Branch("main")
 
-	// Step 3: Create a new branch from main
-	workingDir := mainBranch.Tree()
+	// Step 3: Get the tree and CLEAN the .git directory
+	workingDir := mainBranch.Tree().WithoutDirectory(".git")
 
 	// Step 4: Replace the contents with our fixed files
 	// Copy all files from source directory to the working directory
