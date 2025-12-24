@@ -30,15 +30,25 @@ jobs:
         
     - name: Extract tag name
       shell: bash
-      run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      run: |
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        else
+          # Use commit SHA for manual triggers
+          echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+        fi
       
     - name: Build and push binary scanner to Docker Hub
       run: |
-        # Build for release tag
-        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:${{ env.TAG }} .
+        # Build scanner image
         docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:latest .
         
         # Push to Docker Hub
-        docker push mariominhava04/workflow-scanner:${{ env.TAG }}
         docker push mariominhava04/workflow-scanner:latest
+        
+        # Also tag with specific version if this is a release
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          docker tag mariominhava04/workflow-scanner:latest mariominhava04/workflow-scanner:${{ env.TAG }}
+          docker push mariominhava04/workflow-scanner:${{ env.TAG }}
+        fi
 
