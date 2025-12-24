@@ -25,8 +25,8 @@ RUN CGO_ENABLED=0 GOOS=linux garble -literals -tiny -seed=random build -o workfl
 # Runtime stage - minimal Alpine with just the binary
 FROM alpine:3.19
 
-# Install ca-certificates for HTTPS requests
-RUN apk add --no-cache ca-certificates
+# Install ca-certificates and git (needed for git operations)
+RUN apk add --no-cache ca-certificates git
 
 # Copy the binary from builder
 COPY --from=builder /app/workflow-scanner /usr/local/bin/workflow-scanner
