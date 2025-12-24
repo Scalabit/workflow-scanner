@@ -256,8 +256,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
-	githubTokenSecret := dag.SetSecret("github-token", config.githubToken)
-	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubTokenSecret}))
+	githubClient := github.NewWrapperIssueClientImpl(dag, config.githubToken)
 
 	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, githubClient)
 
