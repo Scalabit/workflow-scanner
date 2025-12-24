@@ -16,30 +16,20 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the unified server (main application for Cloud Run)
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
+# Build the scanner binary for GitHub Actions
+RUN CGO_ENABLED=0 GOOS=linux go build -o workflow-scanner ./cmd/scanner
 
 # Final stage
 FROM alpine:3.18
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and git (needed for git operations)
+RUN apk --no-cache add ca-certificates git
 
 # Create app directory
 WORKDIR /root/
 
-# Copy the unified server binary from builder stage
-COPY --from=builder /app/server .
+# Copy the scanner binary from builder stage
+COPY --from=builder /app/workflow-scanner /usr/local/bin/workflow-scanner
 
-# Copy frontend assets
-COPY --from=builder /app/frontend ./frontend
-
-# Set environment variables for Dagger (dummy values for Cloud Run)
-ENV DAGGER_SESSION_PORT=1234
-ENV DAGGER_SESSION_TOKEN=dummy
-
-# Expose port
-EXPOSE 8080
-
-# Run the unified server
-CMD ["./server"]
+# Run the scanner
+ENTRYPOINT ["workflow-scanner"]
