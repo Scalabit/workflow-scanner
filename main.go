@@ -64,10 +64,16 @@ func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dag
 	//	return "", fmt.Errorf("invalid or expired API token - please check your subscription")
 	// }
 
+	// Extract GitHub token string
+	githubTokenStr, err := githubToken.Plaintext(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract GitHub token: %w", err)
+	}
+
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
-	githubClient := github.NewWrapperIssueClientImpl(dag.GithubIssue(dagger.GithubIssueOpts{Token: githubToken}))
+	githubClient := github.NewWrapperIssueClientImpl(dag, githubTokenStr)
 
 	return scanAndFixWorflowsImpl(ctx, repository, source, zizmor, agent, githubClient)
 }
