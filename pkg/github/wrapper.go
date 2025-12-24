@@ -51,7 +51,6 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	})
 
 	// Step 5: Commit and push changes using git container
-	// First, get better error visibility by running git operations step by step
 	gitContainer := w.daggerClient.Container().
 		From("alpine/git:latest").
 		WithDirectory("/workspace", finalDir).
@@ -64,10 +63,16 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	remoteURL := fmt.Sprintf("https://%s@github.com/%s.git", w.githubToken, repo)
 	gitContainer = gitContainer.WithExec([]string{"git", "remote", "add", "origin", remoteURL})
 
-	// Fetch and create branch
+	// Fetch and prepare branch WITHOUT overwriting files
 	gitContainer = gitContainer.
 		WithExec([]string{"git", "fetch", "origin", "main"}).
-		WithExec([]string{"git", "checkout", "-b", branchName, "origin/main"}).
+		// Create the branch label pointing to main's history
+		WithExec([]string{"git", "branch", branchName, "origin/main"}).
+		// Soft-switch: Point HEAD to the new branch without touching the working directory
+		WithExec([]string{"git", "symbolic-ref", "HEAD", "refs/heads/" + branchName}).
+		// Reset: Sync the git index with main, leaving your fixed files on disk as "modifications"
+		WithExec([]string{"git", "reset"}).
+		// Stage everything (this captures your fixes)
 		WithExec([]string{"git", "add", "."})
 
 	// Check if there are any changes to commit
