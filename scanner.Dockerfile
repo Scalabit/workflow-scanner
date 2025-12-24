@@ -38,6 +38,10 @@ RUN curl -L https://dl.dagger.io/dagger/install.sh | sh && \
 # Copy the workflow scanner binary
 COPY --from=builder /app/workflow-scanner /usr/local/bin/
 
+# Copy Dagger configuration to enable modules
+COPY --from=builder /app/dagger.json /app/dagger.json
+WORKDIR /app
+
 # Make sure the binary is executable
 RUN chmod +x /usr/local/bin/workflow-scanner
 
@@ -56,5 +60,7 @@ CMD ["sh", "-c", "dockerd --host=unix:///var/run/docker.sock & \
     echo 'Pre-pulling Zizmor image...' && \
     docker pull ghcr.io/zizmorcore/zizmor:1.18.0 && \
     echo 'Zizmor image ready!' && \
+    echo 'Initializing Dagger project with modules...' && \
+    dagger develop && \
     echo 'Starting Dagger session and workflow scanner...' && \
     dagger run workflow-scanner"]
