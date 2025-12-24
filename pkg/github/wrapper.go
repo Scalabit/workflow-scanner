@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 	"workflow-scanner/internal/dagger"
 )
@@ -49,26 +50,46 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		Exclude: []string{".git"},
 	})
 
-	// Step 5: Commit the changes using a git container
+	// Step 5: Commit and push changes using git container
+	// First, get better error visibility by running git operations step by step
 	gitContainer := w.daggerClient.Container().
 		From("alpine/git:latest").
 		WithDirectory("/workspace", finalDir).
 		WithWorkdir("/workspace").
-		WithSecretVariable("GITHUB_TOKEN", w.daggerClient.SetSecret("github-token", w.githubToken)).
 		WithExec([]string{"git", "config", "--global", "user.name", "Workflow Security Bot"}).
 		WithExec([]string{"git", "config", "--global", "user.email", "noreply@github.com"}).
-		WithExec([]string{"git", "init"}).
-		WithExec([]string{"git", "remote", "add", "origin", fmt.Sprintf("https://x-access-token:%s@github.com/%s.git", w.githubToken, repo)}).
+		WithExec([]string{"git", "init"})
+
+	// Set up remote with authentication
+	remoteURL := fmt.Sprintf("https://%s@github.com/%s.git", w.githubToken, repo)
+	gitContainer = gitContainer.WithExec([]string{"git", "remote", "add", "origin", remoteURL})
+
+	// Fetch and create branch
+	gitContainer = gitContainer.
 		WithExec([]string{"git", "fetch", "origin", "main"}).
 		WithExec([]string{"git", "checkout", "-b", branchName, "origin/main"}).
-		WithExec([]string{"git", "add", "."}).
-		WithExec([]string{"git", "commit", "-m", "Security fixes: " + title}).
+		WithExec([]string{"git", "add", "."})
+
+	// Check if there are any changes to commit
+	statusOutput, err := gitContainer.WithExec([]string{"git", "status", "--porcelain"}).Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to check git status: %w", err)
+	}
+
+	if strings.TrimSpace(statusOutput) == "" {
+		return "", fmt.Errorf("no changes to commit - all security issues may already be fixed")
+	}
+
+	// Commit and push
+	commitMsg := fmt.Sprintf("Security fixes: %s\n\n%s", title, "Automated security fixes applied by Workflow Scanner")
+	gitContainer = gitContainer.
+		WithExec([]string{"git", "commit", "-m", commitMsg}).
 		WithExec([]string{"git", "push", "origin", branchName})
 
-	// Execute the git operations
-	_, err := gitContainer.Stdout(ctx)
+	// Execute the final push
+	pushOutput, err := gitContainer.Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to push branch: %w", err)
+		return "", fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, pushOutput)
 	}
 
 	// Step 6: Create the pull request using GitHub API
