@@ -40,6 +40,7 @@ COPY --from=builder /app/workflow-scanner /usr/local/bin/
 
 # Copy Dagger configuration to enable modules
 COPY --from=builder /app/dagger.json /app/dagger.json
+COPY --from=builder /app/workspace /app/workspace
 WORKDIR /app
 
 # Make sure the binary is executable
