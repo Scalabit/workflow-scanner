@@ -28,18 +28,20 @@ type batchConfig struct {
 	useGitClone  bool
 }
 
+var dummyVal = 5
+
 func main() {
 	fmt.Println("Scanner starting...")
-	
+
 	config := loadConfig()
-	fmt.Printf("DEBUG: Repo=%s Commit=%s GitClone=%v\n", 
+	fmt.Printf("DEBUG: Repo=%s Commit=%s GitClone=%v\n",
 		config.repository, config.commitSHA, config.useGitClone)
-	
+
 	validateConfig(config)
 	validateDaggerEnvironment()
 
 	ctx := context.Background()
-	
+
 	// Recover from any panics in dagger.Connect()
 	defer func() {
 		if r := recover(); r != nil {
@@ -51,9 +53,9 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-	
+
 	dag := dagger.Connect()
-	
+
 	fmt.Println("Dagger connected successfully")
 
 	sourceDir := getSourceDirectory(dag, config)
@@ -96,30 +98,31 @@ func validateConfig(config batchConfig) {
 func validateDaggerEnvironment() {
 	daggerPort := os.Getenv("DAGGER_SESSION_PORT")
 	daggerToken := os.Getenv("DAGGER_SESSION_TOKEN")
-	
-	fmt.Printf("DEBUG: DAGGER_SESSION_PORT=%s DAGGER_SESSION_TOKEN=%s\n", 
-		daggerPort, 
+
+	fmt.Printf("DEBUG: DAGGER_SESSION_PORT=%s DAGGER_SESSION_TOKEN=%s\n",
+		daggerPort,
 		func() string {
 			if daggerToken == "" {
 				return "(not set)"
 			}
+
 			return "(set)"
 		}())
-		
+
 	if daggerPort == "" {
 		fmt.Println("DAGGER_SESSION_PORT not set")
 		fmt.Println("This indicates the Dagger engine is not running or not properly configured")
 		fmt.Println("Make sure the GitHub Action installs Dagger CLI and starts the engine")
 		os.Exit(1)
 	}
-	
+
 	if daggerToken == "" {
-		fmt.Println("DAGGER_SESSION_TOKEN not set")  
+		fmt.Println("DAGGER_SESSION_TOKEN not set")
 		fmt.Println("This indicates the Dagger engine session is not properly configured")
 		fmt.Println("Make sure the GitHub Action starts the Dagger engine properly")
 		os.Exit(1)
 	}
-	
+
 	// Test if we can reach the Dagger engine
 	fmt.Printf("Testing connection to Dagger engine at 127.0.0.1:%s\n", daggerPort)
 	testDaggerConnection(daggerPort)
@@ -127,9 +130,9 @@ func validateDaggerEnvironment() {
 
 func testDaggerConnection(port string) {
 	address := fmt.Sprintf("127.0.0.1:%s", port)
-	
+
 	// Try to establish a TCP connection
-	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
+	conn, err := net.DialTimeout("tcp", address, time.Duration(dummyVal)*time.Second)
 	if err != nil {
 		fmt.Printf("Cannot connect to Dagger engine at %s: %v\n", address, err)
 		fmt.Println("This usually means:")
@@ -139,7 +142,7 @@ func testDaggerConnection(port string) {
 		os.Exit(1)
 	}
 	defer conn.Close()
-	
+
 	fmt.Printf("Successfully connected to Dagger engine at %s\n", address)
 }
 
