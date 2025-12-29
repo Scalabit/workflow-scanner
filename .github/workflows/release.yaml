@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v5
+      with:
+        persist-credentials: false
       
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -48,7 +50,7 @@ jobs:
         
         # Also tag with specific version if this is a release
         if [[ "${{ github.event_name }}" == "release" ]]; then
-          docker tag mariominhava04/workflow-scanner:latest mariominhava04/workflow-scanner:${{ env.TAG }}
-          docker push mariominhava04/workflow-scanner:${{ env.TAG }}
+          docker tag mariominhava04/workflow-scanner:latest mariominhava04/workflow-scanner:${TAG}
+          docker push mariominhava04/workflow-scanner:${TAG}
         fi
 
