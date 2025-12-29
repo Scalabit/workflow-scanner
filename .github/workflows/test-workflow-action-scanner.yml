@@ -26,7 +26,7 @@ jobs:
         uses: Scalabit/workflow-scanner-action@7e2fcef8f62f188b19d823d3b30bc706f2bba234 # master
         with:
           api-token: ${{ secrets.FS_API_TOKEN }}
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ secrets.TEST_GH_TOKEN }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
           repository: 'Scalabit/integration-test-workflow-scanner'
       
@@ -37,7 +37,7 @@ jobs:
           EXPECTED_PR_TITLE: 'Security Audit & Fixes for GitHub Actions Workflows'
           EXPECTED_DESC_TITLE: 'Complete Security Audit Report'
           REPO: 'Scalabit/integration-test-workflow-scanner'
-          TOKEN: ${{ secrets.GH_PAT }}
+          TOKEN: ${{ secrets.TEST_GH_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -70,7 +70,7 @@ jobs:
       - name: Close AI Pull Request
         if: ${{ steps.validate_pr.outcome == 'success' }}
         env:
-          TOKEN: ${{ secrets.GH_PAT }}
+          TOKEN: ${{ secrets.TEST_GH_TOKEN }}
           REPO: 'Scalabit/integration-test-workflow-scanner'
         shell: bash
         run: |
