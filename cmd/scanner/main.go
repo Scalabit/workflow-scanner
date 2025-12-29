@@ -183,18 +183,140 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	})
 
 	if config.commitSHA != "" && config.commitSHA != "undefined" {
-		log.Printf("DEBUG: Checking out specific commit: %s", config.commitSHA)
-		tree := gitRepo.Commit(config.commitSHA).Tree()
-		log.Printf("DEBUG: Successfully checked out commit tree")
+		log.Printf("DEBUG: Requested specific commit: %s", config.commitSHA)
 
+		exists, err := commitExistsOnRepo(config.repository, config.commitSHA, config.githubToken)
+		if err != nil {
+			log.Printf("DEBUG: Failed to verify commit on remote: %v", err)
+		}
+
+		if exists {
+			log.Printf("DEBUG: Checking out specific commit: %s", config.commitSHA)
+			tree := gitRepo.Commit(config.commitSHA).Tree()
+			log.Printf("DEBUG: Successfully checked out commit tree")
+
+			return tree
+		}
+
+		log.Printf("DEBUG: Commit %s not found on remote %s, resolving target repo HEAD SHA", config.commitSHA, config.repository)
+
+		headSha, err := getBranchHeadSHA(config.repository, config.githubToken)
+		if err == nil && headSha != "" {
+			log.Printf("DEBUG: Using target repo HEAD SHA: %s", headSha)
+			tree := gitRepo.Commit(headSha).Tree()
+			log.Printf("DEBUG: Successfully checked out commit tree for HEAD SHA %s", headSha)
+			return tree
+		}
+
+		log.Printf("DEBUG: Could not resolve HEAD SHA for %s (err=%v), falling back to branch checkout", config.repository, err)
+	}
+
+	defaultBranch, err := getDefaultBranch(config.repository, config.githubToken)
+	if err != nil || defaultBranch == "" {
+		log.Printf("DEBUG: Could not determine default branch (err=%v). Falling back to HEAD", err)
+		tree := gitRepo.Branch("HEAD").Tree()
+		log.Printf("DEBUG: Successfully checked out HEAD tree")
 		return tree
 	}
 
-	log.Printf("DEBUG: Checking out HEAD branch")
-	tree := gitRepo.Branch("HEAD").Tree()
-	log.Printf("DEBUG: Successfully checked out HEAD tree")
+	log.Printf("DEBUG: Checking out default branch: %s", defaultBranch)
+	tree := gitRepo.Branch(defaultBranch).Tree()
+	log.Printf("DEBUG: Successfully checked out default branch tree")
 
 	return tree
+}
+
+func commitExistsOnRepo(repo string, sha string, token string) (bool, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", repo, sha)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return false, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "token "+token)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		return true, nil
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("unexpected status checking commit: %d", resp.StatusCode)
+}
+
+func getDefaultBranch(repo string, token string) (string, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s", repo)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "token "+token)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get repo info: status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&data); err != nil {
+		return "", err
+	}
+
+	return data.DefaultBranch, nil
+}
+
+func getBranchHeadSHA(repo string, token string) (string, error) {
+	defaultBranch, err := getDefaultBranch(repo, token)
+	if err != nil {
+		return "", err
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", repo, defaultBranch)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "token "+token)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get commit for branch %s: status %d", defaultBranch, resp.StatusCode)
+	}
+
+	var data struct {
+		Sha string `json:"sha"`
+	}
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&data); err != nil {
+		return "", err
+	}
+
+	return data.Sha, nil
 }
 
 func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory {
