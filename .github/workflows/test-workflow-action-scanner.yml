@@ -28,6 +28,7 @@ jobs:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.GH_PAT }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
+          repository: 'Scalabit/integration-test-workflow-scanner'
       
       - name: Validate AI Pull Request 
         if: ${{ steps.scanner.outcome == 'success' }}
@@ -35,7 +36,7 @@ jobs:
         env:
           EXPECTED_PR_TITLE: 'Security Audit & Fixes for GitHub Actions Workflows'
           EXPECTED_DESC_TITLE: 'Complete Security Audit Report'
-          REPO: 'Scalabit/workflow-scanner'
+          REPO: 'Scalabit/integration-test-workflow-scanner'
           TOKEN: ${{ secrets.GH_PAT }}
         shell: bash
         run: |
@@ -70,7 +71,7 @@ jobs:
         if: ${{ steps.validate_pr.outcome == 'success' }}
         env:
           TOKEN: ${{ secrets.GH_PAT }}
-          REPO: 'Scalabit/workflow-scanner'
+          REPO: 'Scalabit/integration-test-workflow-scanner'
         shell: bash
         run: |
           set -euo pipefail
