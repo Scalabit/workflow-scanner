@@ -87,7 +87,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	var promptContent []byte
 	var err error
 	for _, path := range promptPaths {
-		promptContent, err = os.ReadFile(path)
+		promptContent, err = os.ReadFile(path) // #nosec G304 -- paths are controlled and safe
 		if err == nil {
 			log.Printf("DEBUG: Found prompt file at: %s", path)
 
