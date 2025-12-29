@@ -113,8 +113,8 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 			issues:              `[{"desc": "security issue", "file": "workflow.yml"}]`,
 			llmExplanation:      "",
 			llmError:            errors.New("LLM timeout"),
-			expectedExplanation: "LLM processing failed - returning original workspace unchanged",
-			expectError:         false,
+			expectedExplanation: "",
+			expectError:         true,
 		},
 	}
 
