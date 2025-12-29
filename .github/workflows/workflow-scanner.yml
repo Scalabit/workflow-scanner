@@ -21,14 +21,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Ensure go module for scanner
-        run: |
-          if [ ! -f go.mod ]; then
-            # initialize a module and set Go version explicitly
-            go mod init github.com/Scalabit/workflow-scanner
-            go mod edit -go=1.25
-          fi
-
       - name: Run workflow scanner
         id: scanner
         uses: Scalabit/workflow-scanner-action@7e2fcef8f62f188b19d823d3b30bc706f2bba234 # master
