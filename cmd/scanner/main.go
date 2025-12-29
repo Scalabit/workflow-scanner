@@ -327,6 +327,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 	remainingIssues, err := zizmor.CheckRemainingIssues(ctx, autoFixedDirectory)
 	if err != nil {
 		log.Printf("ERROR: Failed to check remaining issues: %v", err)
+
 		return "", fmt.Errorf("failed to check remaining issues: %w", err)
 	}
 	log.Printf("DEBUG: Remaining issues check completed. Issues found: %d chars", len(remainingIssues))
@@ -339,6 +340,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 		finalDirectory, llmExplanations, err = agent.FixRemainingIssues(ctx, autoFixedDirectory, remainingIssues)
 		if err != nil {
 			log.Printf("ERROR: LLM agent failed to fix remaining issues: %v", err)
+
 			return "", fmt.Errorf("failed to fix remaining issues with LLM: %w", err)
 		}
 		log.Printf("DEBUG: LLM agent completed successfully. Explanations: %d chars", len(llmExplanations))

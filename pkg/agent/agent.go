@@ -121,5 +121,6 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: LLM completed workspace obtained")
 
 	log.Printf("DEBUG: LLM processing completed successfully")
+
 	return completed, explanations, nil
 }
