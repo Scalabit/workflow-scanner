@@ -40,7 +40,7 @@ func TestAgentImpl_FixRemainingIssues_EarlyReturn(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockClient := mocks.NewMockClient(ctrl)
-	
+
 	// Use a real directory for the source since we're testing early return that doesn't use LLM
 	sourceDirectory := &internalDagger.Directory{}
 
@@ -106,7 +106,7 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 		mockEnv := mocks.NewMockEnv(ctrl)
 		mockWorkspace := mocks.NewMockWorkspace(ctrl)
 		sourceDirectory := &internalDagger.Directory{}
-		
+
 		// Set up the mocks for the initial setup that happens before prompt file reading
 		mockClient.EXPECT().Workspace(sourceDirectory).Return(mockWorkspace)
 		mockClient.EXPECT().Env().Return(mockEnv)
@@ -116,35 +116,35 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 		mockEnv.EXPECT().WithWorkspaceInput("workspace", mockWorkspace, gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithWorkspaceOutput("completed", gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithStringOutput("explanations", gomock.Any()).Return(mockEnv)
-		
+
 		// Create a temporary directory without the prompt file
 		tempDir := t.TempDir()
 		originalWd, _ := os.Getwd()
 		defer os.Chdir(originalWd)
-		
+
 		// Change to temp directory so prompt file won't be found
 		os.Chdir(tempDir)
-		
+
 		agent := NewAgentImpl(mockClient)
 		actualDir, explanation, err := agent.fixRemainingIssuesImpl(context.Background(), sourceDirectory, `[{"desc": "security issue"}]`)
-		
+
 		// Should return error when prompt file can't be found
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read prompt file")
 		assert.Equal(t, sourceDirectory, actualDir)
 		assert.Equal(t, "", explanation)
 	})
-	
+
 	t.Run("validates prompt file reading and environment setup", func(t *testing.T) {
 		// This test validates that the prompt file is read and environment is set up correctly
 		// up to the point where LLM processing would begin. We can't easily test the full
 		// LLM workflow without a running Dagger session, but we can test the setup logic.
-		
+
 		mockClient := mocks.NewMockClient(ctrl)
 		mockEnv := mocks.NewMockEnv(ctrl)
 		mockWorkspace := mocks.NewMockWorkspace(ctrl)
 		sourceDirectory := &internalDagger.Directory{}
-		
+
 		// Set up mocks for the environment creation part
 		mockClient.EXPECT().Workspace(sourceDirectory).Return(mockWorkspace)
 		mockClient.EXPECT().Env().Return(mockEnv)
@@ -154,12 +154,12 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 		mockEnv.EXPECT().WithWorkspaceInput("workspace", mockWorkspace, gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithWorkspaceOutput("completed", gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithStringOutput("explanations", gomock.Any()).Return(mockEnv)
-		
+
 		// The test will fail when trying to call WithNewFile on the real directory,
 		// which is expected behavior - the rest of the logic would need integration testing
 		agent := NewAgentImpl(mockClient)
 		_, _, err := agent.fixRemainingIssuesImpl(context.Background(), sourceDirectory, `[{"desc": "security issue"}]`)
-		
+
 		// We expect this to fail at the WithNewFile step, which proves the setup logic ran correctly
 		assert.Error(t, err)
 	})
