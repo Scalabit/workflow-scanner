@@ -186,12 +186,14 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 		log.Printf("DEBUG: Checking out specific commit: %s", config.commitSHA)
 		tree := gitRepo.Commit(config.commitSHA).Tree()
 		log.Printf("DEBUG: Successfully checked out commit tree")
+
 		return tree
 	}
 
 	log.Printf("DEBUG: Checking out HEAD branch")
 	tree := gitRepo.Branch("HEAD").Tree()
 	log.Printf("DEBUG: Successfully checked out HEAD tree")
+
 	return tree
 }
 
@@ -316,6 +318,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
 		log.Printf("ERROR: ZIZMOR auto-fix failed: %v", err)
+
 		return "", fmt.Errorf("failed to run ZIZMOR auto-fix: %w", err)
 	}
 	log.Printf("DEBUG: ZIZMOR auto-fix completed successfully")
