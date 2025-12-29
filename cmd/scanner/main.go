@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"workflow-scanner/internal/dagger"
@@ -196,14 +197,30 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 }
 
 func setupLLMEnvironment(llmAPIKey string) {
-	if err := os.Setenv("OPENAI_API_KEY", llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set OPENAI_API_KEY: %v", err)
+	// Detect provider based on key format and set only the appropriate env var
+	var providerKey string
+	var providerName string
+
+	if strings.HasPrefix(llmAPIKey, "sk-") {
+		providerKey = "OPENAI_API_KEY"
+		providerName = "OpenAI"
+	} else if strings.HasPrefix(llmAPIKey, "sk-ant-") {
+		providerKey = "ANTHROPIC_API_KEY"
+		providerName = "Anthropic"
+	} else if strings.HasPrefix(llmAPIKey, "AIza") {
+		providerKey = "GEMINI_API_KEY"
+		providerName = "Gemini"
+	} else {
+		// Default to OpenAI if format is unknown
+		providerKey = "OPENAI_API_KEY"
+		providerName = "OpenAI (default)"
+		log.Printf("Warning: Unknown API key format, defaulting to OpenAI")
 	}
-	if err := os.Setenv("ANTHROPIC_API_KEY", llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set ANTHROPIC_API_KEY: %v", err)
-	}
-	if err := os.Setenv("GEMINI_API_KEY", llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set GEMINI_API_KEY: %v", err)
+
+	if err := os.Setenv(providerKey, llmAPIKey); err != nil {
+		log.Printf("Warning: Failed to set %s: %v", providerKey, err)
+	} else {
+		log.Printf("Set LLM environment for %s", providerName)
 	}
 }
 
