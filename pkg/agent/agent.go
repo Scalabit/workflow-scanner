@@ -46,6 +46,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	// Only skip LLM if truly no issues found
 	if areThereIssues(issues) {
 		log.Printf("DEBUG: No issues found, skipping LLM processing")
+
 		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
