@@ -28,7 +28,7 @@ jobs:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.TEST_GH_TOKEN }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
-          #repository: 'goncalogdomingo/test1'
+          repository: 'goncalogdomingo/test1'
       
       - name: Validate AI Pull Request 
         if: ${{ steps.scanner.outcome == 'success' }}
@@ -37,8 +37,7 @@ jobs:
           EXPECTED_PR_TITLE: 'Security Audit & Fixes for GitHub Actions Workflows'
           EXPECTED_DESC_TITLE: 'Complete Security Audit Report'
           #REPO: 'Scalabit/integration-test-workflow-scanner'
-          #REPO: 'goncalogdomingo/test1'
-          REPO: 'Scalabit/workflow-scanner'
+          REPO: 'goncalogdomingo/test1'
           TOKEN: ${{ secrets.TEST_GH_TOKEN }}
         shell: bash
         run: |
@@ -74,8 +73,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.TEST_GH_TOKEN }}
           #REPO: 'Scalabit/integration-test-workflow-scanner'
-          #REPO: 'goncalogdomingo/test1'
-          REPO: 'Scalabit/workflow-scanner'
+          REPO: 'goncalogdomingo/test1'
         shell: bash
         run: |
           set -euo pipefail
