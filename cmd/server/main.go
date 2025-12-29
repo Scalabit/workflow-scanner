@@ -816,7 +816,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency: stripe.String("eur"),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String("flowsniffer Premium"),
+						Name: stripe.String("remediator Premium"),
 					},
 					UnitAmount: stripe.Int64(PriceInCents), // €10.00 in cents
 				},
