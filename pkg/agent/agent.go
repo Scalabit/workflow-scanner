@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -53,11 +54,19 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Setting up LLM environment with issues to fix")
 
 	log.Printf("DEBUG: Creating Dagger environment...")
+
+	// Create workspace with Go module context for LLM
+	log.Printf("DEBUG: Creating workspace with Go module context...")
+	workspace := agent.client.Workspace(source)
+	log.Printf("DEBUG: Workspace created")
+
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
+		WithStringInput("GO111MODULE", "on", "Enable Go modules").
+		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
 		WithWorkspaceInput(
 			"workspace",
-			agent.client.Workspace(source),
+			workspace,
 			"the workspace containing GitHub Actions workflows with remaining issues").
 		WithWorkspaceOutput(
 			"completed",
@@ -68,31 +77,32 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Environment created successfully")
 
-	log.Printf("DEBUG: Attempting to get current module and prompt file...")
-	var promptFile *internalDagger.File
-	var err error
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("ERROR: Panic during CurrentModule() call: %v", r)
-				err = fmt.Errorf("panic during CurrentModule(): %v", r)
-			}
-		}()
-
-		currentModule := agent.client.CurrentModule()
-		log.Printf("DEBUG: CurrentModule() call succeeded")
-
-		moduleSource := currentModule.Source()
-		log.Printf("DEBUG: CurrentModule().Source() call succeeded")
-
-		promptFile = moduleSource.File("llm_fix_prompt.md")
-		log.Printf("DEBUG: Successfully got prompt file reference")
-	}()
-
-	if err != nil {
-		return source, "", fmt.Errorf("failed to get current module or prompt file: %w", err)
+	log.Printf("DEBUG: Reading prompt file directly from filesystem...")
+	// Try multiple locations for the prompt file
+	promptPaths := []string{
+		"llm_fix_prompt.md",       // Current directory
+		"../../llm_fix_prompt.md", // From pkg/agent to root
 	}
+
+	var promptContent []byte
+	var err error
+	for _, path := range promptPaths {
+		promptContent, err = os.ReadFile(path)
+		if err == nil {
+			log.Printf("DEBUG: Found prompt file at: %s", path)
+			break
+		}
+	}
+	if err != nil {
+		return source, "", fmt.Errorf("failed to read prompt file from any location: %w", err)
+	}
+	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
+
+	log.Printf("DEBUG: Creating prompt file in source directory...")
+	// Add the prompt file to the source directory so Dagger can access it
+	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
+	promptFile := sourceWithPrompt.File("llm_fix_prompt.md")
+	log.Printf("DEBUG: Prompt file created in source directory")
 
 	log.Printf("DEBUG: Creating LLM work instance...")
 	work := agent.client.LLM().

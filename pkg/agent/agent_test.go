@@ -84,8 +84,6 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 	mockClient := mocks.NewMockClient(ctrl)
 	mockEnv := mocks.NewMockEnv(ctrl)
 	mockWorkspace := mocks.NewMockWorkspace(ctrl)
-	mockCurrentModule := mocks.NewMockCurrentModule(ctrl)
-	mockDirectory := mocks.NewMockDirectory(ctrl)
 	mockLLM := mocks.NewMockLLM(ctrl)
 	mockBinding := mocks.NewMockBinding(ctrl)
 	mockFile := &internalDagger.File{}
@@ -122,15 +120,12 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient.EXPECT().Env().Return(mockEnv)
 			mockEnv.EXPECT().WithStringInput("zizmor_issues", tt.issues, gomock.Any()).Return(mockEnv)
-			mockClient.EXPECT().Workspace(sourceDirectory).Return(mockWorkspace)
+			mockEnv.EXPECT().WithStringInput("GO111MODULE", "on", gomock.Any()).Return(mockEnv)
+			mockEnv.EXPECT().WithStringInput("GOWORK", "off", gomock.Any()).Return(mockEnv)
+			mockClient.EXPECT().Workspace(gomock.Any()).Return(mockWorkspace)
 			mockEnv.EXPECT().WithWorkspaceInput("workspace", mockWorkspace, gomock.Any()).Return(mockEnv)
 			mockEnv.EXPECT().WithWorkspaceOutput("completed", gomock.Any()).Return(mockEnv)
 			mockEnv.EXPECT().WithStringOutput("explanations", gomock.Any()).Return(mockEnv)
-
-			mockClient.EXPECT().CurrentModule().Return(mockCurrentModule)
-			mockCurrentModule.EXPECT().Source().Return(mockDirectory)
-			mockDirectory.EXPECT().File("llm_fix_prompt.md").Return(mockFile)
-
 			mockClient.EXPECT().LLM().Return(mockLLM)
 			mockLLM.EXPECT().WithEnv(mockEnv).Return(mockLLM)
 			mockLLM.EXPECT().WithPromptFile(mockFile).Return(mockLLM)
