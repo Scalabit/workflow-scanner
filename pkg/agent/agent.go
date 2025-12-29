@@ -5,6 +5,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -40,11 +41,18 @@ func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internal
 }
 
 func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
+	log.Printf("DEBUG: Starting fixRemainingIssuesImpl with %d chars of issues", len(issues))
+
 	// Only skip LLM if truly no issues found
 	if areThereIssues(issues) {
+		log.Printf("DEBUG: No issues found, skipping LLM processing")
+
 		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
+	log.Printf("DEBUG: Setting up LLM environment with issues to fix")
+
+	log.Printf("DEBUG: Creating Dagger environment...")
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithWorkspaceInput(
@@ -58,25 +66,62 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 			"explanations",
 			"explanations of what fixes were applied and why")
 
-	promptFile := agent.client.CurrentModule().Source().File("llm_fix_prompt.md")
+	log.Printf("DEBUG: Environment created successfully")
 
+	log.Printf("DEBUG: Attempting to get current module and prompt file...")
+	var promptFile *internalDagger.File
+	var err error
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("ERROR: Panic during CurrentModule() call: %v", r)
+				err = fmt.Errorf("panic during CurrentModule(): %v", r)
+			}
+		}()
+
+		currentModule := agent.client.CurrentModule()
+		log.Printf("DEBUG: CurrentModule() call succeeded")
+
+		moduleSource := currentModule.Source()
+		log.Printf("DEBUG: CurrentModule().Source() call succeeded")
+
+		promptFile = moduleSource.File("llm_fix_prompt.md")
+		log.Printf("DEBUG: Successfully got prompt file reference")
+	}()
+
+	if err != nil {
+		return source, "", fmt.Errorf("failed to get current module or prompt file: %w", err)
+	}
+
+	log.Printf("DEBUG: Creating LLM work instance...")
 	work := agent.client.LLM().
 		WithEnv(environment).
 		WithPromptFile(promptFile)
+	log.Printf("DEBUG: LLM work instance created successfully")
 
+	log.Printf("DEBUG: Getting LLM work environment...")
 	// Try to execute the LLM and catch any failures early
 	workEnv := work.Env()
+	log.Printf("DEBUG: LLM work environment obtained")
 
+	log.Printf("DEBUG: Requesting explanations from LLM...")
 	// Get explanations first (safer string operation)
 	explanations, err := workEnv.Output("explanations").AsString(ctx)
 	if err != nil {
+		log.Printf("ERROR: LLM explanations failed: %v", err)
 		// If LLM fails completely, return error to caller
 		return source, "", fmt.Errorf("LLM processing failed: %w", err)
 	}
+	log.Printf("DEBUG: LLM explanations received: %d chars", len(explanations))
 
+	log.Printf("DEBUG: Requesting completed workspace from LLM...")
 	// Get the completed workspace from LLM
 	completedWorkspace := workEnv.Output("completed").AsWorkspace()
 	completed := completedWorkspace.Source()
+	log.Printf("DEBUG: LLM completed workspace obtained")
+
+	log.Printf("DEBUG: LLM processing completed successfully")
 
 	return completed, explanations, nil
 }
