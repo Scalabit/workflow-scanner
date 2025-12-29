@@ -90,6 +90,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		promptContent, err = os.ReadFile(path)
 		if err == nil {
 			log.Printf("DEBUG: Found prompt file at: %s", path)
+
 			break
 		}
 	}
