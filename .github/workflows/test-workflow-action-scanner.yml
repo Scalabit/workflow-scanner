@@ -30,6 +30,7 @@ jobs:
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
       
       - name: Validate AI Pull Request 
+        if: ${{ steps.scanner.outcome == 'success' }}
         id: validate_pr
         env:
           EXPECTED_PR_TITLE: 'Security Audit & Fixes for GitHub Actions Workflows'
@@ -66,7 +67,7 @@ jobs:
           exit 1
 
       - name: Close AI Pull Request
-        if: ${{ always() }}
+        if: ${{ steps.validate_pr.outcome == 'success' }}
         env:
           TOKEN: ${{ secrets.GH_PAT }}
           REPO: 'Scalabit/workflow-scanner'
