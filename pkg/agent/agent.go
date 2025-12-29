@@ -5,8 +5,10 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -78,24 +80,34 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Environment created successfully")
 
 	log.Printf("DEBUG: Reading prompt file directly from filesystem...")
-	// Try multiple locations for the prompt file
-	promptPaths := []string{
-		"llm_fix_prompt.md",       // Current directory
-		"../../llm_fix_prompt.md", // From pkg/agent to root
+	// Use os.DirFS to safely scope file access and prevent directory traversal
+	cwd, err := os.Getwd()
+	if err != nil {
+		return source, "", fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
-	var promptContent []byte
-	var err error
-	for _, path := range promptPaths {
-		promptContent, err = os.ReadFile(path) // #nosec G304 -- paths are controlled and safe
-		if err == nil {
-			log.Printf("DEBUG: Found prompt file at: %s", path)
-
+	// Find project root by looking for go.mod file
+	projectRoot := cwd
+	for {
+		if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
 			break
 		}
+		parent := projectRoot + "/.."
+		if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
+			// Can't find project root, use current directory
+			break
+		} else {
+			projectRoot = abs
+		}
 	}
+
+	// Create a root filesystem scoped to the project root
+	rootFS := os.DirFS(projectRoot)
+
+	// Try to find the prompt file relative to project root
+	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
 	if err != nil {
-		return source, "", fmt.Errorf("failed to read prompt file from any location: %w", err)
+		return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
 	}
 	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
 
