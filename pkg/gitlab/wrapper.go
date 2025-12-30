@@ -12,7 +12,7 @@ import (
 	"workflow-scanner/pkg/github"
 )
 
-// NewWrapperIssueClientImpl returns an implementation of github.WrapperIssueClient backed by GitLab
+// NewWrapperIssueClientImpl returns an implementation of github.WrapperIssueClient backed by GitLab.
 func NewWrapperIssueClientImpl(daggerClient *dagger.Client, gitlabToken string) github.WrapperIssueClient {
 	return &WrapperIssueClientImpl{
 		daggerClient: daggerClient,

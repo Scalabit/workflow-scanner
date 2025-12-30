@@ -134,7 +134,7 @@ type WorkflowScanResponse struct {
 }
 
 var (
-	// key is "provider:id" (e.g. "github:12345")
+	// key is "provider:id" (e.g. "github:12345").
 	premiumUsers = make(map[string]*PremiumUser)
 	premiumMutex = sync.RWMutex{}
 	// Track valid tokens - only tokens in this map are accepted.
@@ -214,6 +214,7 @@ func getPremiumUser(provider string, userID int) *PremiumUser {
 	defer premiumMutex.RUnlock()
 
 	key := fmt.Sprintf("%s:%d", provider, userID)
+
 	return premiumUsers[key]
 }
 
@@ -291,12 +292,14 @@ func githubAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 func gitlabAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
 		return
 	}
 
 	code, err := extractAuthCode(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		
 		return
 	}
 
