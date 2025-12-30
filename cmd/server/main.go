@@ -139,8 +139,8 @@ var (
 
 func loadConfig() *Config {
 	return &Config{
-		ClientID:          getEnv("GH_APP_ID", ""),
-		ClientSecret:      getEnv("GH_APP_SECRET", ""),
+		ClientID:          getEnv("GH_CLIENT_ID", ""),
+		ClientSecret:      getEnv("GH_CLIENT_SECRET", ""),
 		StripeKey:         getEnv("TEST_STRIPE", ""),
 		StripePublishable: getEnv("TEST_STRIPE_PK", ""),
 		StripeWebhookKey:  getEnv("TEST_STRIPE_WEBHOOK_SECRET", ""),
@@ -816,7 +816,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency: stripe.String("eur"),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String("flowsniffer Premium"),
+						Name: stripe.String("remediator Premium"),
 					},
 					UnitAmount: stripe.Int64(PriceInCents), // €10.00 in cents
 				},
@@ -1010,7 +1010,7 @@ func main() {
 	config := loadConfig()
 
 	if config.ClientID == "" || config.ClientSecret == "" {
-		log.Fatal("Missing required environment variables: GH_APP_ID, GH_APP_SECRET")
+		log.Fatal("Missing required environment variables: GH_CLIENT_ID, GH_CLIENT_SECRET")
 	}
 
 	mux := http.NewServeMux()
