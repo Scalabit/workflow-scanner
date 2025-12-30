@@ -84,23 +84,28 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 	end := -1
 
 	for i := start; i < len(input); i++ {
-		if input[i] == '[' {
+		ch := input[i]
+		if ch == '[' {
 			bracketCount++
-		} else if input[i] == ']' {
+		} else if ch == ']' {
 			bracketCount--
 			if bracketCount == 0 {
 				end = i + 1
-
 				break
 			}
 		}
 	}
 
 	if end == -1 {
-		return nil, "", fmt.Errorf("unclosed JSON array")
+		return nil, "", fmt.Errorf("unclosed JSON array in input")
 	}
 
 	jsonPart := input[start:end]
+
+	jsonPart = strings.TrimSpace(jsonPart)
+	if strings.HasSuffix(jsonPart, ",]") {
+		jsonPart = strings.TrimSuffix(jsonPart, ",]") + "]"
+	}
 
 	var findings []Finding
 	if err := json.Unmarshal([]byte(jsonPart), &findings); err != nil {
