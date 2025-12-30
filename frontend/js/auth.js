@@ -113,3 +113,78 @@ class GitHubAuth {
         }
     }
 }
+
+class GitLabAuth {
+    constructor() {
+        this.clientId = '';
+        this.accessToken = localStorage.getItem('accessToken');
+        this.userName = localStorage.getItem('userName');
+        this.userEmail = localStorage.getItem('userEmail');
+        this.userId = localStorage.getItem('userID');
+    }
+
+    async loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            const config = await response.json();
+            this.clientId = config.gitlab_client_id || '';
+        } catch (error) {
+            console.error('Failed to load gitlab config:', error);
+        }
+    }
+
+    initiateLogin() {
+        if (!this.clientId) {
+            console.error('GitLab Client ID not loaded');
+            return;
+        }
+        const redirectUri = `${window.location.origin}/auth/gitlab`;
+        const state = 'gitlab';
+        const scope = 'read_user+email';
+        const url = `https://gitlab.com/oauth/authorize?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+        window.location.href = url;
+    }
+
+    async handleCallback(code) {
+        const response = await fetch('/auth/gitlab', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        if (!response.ok) throw new Error('Authentication failed');
+        const data = await response.json();
+        if (data.access_token) {
+            this.storeAuthData(data.access_token, data.user);
+            return data.user;
+        } else {
+            throw new Error('No access token received');
+        }
+    }
+
+    storeAuthData(accessToken, user) {
+        this.accessToken = accessToken;
+        this.userName = user.login;
+        this.userEmail = user.email;
+        this.userId = user.id;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('userName', user.login);
+        localStorage.setItem('userEmail', user.email);
+        localStorage.setItem('userID', user.id);
+    }
+
+    isLoggedIn() {
+        return !!(this.accessToken && this.userName);
+    }
+
+    logout() {
+        this.accessToken = null;
+        this.userName = null;
+        this.userEmail = null;
+        this.userId = null;
+
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userID');
+    }
+}

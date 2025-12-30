@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,12 +71,14 @@ const (
 )
 
 type Config struct {
-	ClientID          string
-	ClientSecret      string
-	StripeKey         string
-	StripePublishable string
-	StripeWebhookKey  string
-	Port              string
+	ClientID           string
+	ClientSecret       string
+	GitLabClientID     string
+	GitLabClientSecret string
+	StripeKey          string
+	StripePublishable  string
+	StripeWebhookKey   string
+	Port               string
 }
 
 type GitHubUser struct {
@@ -96,8 +99,9 @@ type GitHubTokenResponse struct {
 }
 
 type PremiumUser struct {
-	GitHubID      int       `json:"github_id"`
-	GitHubLogin   string    `json:"github_login"`
+	Provider      string    `json:"provider"` // "github" or "gitlab"
+	UserID        int       `json:"user_id"`
+	Login         string    `json:"login"`
 	Email         string    `json:"email"`
 	APIToken      string    `json:"api_token"`
 	SubscribedAt  time.Time `json:"subscribed_at"`
@@ -130,21 +134,24 @@ type WorkflowScanResponse struct {
 }
 
 var (
-	premiumUsers = make(map[int]*PremiumUser)
+	// key is "provider:id" (e.g. "github:12345").
+	premiumUsers = make(map[string]*PremiumUser)
 	premiumMutex = sync.RWMutex{}
 	// Track valid tokens - only tokens in this map are accepted.
-	validTokens      = make(map[string]int) // token -> githubID
+	validTokens      = make(map[string]string) // token -> ownerKey ("provider:id")
 	validTokensMutex = sync.RWMutex{}
 )
 
 func loadConfig() *Config {
 	return &Config{
-		ClientID:          getEnv("GH_CLIENT_ID", ""),
-		ClientSecret:      getEnv("GH_CLIENT_SECRET", ""),
-		StripeKey:         getEnv("TEST_STRIPE", ""),
-		StripePublishable: getEnv("TEST_STRIPE_PK", ""),
-		StripeWebhookKey:  getEnv("TEST_STRIPE_WEBHOOK_SECRET", ""),
-		Port:              getEnv("PORT", "8080"),
+		ClientID:           getEnv("GH_CLIENT_ID", ""),
+		ClientSecret:       getEnv("GH_CLIENT_SECRET", ""),
+		GitLabClientID:     getEnv("GITLAB_CLIENT_ID", ""),
+		GitLabClientSecret: getEnv("GITLAB_CLIENT_SECRET", ""),
+		StripeKey:          getEnv("STRIPE_KEY", getEnv("TEST_STRIPE", "")),
+		StripePublishable:  getEnv("STRIPE_PUBLISHABLE", getEnv("TEST_STRIPE_PK", "")),
+		StripeWebhookKey:   getEnv("STRIPE_WEBHOOK_SECRET", getEnv("TEST_STRIPE_WEBHOOK_SECRET", "")),
+		Port:               getEnv("PORT", "8080"),
 	}
 }
 
@@ -167,11 +174,12 @@ func generateAPIToken() string {
 	return "fs_" + hex.EncodeToString(bytes)
 }
 
-func isPremiumUser(githubID int) bool {
+func isPremiumUser(provider string, userID int) bool {
 	premiumMutex.RLock()
 	defer premiumMutex.RUnlock()
 
-	user, exists := premiumUsers[githubID]
+	key := fmt.Sprintf("%s:%d", provider, userID)
+	user, exists := premiumUsers[key]
 	if !exists {
 		return false
 	}
@@ -187,11 +195,11 @@ func isValidAPIToken(token string) (int, bool) {
 	return DummyNum, true // Always valid for testing
 }
 
-func addValidToken(token string, githubID int) {
+func addValidToken(token string, ownerKey string) {
 	validTokensMutex.Lock()
 	defer validTokensMutex.Unlock()
 
-	validTokens[token] = githubID
+	validTokens[token] = ownerKey
 }
 
 func removeValidToken(token string) {
@@ -201,11 +209,13 @@ func removeValidToken(token string) {
 	delete(validTokens, token)
 }
 
-func getPremiumUser(githubID int) *PremiumUser {
+func getPremiumUser(provider string, userID int) *PremiumUser {
 	premiumMutex.RLock()
 	defer premiumMutex.RUnlock()
 
-	return premiumUsers[githubID]
+	key := fmt.Sprintf("%s:%d", provider, userID)
+
+	return premiumUsers[key]
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
@@ -279,6 +289,48 @@ func githubAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func gitlabAuth(config *Config, w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	code, err := extractAuthCode(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	accessToken, err := exchangeCodeForGitLabToken(config, code)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	user, err := fetchGitLabUser(&http.Client{}, accessToken)
+	if err != nil {
+		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		redirectURL := fmt.Sprintf("/#access_token=%s&user_login=%s&user_id=%d&user_email=%s&provider=gitlab", accessToken, user.Login, user.ID, user.Email)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+
+		return
+	}
+
+	response := AuthResponse{AccessToken: accessToken, User: *user}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
+}
+
 func extractAuthCode(r *http.Request) (string, error) {
 	var code string
 
@@ -337,6 +389,62 @@ func exchangeCodeForToken(config *Config, code string) (string, error) {
 	}
 
 	return tokenData.AccessToken, nil
+}
+
+func exchangeCodeForGitLabToken(config *Config, code string) (string, error) {
+	v := url.Values{}
+	v.Set("client_id", config.GitLabClientID)
+	v.Set("client_secret", config.GitLabClientSecret)
+	v.Set("code", code)
+	v.Set("grant_type", "authorization_code")
+	v.Set("redirect_uri", fmt.Sprintf("%s/auth/gitlab", getEnv("BASE_URL", "http://localhost:8080")))
+
+	resp, err := http.PostForm("https://gitlab.com/oauth/token", v)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("gitlab token exchange error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var tb struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(body, &tb); err != nil {
+		return "", err
+	}
+
+	return tb.AccessToken, nil
+}
+
+func fetchGitLabUser(client *http.Client, token string) (*GitHubUser, error) {
+	req, _ := http.NewRequest(http.MethodGet, "https://gitlab.com/api/v4/user", nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var u struct {
+		Username string `json:"username"`
+		ID       int    `json:"id"`
+		Email    string `json:"email"`
+	}
+	if err := json.Unmarshal(body, &u); err != nil {
+		return nil, err
+	}
+
+	return &GitHubUser{Login: u.Username, ID: u.ID, Email: u.Email}, nil
 }
 
 func fetchGitHubUserWithEmail(client *http.Client, token string) (*GitHubUser, error) {
@@ -436,6 +544,17 @@ func fetchGitHubPrimaryEmail(client *http.Client, token string) (string, error) 
 	return "", fmt.Errorf("no primary email found")
 }
 
+func fetchUserFromToken(client *http.Client, token string) (*GitHubUser, string, error) {
+	if user, err := fetchGitHubUserWithEmail(client, token); err == nil {
+		return user, "github", nil
+	}
+	if user, err := fetchGitLabUser(client, token); err == nil {
+		return user, "gitlab", nil
+	}
+
+	return nil, "", fmt.Errorf("Invalid token")
+}
+
 func verifyToken(config *Config, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get token from Authorization header
@@ -448,40 +567,14 @@ func verifyToken(config *Config, next http.HandlerFunc) http.HandlerFunc {
 
 		token := authHeader[7:] // Remove "Bearer " prefix
 
-		// Validate token with GitHub API
-		url := fmt.Sprintf("https://api.github.com/applications/%s/token", config.ClientID)
-
-		jsonStr := fmt.Sprintf(`{"access_token": "%s"}`, token)
-
-		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(jsonStr))
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-
-			return
-		}
-
-		// Use Basic Auth with client credentials
-		req.SetBasicAuth(config.ClientID, config.ClientSecret)
-		req.Header.Set("Accept", "application/vnd.github+json")
-		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-		req.Header.Set("Content-Type", "application/json")
-
 		client := &http.Client{}
-		resp, err := client.Do(req)
+		_, _, err := fetchUserFromToken(client, token)
 		if err != nil {
-			http.Error(w, "Token verification failed", http.StatusUnauthorized)
-
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
 
 			return
 		}
 
-		// Token is valid, continue to next handler
 		next(w, r)
 	}
 }
@@ -490,6 +583,7 @@ func getConfigHandler(config *Config, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]string{
 		"client_id":          config.ClientID,
+		"gitlab_client_id":   config.GitLabClientID,
 		"stripe_publishable": config.StripePublishable,
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -502,22 +596,23 @@ func getUserHandler(config *Config, w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	token := authHeader[7:] // Remove "Bearer " prefix
 
-	// Fetch user data from GitHub using the verified token
+	// Fetch user data from either provider
 	client := &http.Client{}
-	user, err := fetchGitHubUserWithEmail(client, token)
+	user, provider, err := fetchUserFromToken(client, token)
 	if err != nil {
 		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
 
 		return
 	}
 
-	isPremium := isPremiumUser(user.ID)
-	premiumUser := getPremiumUser(user.ID)
+	isPremium := isPremiumUser(provider, user.ID)
+	premiumUser := getPremiumUser(provider, user.ID)
 
 	response := map[string]interface{}{
 		"login":     user.Login,
 		"id":        user.ID,
 		"email":     user.Email,
+		"provider":  provider,
 		"isPremium": isPremium,
 	}
 
@@ -726,7 +821,7 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	token := authHeader[7:]
 	client := &http.Client{}
-	user, err := fetchGitHubUserWithEmail(client, token)
+	user, provider, err := fetchUserFromToken(client, token)
 	if err != nil {
 		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
 
@@ -734,7 +829,7 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user is premium
-	if !isPremiumUser(user.ID) {
+	if !isPremiumUser(provider, user.ID) {
 		http.Error(w, "Premium subscription required", http.StatusForbidden)
 
 		return
@@ -742,7 +837,8 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 
 	// Get current premium user
 	premiumMutex.Lock()
-	currentUser := premiumUsers[user.ID]
+	key := fmt.Sprintf("%s:%d", provider, user.ID)
+	currentUser := premiumUsers[key]
 	if currentUser == nil {
 		premiumMutex.Unlock()
 		http.Error(w, "Premium user not found", http.StatusNotFound)
@@ -757,11 +853,11 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 	// Generate new token but keep same expiry date
 	newToken := generateAPIToken()
 	currentUser.APIToken = newToken
-	premiumUsers[user.ID] = currentUser
+	premiumUsers[key] = currentUser
 	premiumMutex.Unlock()
 
 	// Add new token to valid tokens
-	addValidToken(newToken, user.ID)
+	addValidToken(newToken, key)
 
 	// Update API key in CloudSQL database
 	updateTokenInDatabase(oldToken, newToken, currentUser.StripeSession, user.Login)
@@ -793,7 +889,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	authHeader := r.Header.Get("Authorization")
 	token := authHeader[7:]
 	client := &http.Client{}
-	user, err := fetchGitHubUserWithEmail(client, token)
+	user, provider, err := fetchUserFromToken(client, token)
 	if err != nil {
 		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
 
@@ -828,9 +924,10 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 		CancelURL:     stripe.String(baseURL),
 		CustomerEmail: stripe.String(user.Email),
 		Metadata: map[string]string{
-			"github_user":  user.Login,
-			"github_email": user.Email,
-			"github_id":    fmt.Sprintf("%d", user.ID),
+			"user":     user.Login,
+			"email":    user.Email,
+			"id":       fmt.Sprintf("%d", user.ID),
+			"provider": provider,
 		},
 	}
 
@@ -850,6 +947,9 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+
+		return
 	}
 }
 
@@ -913,21 +1013,26 @@ func handleCheckoutSessionCompleted(event stripe.Event) {
 
 	log.Printf("Payment successful for session: %s", session.ID)
 
-	// Use metadata to get GitHub user info
-	githubEmail, emailExists := session.Metadata["github_email"]
-	githubUser, userExists := session.Metadata["github_user"]
-	githubIDStr, idExists := session.Metadata["github_id"]
+	// Read metadata
+	provider := session.Metadata["provider"]
+	if provider == "" {
+		provider = "github"
+	}
+
+	userLogin, userExists := session.Metadata["user"]
+	email, emailExists := session.Metadata["email"]
+	userIDStr, idExists := session.Metadata["id"]
 
 	if emailExists && userExists && idExists {
-		createPremiumUser(githubEmail, githubUser, githubIDStr, session.ID)
+		createPremiumUser(provider, email, userLogin, userIDStr, session.ID)
 	}
 }
 
-func createPremiumUser(githubEmail, githubUser, githubIDStr, sessionID string) {
-	// Parse GitHub ID
-	var githubID int
-	if _, err := fmt.Sscanf(githubIDStr, "%d", &githubID); err != nil {
-		log.Printf("Failed to parse GitHub ID '%s': %v", githubIDStr, err)
+func createPremiumUser(provider, email, login, userIDStr, sessionID string) {
+	// Parse user ID
+	var userID int
+	if _, err := fmt.Sscanf(userIDStr, "%d", &userID); err != nil {
+		log.Printf("Failed to parse user ID '%s': %v", userIDStr, err)
 
 		return
 	}
@@ -939,22 +1044,24 @@ func createPremiumUser(githubEmail, githubUser, githubIDStr, sessionID string) {
 	apiToken := generateAPIToken()
 
 	premiumUser := &PremiumUser{
-		GitHubID:      githubID,
-		GitHubLogin:   githubUser,
-		Email:         githubEmail,
+		Provider:      provider,
+		UserID:        userID,
+		Login:         login,
+		Email:         email,
 		APIToken:      apiToken,
 		SubscribedAt:  now,
 		ExpiresAt:     expiresAt,
 		StripeSession: sessionID,
 	}
 
-	// Store the premium user in memory (for backward compatibility)
+	// Store the premium user in memory keyed by provider:id
+	key := fmt.Sprintf("%s:%d", provider, userID)
 	premiumMutex.Lock()
-	premiumUsers[githubID] = premiumUser
+	premiumUsers[key] = premiumUser
 	premiumMutex.Unlock()
 
-	// Add token to valid tokens list (for backward compatibility)
-	addValidToken(apiToken, githubID)
+	// Add token to valid tokens list
+	addValidToken(apiToken, key)
 
 	// Store API key in CloudSQL database
 	database, err := getDatabase()
@@ -972,12 +1079,12 @@ func createPremiumUser(githubEmail, githubUser, githubIDStr, sessionID string) {
 		if err != nil {
 			log.Printf("Failed to store API key in database: %v", err)
 		} else {
-			log.Printf("API key stored in CloudSQL for user %s", githubUser)
+			log.Printf("API key stored in CloudSQL for user %s", login)
 		}
 	}
 
 	log.Printf("User %s (%s) upgraded to premium. Token: %s, Expires: %s",
-		githubUser, githubEmail, apiToken[:10]+"...", expiresAt.Format(time.RFC3339))
+		login, email, apiToken[:10]+"...", expiresAt.Format(time.RFC3339))
 }
 
 func serveStatic(w http.ResponseWriter, r *http.Request) {
@@ -1019,6 +1126,9 @@ func main() {
 	mux.HandleFunc("/auth/github", func(w http.ResponseWriter, r *http.Request) {
 		githubAuth(config, w, r)
 	})
+	mux.HandleFunc("/auth/gitlab", func(w http.ResponseWriter, r *http.Request) {
+		gitlabAuth(config, w, r)
+	})
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
 		getConfigHandler(config, w, r)
 	})
@@ -1057,7 +1167,7 @@ func main() {
 	}
 
 	log.Printf("Server starting on port %s", config.Port)
-	log.Printf("OAuth callback URL: /auth/github")
+	log.Printf("OAuth callback URLs: /auth/github and /auth/gitlab")
 	log.Fatal(server.ListenAndServe())
 }
 

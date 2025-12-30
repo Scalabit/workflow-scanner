@@ -3,27 +3,39 @@
 class remediatorApp {
     constructor() {
         this.auth = new GitHubAuth();
+        this.gitlabAuth = new GitLabAuth();
         this.loginBtn = null;
+    }
+
+    getAccessToken() {
+        if (this.gitlabAuth && this.gitlabAuth.isLoggedIn()) return this.gitlabAuth.accessToken;
+        if (this.auth && this.auth.isLoggedIn()) return this.auth.accessToken;
+        return localStorage.getItem('accessToken') || null;
     }
 
     async init() {
         // Load configuration
         await this.auth.loadConfig();
+        await this.gitlabAuth.loadConfig();
         
         // Get DOM elements
-        this.loginBtn = document.getElementById('github-login-btn');
+        this.githubBtn = document.getElementById('github-login-btn');
+        this.gitlabBtn = document.getElementById('gitlab-login-btn');
+        this.logoutBtn = document.getElementById('logout-btn');
+        // legacy
+        this.loginBtn = this.githubBtn;
         
         // Check for OAuth callback
         this.handleOAuthCallback();
         
         // Update UI based on auth status (after OAuth processing)
         this.updateUI();
-        
+
         // Set up event listeners
         this.setupEventListeners();
 
         setInterval(() => {
-            if (this.auth.isLoggedIn()) {
+            if (this.auth.isLoggedIn() || this.gitlabAuth.isLoggedIn()) {
                 this.refreshPremiumStatus();
             }
         }, 3000);
@@ -33,36 +45,55 @@ class remediatorApp {
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const code = urlParams.get('code');
+        const state = urlParams.get('state');
         const accessToken = hashParams.get('access_token');
-        
+        const providerFromHash = hashParams.get('provider');
+
         if (accessToken) {
             // Handle direct auth data from OAuth callback redirect (from hash)
             const userLogin = hashParams.get('user_login');
             const userId = hashParams.get('user_id');
             const userEmail = hashParams.get('user_email');
-            
+
             if (userLogin && userId && userEmail) {
                 const user = {
                     login: userLogin,
                     id: parseInt(userId),
                     email: userEmail
                 };
-                this.auth.storeAuthData(accessToken, user);
-                
+
+                if (providerFromHash === 'gitlab') {
+                    this.gitlabAuth.storeAuthData(accessToken, user);
+                    this.showLoggedInState(user.login);
+                } else {
+                    this.auth.storeAuthData(accessToken, user);
+                    this.showLoggedInState(user.login);
+                }
+
                 // Clear URL hash
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         } else if (code) {
-            this.processAuthCallback(code);
+            if (state === 'gitlab') {
+                this.processAuthCallback(code, 'gitlab');
+            } else {
+                this.processAuthCallback(code, 'github');
+            }
         }
     }
 
-    async processAuthCallback(code) {
+    async processAuthCallback(code, provider = 'github') {
         try {
             this.showLoadingState();
-            const user = await this.auth.handleCallback(code);
+            let user;
+            if (provider === 'gitlab') {
+                user = await this.gitlabAuth.handleCallback(code);
+            } else {
+                user = await this.auth.handleCallback(code);
+            }
+
             this.showLoggedInState(user.login);
-            
+
             // Clear URL parameters
             window.history.replaceState({}, document.title, window.location.pathname);
         } catch (error) {
@@ -72,16 +103,30 @@ class remediatorApp {
     }
 
     setupEventListeners() {
-        if (this.loginBtn) {
-            this.loginBtn.addEventListener('click', (e) => {
+        if (this.githubBtn) {
+            this.githubBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.handleLoginClick();
+            });
+        }
+
+        if (this.gitlabBtn) {
+            this.gitlabBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.gitlabAuth.initiateLogin();
+            });
+        }
+
+        if (this.logoutBtn) {
+            this.logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.logout();
             });
         }
     }
 
     handleLoginClick() {
-        if (this.auth.isLoggedIn()) {
+        if (this.auth.isLoggedIn() || this.gitlabAuth.isLoggedIn()) {
             this.logout();
         } else {
             this.login();
@@ -93,12 +138,19 @@ class remediatorApp {
     }
 
     logout() {
-        this.auth.logout();
+        if (this.auth && this.auth.isLoggedIn()) {
+            this.auth.logout();
+        }
+        if (this.gitlabAuth && this.gitlabAuth.isLoggedIn()) {
+            this.gitlabAuth.logout();
+        }
         this.showLoggedOutState();
     }
 
     updateUI() {
-        if (this.auth.isLoggedIn()) {
+        if (this.gitlabAuth.isLoggedIn()) {
+            this.showLoggedInState(this.gitlabAuth.userName);
+        } else if (this.auth.isLoggedIn()) {
             this.showLoggedInState(this.auth.userName);
         } else {
             this.showLoggedOutState();
@@ -106,40 +158,68 @@ class remediatorApp {
     }
 
     refreshPremiumStatus() {
-        if (this.auth.isLoggedIn()) {
+        if (this.auth.isLoggedIn() || this.gitlabAuth.isLoggedIn()) {
             this.checkPremiumStatus();
         }
     }
 
     showLoggedInState(userName) {
-        if (this.loginBtn) {
-            this.loginBtn.textContent = `Welcome, ${userName}! (Logout)`;
-            this.loginBtn.classList.remove('bg-white', 'text-primarydark');
-            this.loginBtn.classList.add('bg-green-500', 'text-white');
+        if (this.githubBtn) this.githubBtn.classList.add('hidden');
+        if (this.gitlabBtn) this.gitlabBtn.classList.add('hidden');
+
+        if (this.logoutBtn) {
+            this.logoutBtn.textContent = `Logout (${userName})`;
+            this.logoutBtn.classList.remove('hidden');
         }
-        
+
         this.checkPremiumStatus();
     }
 
     async checkPremiumStatus() {
         try {
+            const token = this.getAccessToken();
+            if (!token) {
+                this.showLoggedOutState();
+                return;
+            }
+
             const response = await fetch('/api/user', {
                 headers: {
-                    'Authorization': `Bearer ${this.auth.accessToken}`
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
                 }
             });
-            
+
             if (response.ok) {
-                const user = await response.json();
+                const text = await response.text();
+                if (!text) {
+                    this.showPaymentSection();
+                    return;
+                }
+                let user;
+                try {
+                    user = JSON.parse(text);
+                } catch (err) {
+                    console.error('Failed parsing /api/user response:', err);
+                    this.showPaymentSection();
+                    return;
+                }
+
                 if (user.isPremium) {
                     this.showPremiumStatus(user);
                 } else {
                     this.showPaymentSection();
                 }
+            } else {
+                this.showPaymentSection();
             }
         } catch (error) {
             console.error('Failed to check premium status:', error);
-            this.showPaymentSection();
+            if (this.getAccessToken()) {
+                this.showPaymentSection();
+            } else {
+                this.showLoggedOutState();
+            }
         }
     }
 
@@ -179,12 +259,21 @@ class remediatorApp {
     }
 
     showLoggedOutState() {
-        if (this.loginBtn) {
-            this.loginBtn.textContent = 'Login with GitHub';
-            this.loginBtn.classList.remove('bg-green-500', 'text-white', 'bg-blue-500', 'bg-red-500');
-            this.loginBtn.classList.add('bg-white', 'text-primarydark');
+        if (this.githubBtn) {
+            this.githubBtn.textContent = 'Login with GitHub';
+            this.githubBtn.classList.remove('hidden');
+            this.githubBtn.classList.remove('bg-green-500', 'text-white', 'bg-blue-500', 'bg-red-500');
+            this.githubBtn.classList.add('bg-white', 'text-primarydark');
         }
-        
+
+        if (this.gitlabBtn) {
+            this.gitlabBtn.classList.remove('hidden');
+        }
+
+        if (this.logoutBtn) {
+            this.logoutBtn.classList.add('hidden');
+        }
+
         // Hide payment section when logged out
         const paymentSection = document.getElementById('payment-section');
         if (paymentSection) {
@@ -202,7 +291,7 @@ class remediatorApp {
     }
 
     async handleUpgrade() {
-        if (!this.auth.isLoggedIn()) {
+        if (!this.getAccessToken()) {
             alert('Please login first');
             return;
         }
@@ -214,16 +303,31 @@ class remediatorApp {
             const response = await fetch('/api/create-checkout-session', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.auth.accessToken}`,
+                    'Authorization': `Bearer ${this.getAccessToken()}`,
                     'Content-Type': 'application/json'
                 }
             });
 
             if (!response.ok) {
-                throw new Error('Failed to create checkout session');
+                const errText = await response.text();
+                throw new Error('Failed to create checkout session: ' + (errText || response.statusText));
             }
 
-            const { checkout_url } = await response.json();
+            const text = await response.text();
+            if (!text) {
+                throw new Error('Empty response from server when creating checkout session');
+            }
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                throw new Error('Invalid JSON from server when creating checkout session: ' + err.message);
+            }
+
+            const checkout_url = data.checkout_url;
+            if (!checkout_url) {
+                throw new Error('No checkout URL returned from server');
+            }
 
             // Redirect to Stripe Checkout
             window.location.href = checkout_url;
