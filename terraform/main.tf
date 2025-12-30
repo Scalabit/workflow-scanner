@@ -111,6 +111,8 @@ locals {
     "base-url"                  = var.base_url
     "gh-client-id"              = var.gh_client_id
     "gh-client-secret"          = var.gh_client_secret
+    "gitlab-client-id"          = var.gitlab_client_id
+    "gitlab-client-secret"      = var.gitlab_client_secret
     "stripe-key"                = var.stripe_key
     "stripe-publishable-key"    = var.stripe_publishable_key
     "stripe-webhook-secret"     = var.stripe_webhook_secret
@@ -225,6 +227,27 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.secrets["gh-client-secret"].secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      # GitLab OAuth secrets
+      env {
+        name = "GITLAB_CLIENT_ID"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["gitlab-client-id"].secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "GITLAB_CLIENT_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["gitlab-client-secret"].secret_id
             version = "latest"
           }
         }

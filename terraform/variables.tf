@@ -29,6 +29,18 @@ variable "gh_client_secret" {
   sensitive   = true
 }
 
+variable "gitlab_client_id" {
+  description = "GitLab App Client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "gitlab_client_secret" {
+  description = "GitLab App Client Secret"
+  type        = string
+  sensitive   = true
+}
+
 variable "stripe_key" {
   description = "Stripe Secret Key"
   type        = string
