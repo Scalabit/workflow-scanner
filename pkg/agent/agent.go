@@ -4,13 +4,14 @@ package agent
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
 
-//go:embed ../../llm_fix_prompt.md
+//go:embed llm_fix_prompt.md
 var llmFixPrompt string
 
 type Agent interface {
