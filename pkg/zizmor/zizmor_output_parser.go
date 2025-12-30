@@ -92,9 +92,6 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 	fmt.Println("-------- JSON END: --------")
 
 	jsonPart = strings.TrimSpace(jsonPart)
-	if strings.HasSuffix(jsonPart, ",]") {
-		jsonPart = strings.TrimSuffix(jsonPart, ",]") + "]"
-	}
 
 	var findings []Finding
 	if err := json.Unmarshal([]byte(jsonPart), &findings); err != nil {
