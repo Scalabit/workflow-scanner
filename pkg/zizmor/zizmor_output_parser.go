@@ -77,30 +77,15 @@ type Span struct {
 func ParseZizmorOutput(input string) ([]Finding, string, error) {
 	start := strings.Index(input, "[")
 	if start == -1 {
-		return nil, "", fmt.Errorf("no JSON array found")
+		return nil, "", fmt.Errorf("no JSON array found for [")
 	}
 
-	bracketCount := 0
-	end := -1
-
-	for i := start; i < len(input); i++ {
-		ch := input[i]
-		if ch == '[' {
-			bracketCount++
-		} else if ch == ']' {
-			bracketCount--
-			if bracketCount == 0 {
-				end = i + 1
-				break
-			}
-		}
+	lastIndex := strings.LastIndex(input, "]")
+	if lastIndex == -1 {
+		return nil, "", fmt.Errorf("no JSON array found for ]")
 	}
 
-	if end == -1 {
-		return nil, "", fmt.Errorf("unclosed JSON array in input")
-	}
-
-	jsonPart := input[start : end-1]
+	jsonPart := input[start:lastIndex]
 
 	fmt.Println("-------- JSON START: --------")
 	fmt.Println(jsonPart)
@@ -117,8 +102,8 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 	}
 
 	fixSummary := ""
-	if end < len(input) {
-		fixSummary = strings.TrimSpace(input[end:])
+	if lastIndex < len(input) {
+		fixSummary = strings.TrimSpace(input[lastIndex:])
 	}
 
 	return findings, fixSummary, nil
