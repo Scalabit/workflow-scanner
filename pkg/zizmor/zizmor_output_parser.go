@@ -90,6 +90,7 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 			bracketCount--
 			if bracketCount == 0 {
 				end = i + 1
+
 				break
 			}
 		}

@@ -43,7 +43,6 @@ func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDag
 
 	findings, fixSummary, err := ParseZizmorOutput(output)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
 		return nil, "", fmt.Errorf("failed to run structure output: %w", err)
 	}
 
