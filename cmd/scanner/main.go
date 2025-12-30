@@ -45,8 +45,8 @@ func main() {
 	validateDaggerEnvironment()
 
 	ctx := context.Background()
+	dagger.SetMarshalContext(ctx)
 
-	// Recover from any panics in dagger.Connect()
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "CRITICAL: Dagger connection panic: %v\n", r)
