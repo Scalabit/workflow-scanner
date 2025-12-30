@@ -73,7 +73,6 @@ jobs:
         env:
           TOKEN: ${{ secrets.TEST_GH_TOKEN }}
           REPO: 'Scalabit/integration-test-workflow-scanner'
-          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
