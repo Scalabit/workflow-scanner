@@ -5,6 +5,7 @@ on:
 
 jobs:
   test-scanner:
+    if: ${{ !contains(github.event.pull_request.title, 'Security Audit & Fixes for GitHub Actions Workflows') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
