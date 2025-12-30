@@ -104,11 +104,17 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	// Create a root filesystem scoped to the project root
 	rootFS := os.DirFS(projectRoot)
 
+	fs.WalkDir(rootFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(path)
+		return nil
+	})
+
 	// Try to find the prompt file relative to project root
 	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
 	if err != nil {
-		fmt.Println("rootFS: ", rootFS)
-
 		return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
 	}
 	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
