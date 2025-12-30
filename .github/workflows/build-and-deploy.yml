@@ -96,8 +96,8 @@ jobs:
         terraform plan \
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
-          -var="gh_app_id=${{ secrets.GH_APP_ID }}" \
-          -var="gh_app_secret=${{ secrets.GH_APP_SECRET }}" \
+          -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
+          -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
@@ -111,8 +111,8 @@ jobs:
         terraform apply -auto-approve \
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
-          -var="gh_app_id=${{ secrets.GH_APP_ID }}" \
-          -var="gh_app_secret=${{ secrets.GH_APP_SECRET }}" \
+          -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
+          -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \

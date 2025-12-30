@@ -11,14 +11,14 @@ variable "region" {
 }
 
 # Secrets as input variables
-variable "gh_app_id" {
-  description = "GitHub App ID"
+variable "gh_client_id" {
+  description = "GitHub App Client ID"
   type        = string
   sensitive   = true
 }
 
-variable "gh_app_secret" {
-  description = "GitHub App Secret"
+variable "gh_client_secret" {
+  description = "GitHub App Client Secret"
   type        = string
   sensitive   = true
 }
