@@ -110,7 +110,7 @@ jobs:
       timeout-minutes: 15
       run: |
         terraform apply -auto-approve \
-          -var="base-url=${{ vars.BASE_URL }}" \
+          -var="base_url=${{ vars.BASE_URL }}" \
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
