@@ -459,7 +459,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 	log.Printf("DEBUG: Remaining issues check completed. Issues found: %d chars", len(remainingIssues))
 
 	finalDirectory := autoFixedDirectory
-	//llmExplanations := ""
+	llmExplanations := ""
 	if remainingIssues != "" && remainingIssues != "[]" && remainingIssues != "[]\n" {
 		log.Printf("DEBUG: Remaining issues detected, calling LLM agent to fix them...")
 		log.Printf("DEBUG: Issues to fix: %s", remainingIssues)
@@ -467,12 +467,12 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 		if err != nil {
 			log.Printf("ERROR: LLM agent failed to fix remaining issues: %v", err)
 
-			//return "", fmt.Errorf("failed to fix remaining issues with LLM: %w", err)
+			return "", fmt.Errorf("failed to fix remaining issues with LLM: %w", err)
 		}
-		//log.Printf("DEBUG: LLM agent completed successfully. Explanations: %d chars", len(llmExplanations))
+		log.Printf("DEBUG: LLM agent completed successfully. Explanations: %d chars", len(llmExplanations))
 	} else {
 		log.Printf("DEBUG: No remaining issues found, skipping LLM processing")
-		//llmExplanations = "No remaining security issues found after ZIZMOR auto-fix"
+		llmExplanations = "No remaining security issues found after ZIZMOR auto-fix"
 	}
 
 	finalValidation, err := zizmor.CheckRemainingIssues(ctx, finalDirectory)
@@ -492,8 +492,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 			"\n\n... (truncated due to length - see full scan in workflow logs)"
 	}
 
-	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, "", //llmExplanations
-		summaryExternalFindings)
+	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, llmExplanations, summaryExternalFindings)
 
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }
