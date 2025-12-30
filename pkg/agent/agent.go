@@ -104,6 +104,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	// Create a root filesystem scoped to the project root
 	rootFS := os.DirFS(projectRoot)
 
+	fmt.Println("Start Walk Path")
 	fs.WalkDir(rootFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			log.Fatal(err)
@@ -111,6 +112,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		fmt.Println(path)
 		return nil
 	})
+	fmt.Println("End Walk Path")
 
 	// Try to find the prompt file relative to project root
 	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
