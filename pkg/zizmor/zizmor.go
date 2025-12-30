@@ -45,7 +45,7 @@ func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDag
 		return nil, []Finding{}, "", fmt.Errorf("failed to run structure output: %w", err)
 	}
 
-	return source, findings, fixSummary, nil
+	return container.Directory("/workspace"), findings, fixSummary, nil
 }
 
 func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error) {

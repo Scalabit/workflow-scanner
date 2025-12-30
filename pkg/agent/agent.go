@@ -5,13 +5,13 @@ package agent
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
+
+//go:embed ../../llm_fix_prompt.md
+var llmFixPrompt string
 
 type Agent interface {
 	FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error)
@@ -79,50 +79,11 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Environment created successfully")
 
-	log.Printf("DEBUG: Reading prompt file directly from filesystem...")
-	// Use os.DirFS to safely scope file access and prevent directory traversal
-	cwd, err := os.Getwd()
-	if err != nil {
-		return source, "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
+	log.Printf("DEBUG: Using embedded prompt file for LLM; adding into Dagger workspace")
 
-	// Find project root by looking for go.mod file
-	projectRoot := cwd
-	for {
-		if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
-			break
-		}
-		parent := projectRoot + "/.."
-		if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
-			// Can't find project root, use current directory
-			break
-		} else {
-			projectRoot = abs
-		}
-	}
+	promptContent := []byte(llmFixPrompt)
+	log.Printf("DEBUG: Embedded prompt length: %d chars", len(promptContent))
 
-	// Create a root filesystem scoped to the project root
-	rootFS := os.DirFS(projectRoot)
-
-	fmt.Println("Start Walk Path")
-	fs.WalkDir(rootFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(path)
-		return nil
-	})
-	fmt.Println("End Walk Path")
-
-	// Try to find the prompt file relative to project root
-	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
-	if err != nil {
-		return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
-	}
-	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
-
-	log.Printf("DEBUG: Creating prompt file in source directory...")
-	// Add the prompt file to the source directory so Dagger can access it
 	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
 	promptFile := sourceWithPrompt.File("llm_fix_prompt.md")
 	log.Printf("DEBUG: Prompt file created in source directory")

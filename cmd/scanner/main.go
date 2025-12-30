@@ -378,7 +378,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 	llmExplanations := ""
 	if remainingIssues != "" && remainingIssues != "[]" && remainingIssues != "[]\n" {
 		log.Printf("DEBUG: Remaining issues detected, calling LLM agent to fix them...")
-		log.Printf("DEBUG: Issues to fix: %s", remainingIssues)
+		//log.Printf("DEBUG: Issues to fix: %s", remainingIssues)
 		finalDirectory, llmExplanations, err = agent.FixRemainingIssues(ctx, autoFixedDirectory, remainingIssues)
 		if err != nil {
 			log.Printf("ERROR: LLM agent failed to fix remaining issues: %v", err)
