@@ -239,7 +239,7 @@ func commitExistsOnRepo(repo string, sha string, token string) (bool, error) {
 	if token != "" {
 		req.Header.Set("Authorization", "token "+token)
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: httpClientTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
@@ -265,7 +265,7 @@ func getDefaultBranch(repo string, token string) (string, error) {
 	if token != "" {
 		req.Header.Set("Authorization", "token "+token)
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: httpClientTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -301,7 +301,7 @@ func getBranchHeadSHA(repo string, token string) (string, error) {
 	if token != "" {
 		req.Header.Set("Authorization", "token "+token)
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: httpClientTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
