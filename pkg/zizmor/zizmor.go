@@ -41,8 +41,16 @@ func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDag
 		return nil, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
 	}
 
-	fmt.Println("OUTPUT: ")
-	fmt.Println(output)
+	findings, fixSummary, err := ParseZizmorOutput(output)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return nil, "", fmt.Errorf("failed to run structure output: %w", err)
+	}
+
+	fmt.Println("Number of findings: ", len(findings))
+
+	fmt.Println("FixSummary: ")
+	fmt.Println(fixSummary)
 
 	fmt.Println("Exit")
 	os.Exit(1)
