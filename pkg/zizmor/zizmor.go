@@ -33,8 +33,7 @@ func NewZizmor(client dagger.Client) Zizmor {
 
 func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, []Finding, string, error) {
 	container := ziz.getZizmorContainer(source).
-		WithExec([]string{"sh", "-c", "ls -la"})
-		//WithExec([]string{"sh", "-c", "zizmor -q --format=json --fix=all .github/workflows/ 2>&1 || true"})
+		WithExec([]string{"sh", "-c", "zizmor -q --format=json --fix=all .github/workflows/ 2>&1 || true"})
 
 	fmt.Println("LS -LA :")
 	output, err := container.Stdout(ctx)
@@ -47,7 +46,7 @@ func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDag
 		return nil, []Finding{}, "", fmt.Errorf("failed to run structure output: %w", err)
 	}
 
-	return container.Directory("/workspace"), findings, fixSummary, nil
+	return container.Directory("."), findings, fixSummary, nil
 }
 
 func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error) {
