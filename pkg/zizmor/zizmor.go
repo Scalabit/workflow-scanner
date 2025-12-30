@@ -33,7 +33,7 @@ func NewZizmor(client dagger.Client) Zizmor {
 
 func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, []Finding, string, error) {
 	container := ziz.getZizmorContainer(source).
-		WithExec([]string{"ls", "-la"})
+		WithExec([]string{"sh", "-c", "ls -la"})
 		//WithExec([]string{"sh", "-c", "zizmor -q --format=json --fix=all .github/workflows/ 2>&1 || true"})
 
 	fmt.Println("LS -LA :")
