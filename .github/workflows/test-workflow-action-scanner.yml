@@ -38,7 +38,8 @@ jobs:
           EXPECTED_PR_TITLE: 'Security Audit & Fixes for GitHub Actions Workflows'
           EXPECTED_DESC_TITLE: 'Complete Security Audit Report'
           #REPO: 'Scalabit/integration-test-workflow-scanner'
-          REPO: 'goncalogdomingo/test1'
+          #REPO: 'goncalogdomingo/test1'
+          REPO: ${{ github.repository }}
           TOKEN: ${{ secrets.TEST_GH_TOKEN }}
         shell: bash
         run: |
@@ -74,7 +75,8 @@ jobs:
         env:
           TOKEN: ${{ secrets.TEST_GH_TOKEN }}
           #REPO: 'Scalabit/integration-test-workflow-scanner'
-          REPO: 'goncalogdomingo/test1'
+          #REPO: 'goncalogdomingo/test1'
+          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
