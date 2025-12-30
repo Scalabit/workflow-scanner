@@ -397,7 +397,7 @@ func exchangeCodeForGitLabToken(config *Config, code string) (string, error) {
 	v.Set("client_secret", config.GitLabClientSecret)
 	v.Set("code", code)
 	v.Set("grant_type", "authorization_code")
-	v.Set("redirect_uri", fmt.Sprintf("%s/auth/gitlab", getEnv("BASE_URL", "http://localhost:8080")))
+	v.Set("redirect_uri", fmt.Sprintf("%s/auth/gitlab", getEnv("BASE_URL", fmt.Sprintf("http://localhost:%s", config.Port))))
 
 	resp, err := http.PostForm("https://gitlab.com/oauth/token", v)
 	if err != nil {
