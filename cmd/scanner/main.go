@@ -226,6 +226,10 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 		tree := gitRepo.Commit(config.commitSHA).Tree()
 		log.Printf("DEBUG: Successfully checked out commit tree")
 
+		log.Printf("Tree Start")
+		log.Println(tree)
+		log.Printf("Tree End")
+
 		return tree
 	}
 
