@@ -188,7 +188,7 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 }
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
-  log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
+	log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
 
 	log.Printf("DEBUG: Setting up LLM environment...")
 	setupLLMEnvironment(config.llmAPIKey)
@@ -328,7 +328,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	log.Printf("DEBUG: Creating Agent instance...")
 	agent := agent.NewAgent(daggerClient)
 
-  log.Printf("DEBUG: Creating client...")
+	log.Printf("DEBUG: Creating client...")
 	var wrapperClient github.WrapperIssueClient
 	if config.provider == "gitlab" {
 		gitlabClient := gitlab.NewWrapperIssueClientImpl(dag, config.gitlabToken)
@@ -337,7 +337,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 		wrapperClient = github.NewWrapperIssueClientImpl(dag, config.githubToken)
 	}
 
-  log.Printf("DEBUG: Starting scanAndFixWorkflows...")
+	log.Printf("DEBUG: Starting scanAndFixWorkflows...")
 	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient)
 
 	// Increment usage regardless of scan success/failure (user still consumed quota)

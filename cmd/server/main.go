@@ -551,6 +551,7 @@ func fetchUserFromToken(client *http.Client, token string) (*GitHubUser, string,
 	if user, err := fetchGitLabUser(client, token); err == nil {
 		return user, "gitlab", nil
 	}
+
 	return nil, "", fmt.Errorf("Invalid token")
 }
 
@@ -560,6 +561,7 @@ func verifyToken(config *Config, next http.HandlerFunc) http.HandlerFunc {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 			http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+
 			return
 		}
 
@@ -569,6 +571,7 @@ func verifyToken(config *Config, next http.HandlerFunc) http.HandlerFunc {
 		_, _, err := fetchUserFromToken(client, token)
 		if err != nil {
 			http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+			
 			return
 		}
 
