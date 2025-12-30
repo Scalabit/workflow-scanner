@@ -11,6 +11,12 @@ variable "region" {
 }
 
 # Secrets as input variables
+variable "base_url" {
+  description = "Webpage URL"
+  type        = string
+  sensitive   = true
+}
+
 variable "gh_client_id" {
   description = "GitHub App Client ID"
   type        = string
