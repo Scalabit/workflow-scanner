@@ -180,7 +180,10 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 
 	log.Printf("Batch scanner processing repository: %s (mode: %s)", config.repository, mode)
 
+	log.Println("Mode: ", mode)
+
 	if config.useGitClone {
+		log.Println("Her!E?!")
 		return cloneRepository(dag, config)
 	}
 
