@@ -102,6 +102,9 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	}
 
 	// Create a root filesystem scoped to the project root
+	fmt.Println("ROOT: ", projectRoot)
+	os.Exit(1)
+
 	rootFS := os.DirFS(projectRoot)
 
 	// Try to find the prompt file relative to project root
