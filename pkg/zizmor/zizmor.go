@@ -5,6 +5,7 @@ package zizmor
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
@@ -33,12 +34,17 @@ func NewZizmor(client dagger.Client) Zizmor {
 
 func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error) {
 	container := ziz.getZizmorContainer(source).
-		WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"})
+		WithExec([]string{"sh", "-c", "zizmor --format=json --fix=all .github/workflows/ 2>&1 || true"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
 	}
+
+	fmt.Println("OUTPUT: ")
+	fmt.Println(output)
+
+	os.Exit(1)
 
 	return container.Directory("/workspace"), output, nil
 }
