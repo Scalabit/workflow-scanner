@@ -571,7 +571,7 @@ func verifyToken(config *Config, next http.HandlerFunc) http.HandlerFunc {
 		_, _, err := fetchUserFromToken(client, token)
 		if err != nil {
 			http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
-			
+
 			return
 		}
 
@@ -881,6 +881,7 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
 		return
 	}
 
@@ -947,6 +948,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+
 		return
 	}
 }
@@ -954,12 +956,14 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 func handleStripeWebhook(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
 		return
 	}
 
 	event, err := validateStripeWebhook(config, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+
 		return
 	}
 
