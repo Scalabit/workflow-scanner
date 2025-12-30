@@ -188,8 +188,9 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 }
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
-	log.Printf("Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
+  log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
 
+	log.Printf("DEBUG: Setting up LLM environment...")
 	setupLLMEnvironment(config.llmAPIKey)
 
 	cloneURL := config.repository
@@ -218,12 +219,18 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	})
 
 	if config.commitSHA != "" && config.commitSHA != "undefined" {
-		log.Printf("Checking out commit: %s", config.commitSHA)
+		log.Printf("DEBUG: Checking out specific commit: %s", config.commitSHA)
+		tree := gitRepo.Commit(config.commitSHA).Tree()
+		log.Printf("DEBUG: Successfully checked out commit tree")
 
-		return gitRepo.Commit(config.commitSHA).Tree()
+		return tree
 	}
 
-	return gitRepo.Branch("HEAD").Tree()
+	log.Printf("DEBUG: Checking out HEAD branch")
+	tree := gitRepo.Branch("HEAD").Tree()
+	log.Printf("DEBUG: Successfully checked out HEAD tree")
+
+	return tree
 }
 
 func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory {
@@ -237,14 +244,30 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 }
 
 func setupLLMEnvironment(llmAPIKey string) {
-	if err := os.Setenv("OPENAI_API_KEY", llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set OPENAI_API_KEY: %v", err)
+	// Detect provider based on key format and set only the appropriate env var
+	var providerKey string
+	var providerName string
+
+	if strings.HasPrefix(llmAPIKey, "sk-") {
+		providerKey = "OPENAI_API_KEY"
+		providerName = "OpenAI"
+	} else if strings.HasPrefix(llmAPIKey, "sk-ant-") {
+		providerKey = "ANTHROPIC_API_KEY"
+		providerName = "Anthropic"
+	} else if strings.HasPrefix(llmAPIKey, "AIza") {
+		providerKey = "GEMINI_API_KEY"
+		providerName = "Gemini"
+	} else {
+		// Default to OpenAI if format is unknown
+		providerKey = "OPENAI_API_KEY"
+		providerName = "OpenAI (default)"
+		log.Printf("Warning: Unknown API key format, defaulting to OpenAI")
 	}
-	if err := os.Setenv("ANTHROPIC_API_KEY", llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set ANTHROPIC_API_KEY: %v", err)
-	}
-	if err := os.Setenv("GEMINI_API_KEY", llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set GEMINI_API_KEY: %v", err)
+
+	if err := os.Setenv(providerKey, llmAPIKey); err != nil {
+		log.Printf("Warning: Failed to set %s: %v", providerKey, err)
+	} else {
+		log.Printf("Set LLM environment for %s", providerName)
 	}
 }
 
@@ -294,10 +317,18 @@ func incrementUsage(repository string, success bool) error {
 }
 
 func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, sourceDir *dagger.Directory) {
+	log.Printf("DEBUG: Starting scan for repository: %s", config.repository)
+
+	log.Printf("DEBUG: Creating Dagger client...")
 	daggerClient := daggerImpl.NewClient(dag)
+
+	log.Printf("DEBUG: Creating Zizmor instance...")
 	zizmor := zizmor.NewZizmor(daggerClient)
+
+	log.Printf("DEBUG: Creating Agent instance...")
 	agent := agent.NewAgent(daggerClient)
 
+  log.Printf("DEBUG: Creating client...")
 	var wrapperClient github.WrapperIssueClient
 	if config.provider == "gitlab" {
 		gitlabClient := gitlab.NewWrapperIssueClientImpl(dag, config.gitlabToken)
@@ -306,6 +337,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 		wrapperClient = github.NewWrapperIssueClientImpl(dag, config.githubToken)
 	}
 
+  log.Printf("DEBUG: Starting scanAndFixWorkflows...")
 	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient)
 
 	// Increment usage regardless of scan success/failure (user still consumed quota)
@@ -324,24 +356,38 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 
 // Same as scanAndFixWorflowsImpl from main.go.
 func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
+	log.Printf("DEBUG: Running ZIZMOR auto-fix on source directory...")
 	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
+		log.Printf("ERROR: ZIZMOR auto-fix failed: %v", err)
+
 		return "", fmt.Errorf("failed to run ZIZMOR auto-fix: %w", err)
 	}
+	log.Printf("DEBUG: ZIZMOR auto-fix completed successfully")
 
+	log.Printf("DEBUG: Checking for remaining issues after ZIZMOR auto-fix...")
 	remainingIssues, err := zizmor.CheckRemainingIssues(ctx, autoFixedDirectory)
 	if err != nil {
+		log.Printf("ERROR: Failed to check remaining issues: %v", err)
+
 		return "", fmt.Errorf("failed to check remaining issues: %w", err)
 	}
+	log.Printf("DEBUG: Remaining issues check completed. Issues found: %d chars", len(remainingIssues))
 
 	finalDirectory := autoFixedDirectory
 	llmExplanations := ""
 	if remainingIssues != "" && remainingIssues != "[]" && remainingIssues != "[]\n" {
+		log.Printf("DEBUG: Remaining issues detected, calling LLM agent to fix them...")
+		log.Printf("DEBUG: Issues to fix: %s", remainingIssues)
 		finalDirectory, llmExplanations, err = agent.FixRemainingIssues(ctx, autoFixedDirectory, remainingIssues)
 		if err != nil {
+			log.Printf("ERROR: LLM agent failed to fix remaining issues: %v", err)
+
 			return "", fmt.Errorf("failed to fix remaining issues with LLM: %w", err)
 		}
+		log.Printf("DEBUG: LLM agent completed successfully. Explanations: %d chars", len(llmExplanations))
 	} else {
+		log.Printf("DEBUG: No remaining issues found, skipping LLM processing")
 		llmExplanations = "No remaining security issues found after ZIZMOR auto-fix"
 	}
 

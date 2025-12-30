@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>flowsniffer AI - Auto-Fixing GitHub Security</title>
+  <title>remediator</title>
   <meta name="description" content="AI agent that finds and automatically fixes security issues in your GitHub pipelines with clean Pull Requests."/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,7 +41,7 @@
   <header class="gradient-bg text-white overflow-hidden relative">
     <div class="container mx-auto px-6 py-24 text-center relative z-10">
       <h1 class="text-5xl md:text-6xl font-bold mb-6">
-        flowsniffer AI
+        remediator
       </h1>
       <p class="text-2xl md:text-3xl mb-8 max-w-4xl mx-auto opacity-95">
         The AI agent that finds security flaws in your GitHub pipelines<br/>
@@ -51,8 +51,8 @@
         <a href="#cta" class="bg-white text-primarydark hover:bg-gray-100 font-bold py-4 px-10 rounded-xl text-lg shadow-xl transition transform hover:scale-105">
           Get Early Access
         </a>
-        <a href="https://github.com/apps/flowsniffer-ai" target="_blank" class="border-2 border-white hover:bg-white hover:text-primarydark font-bold py-4 px-10 rounded-xl text-lg transition">
-          Install Free GitHub App
+        <a href="https://github.com/Scalabit/workflow-scanner-action" target="_blank" class="bg-white text-primarydark hover:bg-gray-100 font-bold py-4 px-10 rounded-xl text-lg shadow-xl transition transform hover:scale-105">
+          Getting Started
         </a>
       </div>
       <p class="text-lg opacity-80">60-second setup • No credit card • Unlimited repos in beta</p>
@@ -61,7 +61,7 @@
   <!-- Auto-Fix Highlight -->
   <section class="py-20 bg-white border-b">
     <div class="container mx-auto px-6 text-center">
-      <div class="max-w-5xl mx-auto">
+      <div class="max-w-6xl mx-auto">
         <span class="inline-block bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-semibold mb-6">
           Automatic Remediation
         </span>
@@ -71,12 +71,12 @@
         </h2>
         <div class="bg-gray-900 rounded-2xl overflow-hidden shadow-2xl max-w-3xl mx-auto">
           <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&h=800&fit=crop"
-               alt="flowsniffer AI auto-fixing a secret leak with a PR"
+               alt="remediator auto-fixing a secret leak with a PR"
                class="w-full">
           <div class="p-8 text-left text-gray-300">
-            <p class="text-emerald-400 font-mono mb-2">flowsniffer AI bot opened pull request #42</p>
+            <p class="text-emerald-400 font-mono mb-2">remediator opened pull request #42</p>
             <p class="text-xl font-semibold text-white mb-2">Fix: Rotate exposed key → GitHub Secrets</p>
-            <p class="text-sm">+3 −3 • 2 files changed • Ready for review</p>
+            <p class="text-sm"><mark class="bg-transparent text-green-500">+3</mark> <mark class="bg-transparent text-red-500">-3</mark> • 2 files changed • Ready for review</p>
           </div>
         </div>
       </div>
@@ -114,27 +114,12 @@
       </div>
     </div>
   </section>
-  <!-- How it works -->
-  <section class="py-20 bg-white">
-    <div class="container mx-auto px-6 text-center">
-      <h2 class="text-4xl font-bold mb-12">So simple you'll wonder why it didn't exist before</h2>
-      <div class="grid md:grid-cols-4 gap-12 max-w-4xl mx-auto text-left">
-        <div><div class="text-6xl font-bold text-primary mb-4">1</div><p class="font-semibold text-lg">Install GitHub App</p></div>
-        <div><div class="text-6xl font-bold text-primary mb-4">2</div><p class="font-semibold text-lg">Pick repositories</p></div>
-        <div><div class="text-6xl font-bold text-primary mb-4">3</div><p class="font-semibold text-lg">AI scans & fixes</p></div>
-        <div><div class="text-6xl font-bold text-primary mb-4">4</div><p class="font-semibold text-lg">You merge & relax</p></div>
-      </div>
-    </div>
-  </section>
   <!-- Final CTA -->
   <section id="cta" class="py-24 gradient-bg text-white text-center">
     <div class="container mx-auto px-6">
       <h2 class="text-4xl md:text-5xl font-bold mb-6">
         Stop fixing security debt manually.<br/>Let AI do it for you.
       </h2>
-      <p class="text-xl mb-10 max-w-2xl mx-auto opacity-90">
-        Already trusted by 3,000+ engineering teams.
-      </p>
       <div class="max-w-lg mx-auto">
         <a href="#" id="github-login-btn" class="bg-white text-primarydark hover:bg-gray-100 font-bold py-4 px-12 rounded-lg text-lg transition transform hover:scale-105 inline-block">
           Login with GitHub
@@ -154,11 +139,10 @@
   <!-- Footer -->
   <footer class="bg-gray-900 text-gray-400 py-12">
     <div class="container mx-auto px-6 text-center">
-      <p class="mb-4">© 2025 flowsniffer AI – Ship faster. Sleep better.</p>
+      <p class="mb-4">© 2025 remediator</p>
       <div class="flex justify-center gap-8">
         <a href="#" class="hover:text-white transition">Privacy</a>
         <a href="#" class="hover:text-white transition">Terms</a>
-        <a href="https://twitter.com/flowsnifferai" class="hover:text-white transition">Twitter</a>
       </div>
     </div>
   </footer>
@@ -175,7 +159,7 @@
         </button>
       </div>
       <p class="text-sm text-gray-600 mb-4">
-        Use this token to authenticate with the flowsniffer API. Keep it secure and never share it publicly.
+        Use this token to authenticate with the remediator API. Keep it secure and never share it publicly.
       </p>
       <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-2">API Token:</label>

@@ -144,8 +144,8 @@ var (
 
 func loadConfig() *Config {
 	return &Config{
-		ClientID:           getEnv("GH_APP_ID", ""),
-		ClientSecret:       getEnv("GH_APP_SECRET", ""),
+		ClientID:           getEnv("GH_CLIENT_ID", ""),
+		ClientSecret:       getEnv("GH_CLIENT_SECRET", ""),
 		GitLabClientID:     getEnv("GITLAB_CLIENT_ID", ""),
 		GitLabClientSecret: getEnv("GITLAB_CLIENT_SECRET", ""),
 		StripeKey:          getEnv("STRIPE_KEY", getEnv("TEST_STRIPE", "")),
@@ -898,7 +898,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	// Create checkout session for 10 euros
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
-		baseURL = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
+		baseURL = fmt.Sprintf("http://0.0.0.0:%s", loadConfig().Port)
 	}
 
 	params := &stripe.CheckoutSessionParams{
@@ -908,7 +908,7 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency: stripe.String("eur"),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String("flowsniffer Premium"),
+						Name: stripe.String("remediator Premium"),
 					},
 					UnitAmount: stripe.Int64(PriceInCents), // €10.00 in cents
 				},
@@ -916,8 +916,8 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 			},
 		},
 		Mode:          stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:    stripe.String(baseURL + "/"),
-		CancelURL:     stripe.String(baseURL + "/"),
+		SuccessURL:    stripe.String(baseURL),
+		CancelURL:     stripe.String(baseURL),
 		CustomerEmail: stripe.String(user.Email),
 		Metadata: map[string]string{
 			"user":     user.Login,
@@ -1109,9 +1109,9 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 func main() {
 	config := loadConfig()
 
-	// if config.ClientID == "" || config.ClientSecret == "" {
-	// 	log.Fatal("Missing required environment variables: GH_APP_ID, GH_APP_SECRET")
-	// }
+	if config.ClientID == "" || config.ClientSecret == "" {
+		log.Fatal("Missing required environment variables: GH_CLIENT_ID, GH_CLIENT_SECRET")
+	}
 
 	mux := http.NewServeMux()
 

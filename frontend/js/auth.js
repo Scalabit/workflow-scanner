@@ -30,9 +30,8 @@ class GitHubAuth {
         }
         
         const redirectUri = `${window.location.origin}/auth/github`;
-        const scope = 'user:email,repo';
-        const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
-        
+        const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
         console.log('Redirecting to:', githubAuthUrl);
         window.location.href = githubAuthUrl;
     }

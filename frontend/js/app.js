@@ -1,6 +1,6 @@
 // Main application logic
 
-class flowsnifferApp {
+class remediatorApp {
     constructor() {
         this.auth = new GitHubAuth();
         this.gitlabAuth = new GitLabAuth();
@@ -380,6 +380,6 @@ class flowsnifferApp {
 
 // Initialize the app when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    const app = new flowsnifferApp();
+    const app = new remediatorApp();
     app.init();
 });
