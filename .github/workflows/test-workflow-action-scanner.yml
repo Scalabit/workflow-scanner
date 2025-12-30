@@ -29,7 +29,7 @@ jobs:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.TEST_GH_TOKEN }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
-          repository: 'goncalogdomingo/test1'
+          #repository: 'goncalogdomingo/test1'
       
       - name: Validate AI Pull Request 
         if: ${{ steps.scanner.outcome == 'success' }}
