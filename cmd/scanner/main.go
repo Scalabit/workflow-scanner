@@ -10,18 +10,22 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/agent"
 	daggerImpl "workflow-scanner/pkg/dagger"
 	"workflow-scanner/pkg/github"
+	"workflow-scanner/pkg/gitlab"
 	"workflow-scanner/pkg/zizmor"
 )
 
 type batchConfig struct {
 	repository   string
+	provider     string
 	githubToken  string
+	gitlabToken  string
 	llmAPIKey    string
 	commitSHA    string
 	sourceBase64 string
@@ -64,16 +68,28 @@ func main() {
 
 func loadConfig() batchConfig {
 	repository := os.Getenv("REPOSITORY")
+	provider := strings.ToLower(os.Getenv("PROVIDER")) // optional override
 	githubToken := os.Getenv("GITHUB_TOKEN")
+	gitlabToken := os.Getenv("GITLAB_TOKEN")
 	llmAPIKey := os.Getenv("LLM_API_KEY")
 	commitSHA := os.Getenv("COMMIT_SHA")
 	sourceBase64 := os.Getenv("SOURCE_BASE64")
 
 	useGitClone := sourceBase64 == "" && llmAPIKey != ""
 
+	if provider == "" {
+		if strings.Contains(repository, "gitlab.com") {
+			provider = "gitlab"
+		} else {
+			provider = "github"
+		}
+	}
+
 	return batchConfig{
 		repository:   repository,
+		provider:     provider,
 		githubToken:  githubToken,
+		gitlabToken:  gitlabToken,
 		llmAPIKey:    llmAPIKey,
 		commitSHA:    commitSHA,
 		sourceBase64: sourceBase64,
@@ -82,8 +98,18 @@ func loadConfig() batchConfig {
 }
 
 func validateConfig(config batchConfig) {
-	if config.repository == "" || config.githubToken == "" {
-		log.Fatal("Missing required environment variables: REPOSITORY, GITHUB_TOKEN")
+	if config.repository == "" {
+		log.Fatal("Missing required environment variable: REPOSITORY")
+	}
+
+	if config.provider == "gitlab" {
+		if config.gitlabToken == "" {
+			log.Fatal("Missing GITLAB_TOKEN for gitlab provider")
+		}
+	} else {
+		if config.githubToken == "" {
+			log.Fatal("Missing GITHUB_TOKEN for github provider")
+		}
 	}
 
 	if !config.useGitClone && config.sourceBase64 == "" {
@@ -162,18 +188,33 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 }
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
-	log.Printf("Cloning repository %s using Dagger Git", config.repository)
+	log.Printf("Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
 
 	setupLLMEnvironment(config.llmAPIKey)
 
-	// Use Dagger's built-in git functionality with HTTP auth
-	cloneURL := fmt.Sprintf("https://github.com/%s.git", config.repository)
+	cloneURL := config.repository
+	if !strings.HasPrefix(config.repository, "http") && !strings.Contains(config.repository, "@") {
+		if config.provider == "gitlab" {
+			cloneURL = fmt.Sprintf("https://gitlab.com/%s.git", config.repository)
+		} else {
+			cloneURL = fmt.Sprintf("https://github.com/%s.git", config.repository)
+		}
+	}
 
-	gitAuth := dag.SetSecret("git-auth", config.githubToken)
+	var gitAuthSecret *dagger.Secret
+	var gitUser string
+	if config.provider == "gitlab" {
+		gitAuthSecret = dag.SetSecret("git-auth", config.gitlabToken)
+		gitUser = "oauth2"
+	} else {
+		gitAuthSecret = dag.SetSecret("git-auth", config.githubToken)
+		gitUser = "x-access-token"
+	}
+
 	gitRepo := dag.Git(cloneURL, dagger.GitOpts{
 		KeepGitDir:       true,
-		HTTPAuthUsername: config.githubToken, // For GitHub, this token can be username
-		HTTPAuthToken:    gitAuth,
+		HTTPAuthUsername: gitUser,
+		HTTPAuthToken:    gitAuthSecret,
 	})
 
 	if config.commitSHA != "" && config.commitSHA != "undefined" {
@@ -256,9 +297,16 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
-	githubClient := github.NewWrapperIssueClientImpl(dag, config.githubToken)
 
-	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, githubClient)
+	var wrapperClient github.WrapperIssueClient
+	if config.provider == "gitlab" {
+		gitlabClient := gitlab.NewWrapperIssueClientImpl(dag, config.gitlabToken)
+		wrapperClient = gitlabClient
+	} else {
+		wrapperClient = github.NewWrapperIssueClientImpl(dag, config.githubToken)
+	}
+
+	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient)
 
 	// Increment usage regardless of scan success/failure (user still consumed quota)
 	usageErr := incrementUsage(config.repository, err == nil)

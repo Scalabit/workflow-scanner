@@ -30,7 +30,7 @@ class flowsnifferApp {
         
         // Update UI based on auth status (after OAuth processing)
         this.updateUI();
-        
+
         // Set up event listeners
         this.setupEventListeners();
 
@@ -179,7 +179,7 @@ class flowsnifferApp {
         try {
             const token = this.getAccessToken();
             if (!token) {
-                this.showPaymentSection();
+                this.showLoggedOutState();
                 return;
             }
 
@@ -215,7 +215,11 @@ class flowsnifferApp {
             }
         } catch (error) {
             console.error('Failed to check premium status:', error);
-            this.showPaymentSection();
+            if (this.getAccessToken()) {
+                this.showPaymentSection();
+            } else {
+                this.showLoggedOutState();
+            }
         }
     }
 
@@ -305,10 +309,25 @@ class flowsnifferApp {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to create checkout session');
+                const errText = await response.text();
+                throw new Error('Failed to create checkout session: ' + (errText || response.statusText));
             }
 
-            const { checkout_url } = await response.json();
+            const text = await response.text();
+            if (!text) {
+                throw new Error('Empty response from server when creating checkout session');
+            }
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                throw new Error('Invalid JSON from server when creating checkout session: ' + err.message);
+            }
+
+            const checkout_url = data.checkout_url;
+            if (!checkout_url) {
+                throw new Error('No checkout URL returned from server');
+            }
 
             // Redirect to Stripe Checkout
             window.location.href = checkout_url;

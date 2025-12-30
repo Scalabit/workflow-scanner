@@ -148,9 +148,9 @@ func loadConfig() *Config {
 		ClientSecret:       getEnv("GH_APP_SECRET", ""),
 		GitLabClientID:     getEnv("GITLAB_CLIENT_ID", ""),
 		GitLabClientSecret: getEnv("GITLAB_CLIENT_SECRET", ""),
-		StripeKey:          getEnv("TEST_STRIPE", ""),
-		StripePublishable:  getEnv("TEST_STRIPE_PK", ""),
-		StripeWebhookKey:   getEnv("TEST_STRIPE_WEBHOOK_SECRET", ""),
+		StripeKey:          getEnv("STRIPE_KEY", getEnv("TEST_STRIPE", "")),
+		StripePublishable:  getEnv("STRIPE_PUBLISHABLE", getEnv("TEST_STRIPE_PK", "")),
+		StripeWebhookKey:   getEnv("STRIPE_WEBHOOK_SECRET", getEnv("TEST_STRIPE_WEBHOOK_SECRET", "")),
 		Port:               getEnv("PORT", "8080"),
 	}
 }
@@ -565,6 +565,8 @@ func verifyToken(config *Config, next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
 			return
 		}
+
+		next(w, r)
 	}
 }
 
@@ -870,7 +872,6 @@ func revokeAPIToken(config *Config, w http.ResponseWriter, r *http.Request) {
 func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-
 		return
 	}
 
@@ -936,20 +937,20 @@ func createCheckoutSession(config *Config, w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Failed to encode JSON response: %v", err)
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		return
 	}
 }
 
 func handleStripeWebhook(config *Config, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-
 		return
 	}
 
 	event, err := validateStripeWebhook(config, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-
 		return
 	}
 
