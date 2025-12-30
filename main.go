@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 
+	"strings"
 	"workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/agent"
 	daggerImpl "workflow-scanner/pkg/dagger"
 	"workflow-scanner/pkg/github"
+	"workflow-scanner/pkg/gitlab"
 	"workflow-scanner/pkg/zizmor"
 )
 
@@ -73,9 +75,20 @@ func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dag
 	daggerClient := daggerImpl.NewClient(dag)
 	zizmor := zizmor.NewZizmor(daggerClient)
 	agent := agent.NewAgent(daggerClient)
-	githubClient := github.NewWrapperIssueClientImpl(dag, githubTokenStr)
 
-	return scanAndFixWorflowsImpl(ctx, repository, source, zizmor, agent, githubClient)
+	provider := "github"
+	if strings.Contains(repository, "gitlab.com") {
+		provider = "gitlab"
+	}
+
+	var wrapperClient github.WrapperIssueClient
+	if provider == "gitlab" {
+		wrapperClient = gitlab.NewWrapperIssueClientImpl(dag, githubTokenStr)
+	} else {
+		wrapperClient = github.NewWrapperIssueClientImpl(dag, githubTokenStr)
+	}
+
+	return scanAndFixWorflowsImpl(ctx, repository, source, zizmor, agent, wrapperClient)
 }
 
 func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
