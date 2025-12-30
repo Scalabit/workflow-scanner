@@ -100,7 +100,7 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 		return nil, "", fmt.Errorf("unclosed JSON array in input")
 	}
 
-	jsonPart := input[start:end]
+	jsonPart := input[start : end-1]
 
 	jsonPart = strings.TrimSpace(jsonPart)
 	if strings.HasSuffix(jsonPart, ",]") {
