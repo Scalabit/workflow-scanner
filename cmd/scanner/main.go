@@ -180,10 +180,7 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 
 	log.Printf("Batch scanner processing repository: %s (mode: %s)", config.repository, mode)
 
-	log.Println("Mode: ", mode)
-
 	if config.useGitClone {
-		log.Println("Her!E?!")
 		return cloneRepository(dag, config)
 	}
 
@@ -226,20 +223,12 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 		tree := gitRepo.Commit(config.commitSHA).Tree()
 		log.Printf("DEBUG: Successfully checked out commit tree")
 
-		log.Printf("Tree Start")
-		log.Println(tree)
-		log.Printf("Tree End")
-
 		return tree
 	}
 
 	log.Printf("DEBUG: Checking out HEAD branch")
 	tree := gitRepo.Branch("HEAD").Tree()
 	log.Printf("DEBUG: Successfully checked out HEAD tree")
-
-	log.Printf("Tree Start")
-	log.Println(tree)
-	log.Printf("Tree End")
 
 	return tree
 }
