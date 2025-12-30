@@ -108,12 +108,13 @@ resource "google_project_iam_member" "cloud_run_sa_bindings" {
 # Secrets in Secret Manager
 locals {
   secrets = {
+    "base-url"                  = var.base_url
     "gh-client-id"              = var.gh_client_id
     "gh-client-secret"          = var.gh_client_secret
-    "stripe-key"             = var.stripe_key
-    "stripe-publishable-key" = var.stripe_publishable_key
-    "stripe-webhook-secret"  = var.stripe_webhook_secret
-    "openai-api-key"         = var.openai_api_key
+    "stripe-key"                = var.stripe_key
+    "stripe-publishable-key"    = var.stripe_publishable_key
+    "stripe-webhook-secret"     = var.stripe_webhook_secret
+    "openai-api-key"            = var.openai_api_key
   }
 }
 
@@ -189,7 +190,12 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
       
       env {
         name  = "BASE_URL"
-        value = "https://workflow-scanner-36bg3tpnra-lz.a.run.app"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["base-url"].secret_id
+            version = "latest"
+          }
+        }
       }
       
       # Database configuration
