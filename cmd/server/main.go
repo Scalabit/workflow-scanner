@@ -299,25 +299,28 @@ func gitlabAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 	code, err := extractAuthCode(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		
+
 		return
 	}
 
 	accessToken, err := exchangeCodeForGitLabToken(config, code)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 
 	user, err := fetchGitLabUser(&http.Client{}, accessToken)
 	if err != nil {
 		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+
 		return
 	}
 
 	if r.Method == http.MethodGet {
 		redirectURL := fmt.Sprintf("/#access_token=%s&user_login=%s&user_id=%d&user_email=%s&provider=gitlab", accessToken, user.Login, user.ID, user.Email)
 		http.Redirect(w, r, redirectURL, http.StatusFound)
+
 		return
 	}
 
