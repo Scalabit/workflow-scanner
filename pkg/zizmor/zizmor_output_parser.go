@@ -80,12 +80,12 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 		return nil, "", fmt.Errorf("no JSON array found for [")
 	}
 
-	lastIndex := strings.LastIndex(input, "]")
+	lastIndex := strings.LastIndex(input, "Fix")
 	if lastIndex == -1 {
 		return nil, "", fmt.Errorf("no JSON array found for ]")
 	}
 
-	jsonPart := input[start:lastIndex]
+	jsonPart := input[start+1 : lastIndex-3]
 
 	fmt.Println("-------- JSON START: --------")
 	fmt.Println(jsonPart)
