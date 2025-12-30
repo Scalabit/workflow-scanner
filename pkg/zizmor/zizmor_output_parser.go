@@ -102,6 +102,10 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 
 	jsonPart := input[start : end-1]
 
+	fmt.Println("-------- JSON START: --------")
+	fmt.Println(jsonPart)
+	fmt.Println("-------- JSON END: --------")
+
 	jsonPart = strings.TrimSpace(jsonPart)
 	if strings.HasSuffix(jsonPart, ",]") {
 		jsonPart = strings.TrimSuffix(jsonPart, ",]") + "]"
