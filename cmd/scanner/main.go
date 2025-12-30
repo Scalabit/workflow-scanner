@@ -31,6 +31,8 @@ type batchConfig struct {
 
 var dummyVal = 5
 
+const httpClientTimeout = 10 * time.Second
+
 func main() {
 	fmt.Println("Scanner starting...")
 
@@ -205,6 +207,7 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 			log.Printf("DEBUG: Using target repo HEAD SHA: %s", headSha)
 			tree := gitRepo.Commit(headSha).Tree()
 			log.Printf("DEBUG: Successfully checked out commit tree for HEAD SHA %s", headSha)
+
 			return tree
 		}
 
@@ -216,6 +219,7 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 		log.Printf("DEBUG: Could not determine default branch (err=%v). Falling back to HEAD", err)
 		tree := gitRepo.Branch("HEAD").Tree()
 		log.Printf("DEBUG: Successfully checked out HEAD tree")
+
 		return tree
 	}
 
