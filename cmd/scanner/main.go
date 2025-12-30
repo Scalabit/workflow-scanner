@@ -315,7 +315,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 // Same as scanAndFixWorflowsImpl from main.go.
 func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
 	log.Printf("DEBUG: Running ZIZMOR auto-fix on source directory...")
-	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
+	autoFixedDirectory, zizmorFindings, fixSummary, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
 		log.Printf("ERROR: ZIZMOR auto-fix failed: %v", err)
 
@@ -366,7 +366,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 			"\n\n... (truncated due to length - see full scan in workflow logs)"
 	}
 
-	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, llmExplanations, summaryExternalFindings)
+	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorFindings, fixSummary, llmExplanations, summaryExternalFindings)
 
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }

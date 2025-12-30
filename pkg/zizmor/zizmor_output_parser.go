@@ -86,11 +86,6 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 	}
 
 	jsonPart := input[start : lastIndex+1]
-
-	fmt.Println("-------- JSON START: --------")
-	fmt.Println(jsonPart)
-	fmt.Println("-------- JSON END: --------")
-
 	jsonPart = strings.TrimSpace(jsonPart)
 	jsonArray := "[" + jsonPart + "]"
 

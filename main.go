@@ -79,7 +79,7 @@ func (m *WorkflowScanner) ScanAndFixWorkflows(ctx context.Context, apiToken *dag
 }
 
 func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
-	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
+	autoFixedDirectory, zizmorFindings, fixSummary, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
 		return "", fmt.Errorf("failed to run ZIZMOR auto-fix: %w", err)
 	}
@@ -121,7 +121,7 @@ func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagg
 			"\n\n... (truncated due to length - see full scan in workflow logs)"
 	}
 
-	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, llmExplanations, summaryExternalFindings)
+	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorFindings, fixSummary, llmExplanations, summaryExternalFindings)
 
 	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
 }
