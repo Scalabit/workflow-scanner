@@ -28,7 +28,8 @@ type WrapperIssueClientImpl struct {
 func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory) (string, error) {
 	branchName := fmt.Sprintf("workflow-security-fixes-%d", time.Now().Unix())
 
-	repoURL := fmt.Sprintf("https://gitlab.com/%s.git", repo)
+	normalizedRepo := sanitizeRepo(repo)
+	repoURL := fmt.Sprintf("https://gitlab.com/%s.git", normalizedRepo)
 	gitAuth := w.daggerClient.SetSecret("gitlab-token", w.gitlabToken)
 	gitRepo := w.daggerClient.Git(repoURL, dagger.GitOpts{
 		KeepGitDir:       true,
@@ -51,7 +52,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		WithExec([]string{"git", "config", "--global", "user.email", "noreply@workflow-scanner.local"}).
 		WithExec([]string{"git", "init"})
 
-	remoteURL := fmt.Sprintf("https://oauth2:%s@gitlab.com/%s.git", w.gitlabToken, repo)
+	remoteURL := fmt.Sprintf("https://oauth2:%s@gitlab.com/%s.git", w.gitlabToken, normalizedRepo)
 	gitContainer = gitContainer.WithExec([]string{"git", "remote", "add", "origin", remoteURL})
 
 	gitContainer = gitContainer.
@@ -80,7 +81,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	}
 
 	// Create merge request via GitLab API
-	apiURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests", url.PathEscape(repo))
+	apiURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests", url.PathEscape(normalizedRepo))
 	mrData := map[string]interface{}{
 		"source_branch": branchName,
 		"target_branch": "main",
@@ -112,6 +113,21 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	}
 
 	return "", fmt.Errorf("MR creation failed, response: %s", resp)
+}
+
+func sanitizeRepo(repo string) string {
+	repo = strings.TrimSpace(repo)
+	if strings.HasPrefix(repo, "http://") || strings.HasPrefix(repo, "https://") {
+		u, err := url.Parse(repo)
+		if err == nil {
+			repo = strings.TrimPrefix(u.Path, "/")
+		}
+	}
+	repo = strings.TrimPrefix(repo, "/")
+	repo = strings.TrimSuffix(repo, ".git")
+	repo = strings.TrimPrefix(repo, "gitlab.com/")
+	repo = strings.TrimPrefix(repo, "github.com/")
+	return repo
 }
 
 func timeNowUnix() int64 {
