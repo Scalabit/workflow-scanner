@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -66,6 +67,14 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
 		WithStringOutput("completed", "the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput("explanations", "explanations of what fixes were applied and why")
+
+	if v := os.Getenv("OPENAI_API_KEY"); v != "" {
+		environment = environment.WithStringInput("OPENAI_API_KEY", v, "OpenAI API key")
+	} else if v := os.Getenv("ANTHROPIC_API_KEY"); v != "" {
+		environment = environment.WithStringInput("ANTHROPIC_API_KEY", v, "Anthropic API key")
+	} else if v := os.Getenv("GEMINI_API_KEY"); v != "" {
+		environment = environment.WithStringInput("GEMINI_API_KEY", v, "Gemini API key")
+	}
 
 	log.Printf("DEBUG: Environment created successfully")
 
