@@ -16,7 +16,7 @@ const (
 
 type Zizmor interface {
 	CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error)
-	RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error)
+	RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, []Finding, string, error)
 	ScanExternalDependencies(ctx context.Context, source *internalDagger.Directory) (string, error)
 	SummarizeExternalFindings(fullReport string) string
 }
@@ -31,16 +31,21 @@ func NewZizmor(client dagger.Client) Zizmor {
 	}
 }
 
-func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, string, error) {
+func (ziz *ZizmorImpl) RunZizmorAutoFix(ctx context.Context, source *internalDagger.Directory) (*internalDagger.Directory, []Finding, string, error) {
 	container := ziz.getZizmorContainer(source).
-		WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"})
+		WithExec([]string{"sh", "-c", "zizmor -q --format=json --fix=all .github/workflows/ 2>&1 || true"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
+		return nil, []Finding{}, "", fmt.Errorf("failed to run ZIZMOR: %w", err)
 	}
 
-	return container.Directory("/workspace"), output, nil
+	findings, fixSummary, err := ParseZizmorOutput(output)
+	if err != nil {
+		return nil, []Finding{}, "", fmt.Errorf("failed to run structure output: %w", err)
+	}
+
+	return container.Directory("/workspace"), findings, fixSummary, nil
 }
 
 func (ziz *ZizmorImpl) CheckRemainingIssues(ctx context.Context, source *internalDagger.Directory) (string, error) {
