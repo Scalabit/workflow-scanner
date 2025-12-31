@@ -188,49 +188,60 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 }
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
-	log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
+    log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
 
-	log.Printf("DEBUG: Setting up LLM environment...")
-	setupLLMEnvironment(config.llmAPIKey)
+    log.Printf("DEBUG: Setting up LLM environment...")
+    setupLLMEnvironment(config.llmAPIKey)
 
-	cloneURL := config.repository
-	if !strings.HasPrefix(config.repository, "http") && !strings.Contains(config.repository, "@") {
-		if config.provider == "gitlab" {
-			cloneURL = fmt.Sprintf("https://gitlab.com/%s.git", config.repository)
-		} else {
-			cloneURL = fmt.Sprintf("https://github.com/%s.git", config.repository)
-		}
-	}
+    cloneURL := config.repository
 
-	var gitAuthSecret *dagger.Secret
-	var gitUser string
-	if config.provider == "gitlab" {
-		gitAuthSecret = dag.SetSecret("git-auth", config.gitlabToken)
-		gitUser = "oauth2"
-	} else {
-		gitAuthSecret = dag.SetSecret("git-auth", config.githubToken)
-		gitUser = "x-access-token"
-	}
+    if strings.HasPrefix(cloneURL, "http://") || strings.HasPrefix(cloneURL, "https://") {
+        // If an extra scheme/host was accidentally prepended (e.g. "https://gitlab.com/https://..."),
+        // keep only the last proper "http(s)://" occurrence.
+        if pos := strings.LastIndex(cloneURL, "https://"); pos > 0 {
+            cloneURL = cloneURL[pos:]
+        } else if pos := strings.LastIndex(cloneURL, "http://"); pos > 0 {
+            cloneURL = cloneURL[pos:]
+        }
+        cloneURL = strings.TrimSuffix(cloneURL, ".git") + ".git"
+    } else {
+        ownerRepo := strings.TrimPrefix(cloneURL, "/")
+        if config.provider == "gitlab" {
+            cloneURL = fmt.Sprintf("https://gitlab.com/%s.git", ownerRepo)
+        } else {
+            cloneURL = fmt.Sprintf("https://github.com/%s.git", ownerRepo)
+        }
+    }
 
-	gitRepo := dag.Git(cloneURL, dagger.GitOpts{
-		KeepGitDir:       true,
-		HTTPAuthUsername: gitUser,
-		HTTPAuthToken:    gitAuthSecret,
-	})
+    var gitAuthSecret *dagger.Secret
+    var gitUser string
+    if config.provider == "gitlab" {
+        gitAuthSecret = dag.SetSecret("gitlab-token", config.gitlabToken)
+        gitUser = "oauth2"
+    } else {
+        gitAuthSecret = dag.SetSecret("git-auth", config.githubToken)
+        gitUser = "x-access-token"
+    }
 
-	if config.commitSHA != "" && config.commitSHA != "undefined" {
-		log.Printf("DEBUG: Checking out specific commit: %s", config.commitSHA)
-		tree := gitRepo.Commit(config.commitSHA).Tree()
-		log.Printf("DEBUG: Successfully checked out commit tree")
+    gitRepo := dag.Git(cloneURL, dagger.GitOpts{
+        KeepGitDir:       true,
+        HTTPAuthUsername: gitUser,
+        HTTPAuthToken:    gitAuthSecret,
+    })
 
-		return tree
-	}
+    if config.commitSHA != "" && config.commitSHA != "undefined" {
+        log.Printf("DEBUG: Checking out specific commit: %s", config.commitSHA)
+        tree := gitRepo.Commit(config.commitSHA).Tree()
+        log.Printf("DEBUG: Successfully checked out commit tree")
 
-	log.Printf("DEBUG: Checking out HEAD branch")
-	tree := gitRepo.Branch("main").Tree()
-	log.Printf("DEBUG: Successfully checked out HEAD tree")
+        return tree
+    }
 
-	return tree
+    log.Printf("DEBUG: Checking out HEAD branch")
+    tree := gitRepo.Branch("main").Tree()
+    log.Printf("DEBUG: Successfully checked out HEAD tree")
+
+    return tree
 }
 
 func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory {
