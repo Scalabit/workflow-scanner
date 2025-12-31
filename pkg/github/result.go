@@ -10,8 +10,9 @@ const (
 	bodyFmt = `## Complete Security Audit Report
 
 This PR contains comprehensive security analysis and fixes for GitHub Actions workflows.
+Number of Findings: %d
 
-### Auto-fixed by ZIZMOR
+### Files Auto-fixed by ZIZMOR
 %s
 
 ### Manual Security Fixes Applied
@@ -62,10 +63,13 @@ func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fix
 	}
 
 	body := fmt.Sprintf(bodyFmt,
-		fmt.Sprintf("Number of findings: %v", len(zizmorFindings)),
+		len(zizmorFindings),
+		fixSummary,
+		llmOut,
 		result.status,
 		result.text,
 		validationStatus,
+		summaryFindings,
 	)
 
 	// GitHub PR body limit is 65,536 characters
