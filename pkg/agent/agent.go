@@ -60,7 +60,8 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Creating Dagger environment...")
 
 	envWrap := agent.client.Env()
-	envInternal := envWrap.GetEnv().WithWorkspace(source)
+	srcWithPrompt := source.WithNewFile("llm_fix_prompt.md", llmFixPrompt)
+	envInternal := envWrap.GetEnv().WithWorkspace(srcWithPrompt)
 	environment := dagger.NewEnvImpl(envInternal).
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
@@ -76,7 +77,8 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	environment = environment.WithStringInput("llm_fix_prompt", promptContent, "LLM prompt for fixing remaining issues")
 
 	log.Printf("DEBUG: Creating LLM work instance...")
-	work := agent.client.LLM().WithEnv(environment)
+	promptFile := srcWithPrompt.File("llm_fix_prompt.md")
+	work := agent.client.LLM().WithEnv(environment).WithPromptFile(promptFile)
 	log.Printf("DEBUG: LLM work instance created successfully")
 
 	log.Printf("DEBUG: Getting LLM work environment...")
