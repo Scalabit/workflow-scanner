@@ -29,17 +29,6 @@ variable "gh_client_secret" {
   sensitive   = true
 }
 
-variable "gitlab_client_id" {
-  description = "GitLab App Client ID"
-  type        = string
-  sensitive   = true
-}
-
-variable "gitlab_client_secret" {
-  description = "GitLab App Client Secret"
-  type        = string
-  sensitive   = true
-}
 
 variable "stripe_key" {
   description = "Stripe Secret Key"
@@ -64,6 +53,7 @@ variable "openai_api_key" {
   type        = string
   sensitive   = true
 }
+
 
 variable "sandbox_allowed_users" {
   description = "Comma-separated list of email addresses allowed to access sandbox environment"
