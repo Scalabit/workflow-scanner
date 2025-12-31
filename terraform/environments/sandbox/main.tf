@@ -105,19 +105,19 @@ resource "google_project_iam_member" "cloud_run_sa_bindings" {
 }
 
 
-# Secrets in Secret Manager
+# Secrets in Secret Manager (sandbox-specific names)
 locals {
   secrets = {
-    "base-url"               = var.base_url
-    "gh-client-id"           = var.gh_client_id
-    "gh-client-secret"       = var.gh_client_secret
-    "gitlab-client-id"       = var.gitlab_client_id
-    "gitlab-client-secret"   = var.gitlab_client_secret
-    "stripe-key"             = var.stripe_key
-    "stripe-publishable-key" = var.stripe_publishable_key
-    "stripe-webhook-secret"  = var.stripe_webhook_secret
-    "openai-api-key"         = var.openai_api_key
-    "sandbox-allowed-users"  = var.sandbox_allowed_users
+    "sandbox-base-url"               = var.base_url
+    "sandbox-gh-client-id"           = var.gh_client_id
+    "sandbox-gh-client-secret"       = var.gh_client_secret
+    "sandbox-gitlab-client-id"       = var.gitlab_client_id
+    "sandbox-gitlab-client-secret"   = var.gitlab_client_secret
+    "sandbox-stripe-key"             = var.stripe_key
+    "sandbox-stripe-publishable-key" = var.stripe_publishable_key
+    "sandbox-stripe-webhook-secret"  = var.stripe_webhook_secret
+    "sandbox-openai-api-key"         = var.openai_api_key
+    "sandbox-allowed-users"          = var.sandbox_allowed_users
   }
 }
 
@@ -195,7 +195,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "BASE_URL"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["base-url"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-base-url"].secret_id
             version = "latest"
           }
         }
@@ -217,7 +217,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "GH_CLIENT_ID"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gh-client-id"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-gh-client-id"].secret_id
             version = "latest"
           }
         }
@@ -227,7 +227,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "GH_CLIENT_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gh-client-secret"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-gh-client-secret"].secret_id
             version = "latest"
           }
         }
@@ -238,7 +238,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "GITLAB_CLIENT_ID"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gitlab-client-id"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-gitlab-client-id"].secret_id
             version = "latest"
           }
         }
@@ -248,7 +248,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "GITLAB_CLIENT_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gitlab-client-secret"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-gitlab-client-secret"].secret_id
             version = "latest"
           }
         }
@@ -259,7 +259,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "TEST_STRIPE"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["stripe-key"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-stripe-key"].secret_id
             version = "latest"
           }
         }
@@ -269,7 +269,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "TEST_STRIPE_PK"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["stripe-publishable-key"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-stripe-publishable-key"].secret_id
             version = "latest"
           }
         }
@@ -279,7 +279,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "TEST_STRIPE_WEBHOOK_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["stripe-webhook-secret"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-stripe-webhook-secret"].secret_id
             version = "latest"
           }
         }
@@ -290,7 +290,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "OPENAI_API_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["openai-api-key"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-openai-api-key"].secret_id
             version = "latest"
           }
         }
