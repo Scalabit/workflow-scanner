@@ -59,13 +59,19 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Creating Dagger environment...")
 
-	// Build environment for LLM without using Workspace APIs to avoid
-	// GraphQL schema mismatches on servers that don't expose `workspace`.
+	log.Printf("DEBUG: Creating workspace with Go module context...")
+	workspace := agent.client.Workspace(source)
+	log.Printf("DEBUG: Workspace created")
+
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
-		WithStringOutput(
+		WithWorkspaceInput(
+			"workspace",
+			workspace,
+			"the workspace containing GitHub Actions workflows with remaining issues").
+		WithWorkspaceOutput(
 			"completed",
 			"the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput(
