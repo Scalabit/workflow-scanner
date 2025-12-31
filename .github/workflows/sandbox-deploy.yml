@@ -45,6 +45,13 @@ jobs:
       with:
         terraform_version: 1.5.0
         
+    - name: Cleanup any stuck Terraform locks
+      working-directory: terraform/environments/sandbox
+      run: |
+        echo "Checking for stuck Terraform locks..."
+        terraform force-unlock -force 1767191458797557 || true
+        echo "Lock cleanup completed (if any existed)"
+        
     - name: Terraform Init (Sandbox)
       working-directory: terraform/environments/sandbox
       run: terraform init
@@ -94,15 +101,6 @@ jobs:
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}
         docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest
     
-    - name: Cleanup Terraform lock on failure
-      if: failure()
-      working-directory: terraform/environments/sandbox
-      run: |
-        # Force unlock with the specific lock ID from error
-        echo "Attempting to unlock Terraform state lock..."
-        terraform force-unlock -force 1767191458797557 || true
-        echo "Lock cleanup completed"
-        
     - name: Get Service URL
       run: |
         SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE }} \
