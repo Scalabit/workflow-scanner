@@ -59,8 +59,6 @@ jobs:
           -var="base_url=https://sandbox.remediator.ai" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
           -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
-          -var="gitlab_client_id=${{ secrets.GITLAB_CLIENT_ID }}" \
-          -var="gitlab_client_secret=${{ secrets.GITLAB_CLIENT_SECRET }}" \
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
@@ -77,8 +75,6 @@ jobs:
           -var="base_url=https://sandbox.remediator.ai" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
           -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
-          -var="gitlab_client_id=${{ secrets.GITLAB_CLIENT_ID }}" \
-          -var="gitlab_client_secret=${{ secrets.GITLAB_CLIENT_SECRET }}" \
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \

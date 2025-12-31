@@ -111,8 +111,6 @@ locals {
     "sandbox-base-url"               = var.base_url
     "sandbox-gh-client-id"           = var.gh_client_id
     "sandbox-gh-client-secret"       = var.gh_client_secret
-    "sandbox-gitlab-client-id"       = var.gitlab_client_id
-    "sandbox-gitlab-client-secret"   = var.gitlab_client_secret
     "sandbox-stripe-key"             = var.stripe_key
     "sandbox-stripe-publishable-key" = var.stripe_publishable_key
     "sandbox-stripe-webhook-secret"  = var.stripe_webhook_secret
@@ -233,25 +231,15 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         }
       }
 
-      # GitLab OAuth secrets
+      # GitLab OAuth secrets (using dummy values)
       env {
         name = "GITLAB_CLIENT_ID"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["sandbox-gitlab-client-id"].secret_id
-            version = "latest"
-          }
-        }
+        value = "dummy"
       }
 
       env {
         name = "GITLAB_CLIENT_SECRET"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["sandbox-gitlab-client-secret"].secret_id
-            version = "latest"
-          }
-        }
+        value = "dummy"
       }
 
       # Stripe secrets
