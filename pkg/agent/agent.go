@@ -4,14 +4,16 @@ package agent
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
-	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
+
+//go:embed llm_fix_prompt.md
+var llmFixPrompt string
 
 type Agent interface {
 	FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error)
@@ -57,20 +59,13 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Creating Dagger environment...")
 
-	// Create workspace with Go module context for LLM
-	log.Printf("DEBUG: Creating workspace with Go module context...")
-	workspace := agent.client.Workspace(source)
-	log.Printf("DEBUG: Workspace created")
-
+	// Build environment for LLM without using Workspace APIs to avoid
+	// GraphQL schema mismatches on servers that don't expose `workspace`.
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
-		WithWorkspaceInput(
-			"workspace",
-			workspace,
-			"the workspace containing GitHub Actions workflows with remaining issues").
-		WithWorkspaceOutput(
+		WithStringOutput(
 			"completed",
 			"the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput(
@@ -79,48 +74,13 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Environment created successfully")
 
-	log.Printf("DEBUG: Reading prompt file directly from filesystem...")
-	// Use os.DirFS to safely scope file access and prevent directory traversal
-	cwd, err := os.Getwd()
-	if err != nil {
-		return source, "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
+	log.Printf("DEBUG: Passing embedded prompt to LLM as a string input")
 
-	// Find project root by looking for go.mod file
-	projectRoot := cwd
-	for {
-		if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
-			break
-		}
-		parent := projectRoot + "/.."
-		if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
-			// Can't find project root, use current directory
-			break
-		} else {
-			projectRoot = abs
-		}
-	}
-
-	// Create a root filesystem scoped to the project root
-	rootFS := os.DirFS(projectRoot)
-
-	// Try to find the prompt file relative to project root
-	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
-	if err != nil {
-		return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
-	}
-	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
-
-	log.Printf("DEBUG: Creating prompt file in source directory...")
-	// Add the prompt file to the source directory so Dagger can access it
-	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
-	promptFile := sourceWithPrompt.File("llm_fix_prompt.md")
-	log.Printf("DEBUG: Prompt file created in source directory")
+	promptContent := llmFixPrompt
+	environment = environment.WithStringInput("llm_fix_prompt", promptContent, "LLM prompt for fixing remaining issues")
 
 	log.Printf("DEBUG: Creating LLM work instance...")
-	work := agent.client.LLM().
-		WithEnv(environment).
-		WithPromptFile(promptFile)
+	work := agent.client.LLM().WithEnv(environment)
 	log.Printf("DEBUG: LLM work instance created successfully")
 
 	log.Printf("DEBUG: Getting LLM work environment...")
@@ -138,13 +98,51 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	}
 	log.Printf("DEBUG: LLM explanations received: %d chars", len(explanations))
 
-	log.Printf("DEBUG: Requesting completed workspace from LLM...")
-	// Get the completed workspace from LLM
-	completedWorkspace := workEnv.Output("completed").AsWorkspace()
-	completed := completedWorkspace.Source()
-	log.Printf("DEBUG: LLM completed workspace obtained")
+	log.Printf("DEBUG: Requesting completed output from LLM (string)")
+	completedStr, err := workEnv.Output("completed").AsString(ctx)
+	if err != nil {
+		log.Printf("ERROR: LLM completed output failed: %v", err)
+		return source, "", fmt.Errorf("LLM processing failed: %w", err)
+	}
+	log.Printf("DEBUG: LLM completed output received: %d chars", len(completedStr))
 
-	log.Printf("DEBUG: LLM processing completed successfully")
+	// Try to parse completed output as JSON edits: [{"path":".github/workflows/x.yml","contents":"..."},...]
+	type fileEdit struct {
+		Path     string `json:"path"`
+		Contents string `json:"contents"`
+	}
 
-	return completed, explanations, nil
+	var edits []fileEdit
+	if err := json.Unmarshal([]byte(completedStr), &edits); err != nil {
+		log.Printf("DEBUG: completed output is not JSON edits: %v", err)
+		// Nothing to apply — return original source and explanations
+		return source, explanations, nil
+	}
+
+	if len(edits) == 0 {
+		log.Printf("DEBUG: completed output contained zero edits")
+		return source, explanations, nil
+	}
+
+	// Apply edits immutably by chaining WithNewFile and verify each write.
+	src := source
+	for _, e := range edits {
+		log.Printf("DEBUG: Applying edit to %s (len %d)", e.Path, len(e.Contents))
+		src = src.WithNewFile(e.Path, e.Contents)
+
+		// Verify write
+		back, err := src.File(e.Path).Contents(ctx)
+		if err != nil {
+			log.Printf("ERROR: verifying written file %s failed: %v", e.Path, err)
+			return source, "", fmt.Errorf("failed to verify written file %s: %w", e.Path, err)
+		}
+		if back != e.Contents {
+			log.Printf("ERROR: verification mismatch for %s: expected %d got %d", e.Path, len(e.Contents), len(back))
+			return source, "", fmt.Errorf("verification mismatch for %s", e.Path)
+		}
+		log.Printf("DEBUG: Verified write for %s", e.Path)
+	}
+
+	log.Printf("DEBUG: LLM processing completed and edits applied successfully")
+	return src, explanations, nil
 }
