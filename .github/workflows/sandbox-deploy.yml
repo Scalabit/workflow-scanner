@@ -1,0 +1,108 @@
+name: Deploy Sandbox Environment
+
+on:
+  push:
+    branches: [ main, sandbox-env ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'sandbox'
+        type: choice
+        options:
+          - sandbox
+
+env:
+  PROJECT_ID: workflow-scanner
+  REGION: europe-north1
+  SERVICE: workflow-scanner-sandbox
+  REGISTRY: europe-north1-docker.pkg.dev
+
+jobs:
+  deploy-sandbox:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+        
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: Configure Docker to use gcloud as credential helper
+      run: gcloud auth configure-docker ${{ env.REGISTRY }}
+      
+    - name: Build and push Docker image
+      run: |
+        # Build the sandbox image (same as production but different tag)
+        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }} .
+        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest .
+        
+        # Push sandbox images  
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest
+        
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        
+    - name: Terraform Init (Sandbox)
+      working-directory: terraform/environments/sandbox
+      run: terraform init
+      
+    - name: Terraform Plan (Sandbox)
+      working-directory: terraform/environments/sandbox
+      run: |
+        terraform plan \
+          -var="project_id=${{ env.PROJECT_ID }}" \
+          -var="region=${{ env.REGION }}" \
+          -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}" \
+          -var="base_url=https://sandbox.remediator.ai" \
+          -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
+          -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
+          -var="gitlab_client_id=${{ secrets.GITLAB_CLIENT_ID }}" \
+          -var="gitlab_client_secret=${{ secrets.GITLAB_CLIENT_SECRET }}" \
+          -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
+          -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
+          -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="sandbox_allowed_users=${{ secrets.SANDBOX_ALLOWED_USERS }}"
+          
+    - name: Terraform Apply (Sandbox)  
+      working-directory: terraform/environments/sandbox
+      run: |
+        terraform apply -auto-approve \
+          -var="project_id=${{ env.PROJECT_ID }}" \
+          -var="region=${{ env.REGION }}" \
+          -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}" \
+          -var="base_url=https://sandbox.remediator.ai" \
+          -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
+          -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
+          -var="gitlab_client_id=${{ secrets.GITLAB_CLIENT_ID }}" \
+          -var="gitlab_client_secret=${{ secrets.GITLAB_CLIENT_SECRET }}" \
+          -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
+          -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
+          -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="sandbox_allowed_users=${{ secrets.SANDBOX_ALLOWED_USERS }}"
+    
+    - name: Get Service URL
+      run: |
+        SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE }} \
+          --platform=managed \
+          --region=${{ env.REGION }} \
+          --format='value(status.url)')
+        echo "Sandbox deployed to: $SERVICE_URL"
+        echo "::notice title=Sandbox Deployment::Sandbox environment deployed to $SERVICE_URL"

@@ -79,6 +79,8 @@ type Config struct {
 	StripePublishable  string
 	StripeWebhookKey   string
 	Port               string
+	Environment        string
+	AllowedUsers       []string
 }
 
 type GitHubUser struct {
@@ -143,6 +145,16 @@ var (
 )
 
 func loadConfig() *Config {
+	allowedUsersStr := getEnv("ALLOWED_USERS", "")
+	var allowedUsers []string
+	if allowedUsersStr != "" {
+		allowedUsers = strings.Split(allowedUsersStr, ",")
+		// Trim whitespace from each email
+		for i, email := range allowedUsers {
+			allowedUsers[i] = strings.TrimSpace(email)
+		}
+	}
+
 	return &Config{
 		ClientID:           getEnv("GH_CLIENT_ID", ""),
 		ClientSecret:       getEnv("GH_CLIENT_SECRET", ""),
@@ -152,6 +164,8 @@ func loadConfig() *Config {
 		StripePublishable:  getEnv("STRIPE_PUBLISHABLE", getEnv("TEST_STRIPE_PK", "")),
 		StripeWebhookKey:   getEnv("STRIPE_WEBHOOK_SECRET", getEnv("TEST_STRIPE_WEBHOOK_SECRET", "")),
 		Port:               getEnv("PORT", "8080"),
+		Environment:        getEnv("ENVIRONMENT", "production"),
+		AllowedUsers:       allowedUsers,
 	}
 }
 
@@ -161,6 +175,30 @@ func getEnv(key, defaultValue string) string {
 	}
 
 	return defaultValue
+}
+
+// isUserAllowed checks if a user email is allowed to access the environment
+func isUserAllowed(config *Config, userEmail string) bool {
+	// In production environment, all users are allowed
+	if config.Environment != "sandbox" {
+
+		return true
+	}
+
+	// In sandbox environment, check allowed users list
+	if len(config.AllowedUsers) == 0 {
+
+		return true // If no restrictions set, allow all
+	}
+
+	for _, allowedEmail := range config.AllowedUsers {
+		if strings.EqualFold(allowedEmail, userEmail) {
+
+			return true
+		}
+	}
+
+	return false
 }
 
 func generateAPIToken() string {
@@ -185,14 +223,6 @@ func isPremiumUser(provider string, userID int) bool {
 	}
 
 	return time.Now().Before(user.ExpiresAt)
-}
-
-func isValidAPIToken(token string) (int, bool) {
-	// CloudSQL validation: Check token against database of valid premium user tokens
-	// For now, disable validation and return a dummy user ID
-	_ = token // Suppress unused parameter warning
-
-	return DummyNum, true // Always valid for testing
 }
 
 func addValidToken(token string, ownerKey string) {
@@ -264,6 +294,14 @@ func githubAuth(config *Config, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Failed to fetch user data: %v", err)
 		http.Error(w, "Failed to fetch user data", http.StatusInternalServerError)
+
+		return
+	}
+
+	// Check sandbox access control
+	if !isUserAllowed(config, user.Email) {
+		log.Printf("Access denied for user %s in %s environment", user.Email, config.Environment)
+		http.Error(w, "Access denied. This is a restricted environment.", http.StatusForbidden)
 
 		return
 	}
