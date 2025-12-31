@@ -177,23 +177,20 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-// isUserAllowed checks if a user email is allowed to access the environment
+// isUserAllowed checks if a user email is allowed to access the environment.
 func isUserAllowed(config *Config, userEmail string) bool {
 	// In production environment, all users are allowed
 	if config.Environment != "sandbox" {
-
 		return true
 	}
 
 	// In sandbox environment, check allowed users list
 	if len(config.AllowedUsers) == 0 {
-
 		return true // If no restrictions set, allow all
 	}
 
 	for _, allowedEmail := range config.AllowedUsers {
 		if strings.EqualFold(allowedEmail, userEmail) {
-
 			return true
 		}
 	}
