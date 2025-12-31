@@ -83,35 +83,44 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Environment created successfully")
 
-	log.Printf("DEBUG: Reading prompt file directly from filesystem...")
-	// Use os.DirFS to safely scope file access and prevent directory traversal
-	cwd, err := os.Getwd()
-	if err != nil {
-		return source, "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
+	log.Printf("DEBUG: Obtaining prompt content (embedded or from project root)...")
 
-	// Find project root by looking for go.mod file
-	projectRoot := cwd
-	for {
-		if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
-			break
+	var promptContent []byte
+
+	// Prefer the embedded prompt when available (go:embed llm_fix_prompt.md)
+	if llmFixPrompt != "" {
+		promptContent = []byte(llmFixPrompt)
+		log.Printf("DEBUG: Using embedded prompt: %d chars", len(promptContent))
+	} else {
+		// Use os.DirFS to safely scope file access and prevent directory traversal
+		cwd, err := os.Getwd()
+		if err != nil {
+			return source, "", fmt.Errorf("failed to get current working directory: %w", err)
 		}
-		parent := projectRoot + "/.."
-		if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
-			// Can't find project root, use current directory
-			break
-		} else {
-			projectRoot = abs
+
+		// Find project root by looking for go.mod file
+		projectRoot := cwd
+		for {
+			if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
+				break
+			}
+			parent := projectRoot + "/.."
+			if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
+				// Can't find project root, use current directory
+				break
+			} else {
+				projectRoot = abs
+			}
 		}
-	}
 
-	rootFS := os.DirFS(projectRoot)
+		rootFS := os.DirFS(projectRoot)
 
-	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
-	if err != nil {
-		return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
+		promptContent, err = fs.ReadFile(rootFS, "llm_fix_prompt.md")
+		if err != nil {
+			return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
+		}
+		log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
 	}
-	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
 
 	log.Printf("DEBUG: Creating prompt file in source directory...")
 
