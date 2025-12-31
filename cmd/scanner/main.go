@@ -72,7 +72,7 @@ func loadConfig() batchConfig {
 	githubToken := os.Getenv("GITHUB_TOKEN")
 	gitlabToken := os.Getenv("GITLAB_TOKEN")
 	llmAPIKey := os.Getenv("LLM_API_KEY")
-	commitSHA := os.Getenv("COMMIT_SHA")
+	commitSHA := "" // os.Getenv("COMMIT_SHA")
 	sourceBase64 := os.Getenv("SOURCE_BASE64")
 
 	useGitClone := sourceBase64 == "" && llmAPIKey != ""
