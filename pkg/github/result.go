@@ -1,14 +1,18 @@
 package github
 
-import "fmt"
+import (
+	"fmt"
+	"workflow-scanner/pkg/zizmor"
+)
 
 const (
 	title   = "Security Audit & Fixes for GitHub Actions Workflows"
 	bodyFmt = `## Complete Security Audit Report
 
 This PR contains comprehensive security analysis and fixes for GitHub Actions workflows.
+Number of Findings: %d
 
-### Auto-fixed by ZIZMOR
+### Files Auto-fixed by ZIZMOR
 %s
 
 ### Manual Security Fixes Applied
@@ -45,7 +49,7 @@ var (
 	}
 )
 
-func GetPrTitleBody(finalValidation string, zizmorOut, llmOut, summaryFindings string) (string, string) {
+func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fixSummary string, llmOut string, summaryFindings string) (string, string) {
 	var result Result
 	success := finalValidation == "" || finalValidation == "[]" || finalValidation == "[]\n"
 
@@ -59,7 +63,8 @@ func GetPrTitleBody(finalValidation string, zizmorOut, llmOut, summaryFindings s
 	}
 
 	body := fmt.Sprintf(bodyFmt,
-		zizmorOut,
+		len(zizmorFindings),
+		fixSummary,
 		llmOut,
 		result.status,
 		result.text,
