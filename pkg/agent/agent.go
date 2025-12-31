@@ -60,12 +60,12 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Creating Dagger environment...")
 
 	envWrap := agent.client.Env()
-	envInternal := envWrap.GetEnv().WithWorkspace(source) // uses withWorkspace, not workspace
+	envInternal := envWrap.GetEnv().WithWorkspace(source)
 	environment := dagger.NewEnvImpl(envInternal).
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
-		WithWorkspaceOutput("completed", "the workspace with remaining security vulnerabilities fixed").
+		WithStringOutput("completed", "the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput("explanations", "explanations of what fixes were applied and why")
 
 	log.Printf("DEBUG: Environment created successfully")
