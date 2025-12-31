@@ -72,6 +72,19 @@ jobs:
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
           -var="sandbox_allowed_users=${{ secrets.SANDBOX_ALLOWED_USERS }}"
           
+    - name: Configure Docker to use gcloud as credential helper
+      run: gcloud auth configure-docker ${{ env.REGISTRY }}
+      
+    - name: Build and push Docker image
+      run: |
+        # Build the sandbox image (same as production but different tag)
+        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }} .
+        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest .
+        
+        # Push sandbox images  
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest
+        
     - name: Terraform Apply (Sandbox)  
       working-directory: terraform/environments/sandbox
       run: |
@@ -87,19 +100,6 @@ jobs:
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
           -var="sandbox_allowed_users=${{ secrets.SANDBOX_ALLOWED_USERS }}"
-          
-    - name: Configure Docker to use gcloud as credential helper
-      run: gcloud auth configure-docker ${{ env.REGISTRY }}
-      
-    - name: Build and push Docker image
-      run: |
-        # Build the sandbox image (same as production but different tag)
-        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }} .
-        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest .
-        
-        # Push sandbox images  
-        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}
-        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:latest
     
     - name: Get Service URL
       run: |
