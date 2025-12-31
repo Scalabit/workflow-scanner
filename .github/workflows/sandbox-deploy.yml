@@ -63,7 +63,7 @@ jobs:
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}" \
-          -var="base_url=https://sandbox.remediator.ai" \
+          -var="base_url=https://workflow-scanner-sandbox-34659588692.europe-north1.run.app" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
           -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
@@ -79,7 +79,7 @@ jobs:
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner-sandbox/workflow-scanner-sandbox:${{ github.sha }}" \
-          -var="base_url=https://sandbox.remediator.ai" \
+          -var="base_url=https://workflow-scanner-sandbox-34659588692.europe-north1.run.app" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
           -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
           -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
