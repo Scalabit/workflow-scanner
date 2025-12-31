@@ -227,7 +227,7 @@ func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	}
 
 	log.Printf("DEBUG: Checking out HEAD branch")
-	tree := gitRepo.Branch("HEAD").Tree()
+	tree := gitRepo.Branch("main").Tree()
 	log.Printf("DEBUG: Successfully checked out HEAD tree")
 
 	return tree
