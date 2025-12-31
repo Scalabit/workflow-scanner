@@ -22,6 +22,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        persist-credentials: false
       
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
@@ -73,6 +75,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        persist-credentials: false
       
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
@@ -94,7 +98,7 @@ jobs:
       timeout-minutes: 10
       run: |
         terraform plan \
-          -var="base_url=${{ vars.BASE_URL }}" \
+          -var="base_url=${VARS_BASE_URL}" \
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
@@ -106,13 +110,15 @@ jobs:
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
+      env:
+        VARS_BASE_URL: ${{ vars.BASE_URL }}
           
     - name: Terraform Apply
       working-directory: ./terraform
       timeout-minutes: 15
       run: |
         terraform apply -auto-approve \
-          -var="base_url=${{ vars.BASE_URL }}" \
+          -var="base_url=${VARS_BASE_URL}" \
           -var="project_id=${{ env.PROJECT_ID }}" \
           -var="region=${{ env.REGION }}" \
           -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
@@ -124,6 +130,8 @@ jobs:
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
+      env:
+        VARS_BASE_URL: ${{ vars.BASE_URL }}
           
     - name: Cleanup Terraform lock on failure
       if: failure()
