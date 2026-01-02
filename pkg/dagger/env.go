@@ -15,6 +15,7 @@ type Env interface {
 	WithStringOutput(name, description string) Env
 	Output(name string) Binding
 	GetEnv() *dagger.Env
+	WithSecretInput(name string, secret *dagger.Secret, description string) Env
 }
 
 type EnvImpl struct {
@@ -25,6 +26,10 @@ func NewEnvImpl(env *dagger.Env) Env {
 	return &EnvImpl{
 		internal: env,
 	}
+}
+
+func (envImpl *EnvImpl) WithSecretInput(name string, secret *dagger.Secret, description string) Env {
+	return &EnvImpl{internal: envImpl.internal.WithSecretInput(name, secret, description)}
 }
 
 func (envImpl *EnvImpl) WithStringInput(name, value, description string) Env {

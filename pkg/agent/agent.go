@@ -66,7 +66,10 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		os.Setenv("GEMINI_API_KEY", apiKey)
 	}
 
+	geminiSecret := agent.client.SetSecret("GEMINI_API_KEY", os.Getenv("GEMINI_API_KEY"))
+
 	environment := agent.client.Env().
+		WithSecretInput("GEMINI_API_KEY",geminiSecret, "gemini api key").
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
