@@ -135,7 +135,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
 		model = "claude-3-5-sonnet-20241022" // From Anthropic docs
 	} else if os.Getenv("GEMINI_API_KEY") != "" {
-		model = "gemini-2.0-flash-exp"
+		model = "gemini-2.0-flash"
 	}
 	
 	log.Printf("DEBUG: Using LLM model: %s", model)
