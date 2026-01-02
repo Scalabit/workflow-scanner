@@ -8,6 +8,7 @@ import (
 
 type Env interface {
 	WithDirectoryInput(name string, value *dagger.Directory, description string) Env
+	WithDirectoryOutput(name string, description string) Env
 	WithStringInput(name, value, description string) Env
 	WithWorkspaceInput(name string, value Workspace, description string) Env
 	WithWorkspaceOutput(name, description string) Env
@@ -54,6 +55,10 @@ func (envImpl *EnvImpl) Output(name string) Binding {
 
 func (envImpl *EnvImpl) WithDirectoryInput(name string, value *dagger.Directory, description string) Env {
 	return &EnvImpl{internal: envImpl.internal.WithDirectoryInput(name, value, description)}
+}
+
+func (envImpl *EnvImpl) WithDirectoryOutput(name string, description string) Env {
+	return &EnvImpl{internal: envImpl.internal.WithDirectoryOutput(name, description)}
 }
 
 func (envImpl *EnvImpl) GetEnv() *dagger.Env {

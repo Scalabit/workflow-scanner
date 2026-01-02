@@ -69,7 +69,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 			"workspace",
 			source,
 			"the workspace containing GitHub Actions workflows with remaining issues").
-		WithWorkspaceOutput(
+		WithDirectoryOutput(
 			"completed",
 			"the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput(
