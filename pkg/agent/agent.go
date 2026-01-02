@@ -51,9 +51,9 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Creating Dagger environment...")
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
-		WithWorkspaceInput(
+		WithDirectoryInput(
 			"workspace",
-			agent.client.Workspace(source),
+			source,
 			"the workspace containing GitHub Actions workflows with remaining issues").
 		WithWorkspaceOutput(
 			"completed",
@@ -96,20 +96,20 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: LLM work instance created successfully")
 	log.Printf("DEBUG: Getting LLM work environment...")
 	// Try to execute the LLM and catch any failures early
-	workEnv := work.Env()
 	log.Printf("DEBUG: LLM work environment obtained")
 	log.Printf("DEBUG: Requesting explanations from LLM...")
 	// Get explanations first (safer string operation)
-	explanations, err := workEnv.Output("explanations").AsString(ctx)
+	explanations, err := work.Env().Output("explanations").AsString(ctx)
 	if err != nil {
 		log.Printf("ERROR: LLM explanations failed: %v", err)
 		// If LLM fails completely, return error to caller
 		return source, "", fmt.Errorf("LLM processing failed: %w", err)
 	}
+
 	log.Printf("DEBUG: LLM explanations received: %d chars", len(explanations))
 	log.Printf("DEBUG: Requesting completed workspace from LLM...")
 	// Get the completed workspace from LLM
-	completedWorkspace := workEnv.Output("completed").AsWorkspace()
+	completedWorkspace := work.Env().Output("completed").AsWorkspace()
 	completed := completedWorkspace.Source()
 	log.Printf("DEBUG: LLM completed workspace obtained")
 	log.Printf("DEBUG: LLM processing completed successfully")
