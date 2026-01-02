@@ -127,7 +127,19 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Prompt file created in source directory")
 
 	log.Printf("DEBUG: Creating LLM work instance...")
-	work := agent.client.LLM().
+	
+	// Determine model based on available API keys using documented model names
+	model := ""
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		model = "gpt-4o"
+	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		model = "claude-3-5-sonnet-20241022" // From Anthropic docs
+	} else if os.Getenv("GEMINI_API_KEY") != "" {
+		model = "gemini-2.0-flash-exp"
+	}
+	
+	log.Printf("DEBUG: Using LLM model: %s", model)
+	work := agent.client.LLM(internalDagger.LLMOpts{Model: model}).
 		WithEnv(environment).
 		WithPromptFile(promptFile)
 	log.Printf("DEBUG: LLM work instance created successfully")
