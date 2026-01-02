@@ -144,6 +144,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		log.Printf("ERROR: LLM explanations failed: %v", err)
 		return source, "", fmt.Errorf("LLM processing failed: %w", err)
 	}
+
 	log.Printf("DEBUG: LLM explanations received: %d chars", len(explanations))
 
 	log.Printf("DEBUG: Requesting completed workspace from LLM...")
