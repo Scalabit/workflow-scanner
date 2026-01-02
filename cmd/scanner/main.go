@@ -323,6 +323,13 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	if config.llmAPIKey != "" {
 		log.Printf("DEBUG: Setting up LLM environment...")
 		setupLLMEnvironment(config.llmAPIKey)
+		
+		// Debug: Check what was actually set (without revealing keys)
+		log.Printf("DEBUG: After setup - OPENAI_API_KEY set: %v", os.Getenv("OPENAI_API_KEY") != "")
+		log.Printf("DEBUG: After setup - ANTHROPIC_API_KEY set: %v", os.Getenv("ANTHROPIC_API_KEY") != "")
+		log.Printf("DEBUG: After setup - GEMINI_API_KEY set: %v", os.Getenv("GEMINI_API_KEY") != "")
+	} else {
+		log.Printf("DEBUG: No LLM API key provided (llmAPIKey is empty)")
 	}
 
 	log.Printf("DEBUG: Creating Dagger client...")
