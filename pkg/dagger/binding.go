@@ -10,7 +10,6 @@ import (
 type Binding interface {
 	AsString(ctx context.Context) (string, error)
 	AsDirectory() *dagger.Directory
-	AsWorkspace() Workspace
 }
 
 type BindingImpl struct {
@@ -25,6 +24,3 @@ func (bindingImpl *BindingImpl) AsDirectory() *dagger.Directory {
 	return bindingImpl.internal.AsDirectory()
 }
 
-func (bindingImpl *BindingImpl) AsWorkspace() Workspace {
-	return &WorkspaceImpl{internal: bindingImpl.internal.AsWorkspace()}
-}

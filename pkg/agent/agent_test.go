@@ -104,17 +104,15 @@ func TestAgentImpl_FixRemainingIssues_LLMChain(t *testing.T) {
 	t.Run("prompt file not found", func(t *testing.T) {
 		mockClient := mocks.NewMockClient(ctrl)
 		mockEnv := mocks.NewMockEnv(ctrl)
-		mockWorkspace := mocks.NewMockWorkspace(ctrl)
 		sourceDirectory := &internalDagger.Directory{}
 
 		// Set up the mocks for the initial setup that happens before prompt file reading
-		mockClient.EXPECT().Workspace(sourceDirectory).Return(mockWorkspace)
 		mockClient.EXPECT().Env().Return(mockEnv)
 		mockEnv.EXPECT().WithStringInput("zizmor_issues", `[{"desc": "security issue"}]`, gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithStringInput("GO111MODULE", "on", gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithStringInput("GOWORK", "off", gomock.Any()).Return(mockEnv)
-		mockEnv.EXPECT().WithWorkspaceInput("workspace", mockWorkspace, gomock.Any()).Return(mockEnv)
-		mockEnv.EXPECT().WithWorkspaceOutput("completed", gomock.Any()).Return(mockEnv)
+		mockEnv.EXPECT().WithDirectoryInput("workspace", sourceDirectory, gomock.Any()).Return(mockEnv)
+		mockEnv.EXPECT().WithDirectoryOutput("completed", gomock.Any()).Return(mockEnv)
 		mockEnv.EXPECT().WithStringOutput("explanations", gomock.Any()).Return(mockEnv)
 
 		// Create a temporary directory without the prompt file

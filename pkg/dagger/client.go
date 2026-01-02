@@ -9,7 +9,6 @@ import (
 type Client interface {
 	Container(opts ...dagger.ContainerOpts) Container
 	Env(opts ...dagger.EnvOpts) Env
-	Workspace(source *dagger.Directory) Workspace
 	CurrentModule() CurrentModule
 	LLM(opts ...dagger.LLMOpts) LLM
 }
@@ -30,10 +29,6 @@ func (clientImpl *ClientImpl) Container(opts ...dagger.ContainerOpts) Container 
 
 func (clientImpl *ClientImpl) Env(opts ...dagger.EnvOpts) Env {
 	return &EnvImpl{internal: clientImpl.internal.Env(opts...)}
-}
-
-func (clientImpl *ClientImpl) Workspace(source *dagger.Directory) Workspace {
-	return &WorkspaceImpl{internal: clientImpl.internal.Workspace(source)}
 }
 
 func (clientImpl *ClientImpl) CurrentModule() CurrentModule {
