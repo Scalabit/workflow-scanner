@@ -20,7 +20,7 @@ type ClientImpl struct {
 }
 
 func (clientImpl *ClientImpl) SetSecret(name, plaintext string) *dagger.Secret {
-    return clientImpl.internal.SetSecret(name, plaintext)
+	return clientImpl.internal.SetSecret(name, plaintext)
 }
 
 func NewClient(client *dagger.Client) Client {

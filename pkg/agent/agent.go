@@ -67,9 +67,11 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	}
 
 	geminiSecret := agent.client.SetSecret("GEMINI_API_KEY", os.Getenv("GEMINI_API_KEY"))
+	llmApiKey := agent.client.SetSecret("LLM_API_KEY", os.Getenv("LLM_API_KEY"))
 
 	environment := agent.client.Env().
-		WithSecretInput("GEMINI_API_KEY",geminiSecret, "gemini api key").
+		WithSecretInput("GEMINI_API_KEY", geminiSecret, "gemini API key").
+		WithSecretInput("LLM_API_KEY", llmApiKey, "test key").
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
@@ -132,6 +134,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	work := agent.client.LLM(internalDagger.LLMOpts{Model: "gemini-2.0-flash"}).
 		WithEnv(environment).
 		WithPromptFile(promptFile)
+
 	log.Printf("DEBUG: LLM work instance created successfully")
 
 	log.Printf("DEBUG: Getting LLM work environment...")
