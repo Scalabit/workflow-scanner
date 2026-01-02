@@ -319,6 +319,12 @@ func incrementUsage(repository string, success bool) error {
 func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, sourceDir *dagger.Directory) {
 	log.Printf("DEBUG: Starting scan for repository: %s", config.repository)
 
+	// Setup LLM environment regardless of git clone vs source upload mode
+	if config.llmAPIKey != "" {
+		log.Printf("DEBUG: Setting up LLM environment...")
+		setupLLMEnvironment(config.llmAPIKey)
+	}
+
 	log.Printf("DEBUG: Creating Dagger client...")
 	daggerClient := daggerImpl.NewClient(dag)
 
