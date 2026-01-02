@@ -62,6 +62,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Creating Dagger environment...")
 
 	environment := agent.client.Env().
+		WithStringInput("OPENAI_API_KEY", os.Getenv("OPEN_API_KEY"), "OpenAI API key for LLM").
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
@@ -121,7 +122,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: Prompt file created in source directory")
 
 	log.Printf("DEBUG: Creating LLM work instance...")
-	work := agent.client.LLM().
+	work := agent.client.LLM(internalDagger.LLMOpts{Model: "gpt-4o"}).
 		WithEnv(environment).
 		WithPromptFile(promptFile)
 	log.Printf("DEBUG: LLM work instance created successfully")
