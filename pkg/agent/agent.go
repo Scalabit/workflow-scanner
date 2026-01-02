@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -98,7 +99,14 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	// Try to execute the LLM and catch any failures early
 	log.Printf("DEBUG: LLM work environment obtained")
 	log.Printf("DEBUG: Requesting explanations from LLM...")
-	// Get explanations first (safer string operation)
+	// Last Message
+
+	lastMessage, err := work.LastReply(ctx)
+	if err != nil {
+		fmt.Println("LAST MESSAGE: ", lastMessage, "\nERROR: ", err)
+		os.Exit(29)
+	}
+	// Get explanations
 	explanations, err := work.Env().Output("explanations").AsString(ctx)
 	if err != nil {
 		log.Printf("ERROR: LLM explanations failed: %v", err)
