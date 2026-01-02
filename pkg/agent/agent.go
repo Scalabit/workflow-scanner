@@ -127,7 +127,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: LLM work instance created successfully")
 
 	log.Printf("DEBUG: Getting LLM work environment...")
-	workEnv := work.Env()
+	workEnv := work.Env().GetEnv()
 	log.Printf("DEBUG: LLM work environment obtained")
 
 	log.Printf("DEBUG: Requesting explanations from LLM...")
