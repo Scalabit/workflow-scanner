@@ -61,20 +61,18 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Creating Dagger environment...")
 
-	// Create workspace with Go module context for LLM
-	log.Printf("DEBUG: Creating workspace with Go module context...")
-	workspace := agent.client.Workspace(source)
-	log.Printf("DEBUG: Workspace created")
+	// Create LLM environment with source directory directly
+	log.Printf("DEBUG: Creating LLM environment with source directory...")
 
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithStringInput("GO111MODULE", "on", "Enable Go modules").
 		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
-		WithWorkspaceInput(
+		WithDirectoryInput(
 			"workspace",
-			workspace,
+			source,
 			"the workspace containing GitHub Actions workflows with remaining issues").
-		WithWorkspaceOutput(
+		WithDirectoryOutput(
 			"completed",
 			"the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput(
@@ -147,10 +145,9 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: LLM explanations received: %d chars", len(explanations))
 
-	log.Printf("DEBUG: Requesting completed workspace from LLM...")
-	completedWorkspace := workEnv.Output("completed").AsWorkspace()
-	completed := completedWorkspace.Source()
-	log.Printf("DEBUG: LLM completed workspace obtained")
+	log.Printf("DEBUG: Requesting completed directory from LLM...")
+	completed := workEnv.Output("completed").AsDirectory()
+	log.Printf("DEBUG: LLM completed directory obtained")
 
 	log.Printf("DEBUG: LLM processing completed successfully")
 
