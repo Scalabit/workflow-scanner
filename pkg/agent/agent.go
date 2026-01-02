@@ -52,9 +52,9 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
 		WithDirectoryInput(
-			"workspace",
+			"source",
 			source,
-			"the workspace containing GitHub Actions workflows with remaining issues").
+			"the directory containing GitHub Actions workflows with remaining issues").
 		WithWorkspaceOutput(
 			"completed",
 			"the workspace with remaining security vulnerabilities fixed").
