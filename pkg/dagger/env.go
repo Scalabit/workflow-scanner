@@ -3,7 +3,6 @@ package dagger
 //go:generate mockgen -source=env.go -destination=../../mocks/env_mock.go -package=mocks Env
 
 import (
-	"fmt"
 	"workflow-scanner/internal/dagger"
 )
 
@@ -49,7 +48,6 @@ func (envImpl *EnvImpl) WithStringOutput(name, description string) Env {
 }
 
 func (envImpl *EnvImpl) Output(name string) Binding {
-	fmt.Println("TEST NAME: ", name)
 	return &BindingImpl{internal: envImpl.internal.Output(name)}
 }
 
