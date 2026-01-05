@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	internalDagger "workflow-scanner/internal/dagger"
@@ -48,17 +49,21 @@ func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internal
 
 func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
 
-	if issues == "" || issues == "[]" || issues == "[]\n" {
-		return source.WithoutDirectory("node_modules"), "No remaining issues found after ZIZMOR auto-fix", nil
+	if areThereIssues(issues) {
+		log.Printf("DEBUG: No issues found, skipping LLM processing")
+
+		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
 	environment := agent.client.Env().
 		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
-		WithWorkspaceInput(
+		WithStringInput("GO111MODULE", "on", "Enable Go modules").
+		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
+		WithDirectoryInput(
 			"workspace",
-			agent.client.Workspace(source),
+			source,
 			"the workspace containing GitHub Actions workflows with remaining issues").
-		WithWorkspaceOutput(
+		WithDirectoryOutput(
 			"completed",
 			"the workspace with remaining security vulnerabilities fixed").
 		WithStringOutput(
@@ -104,31 +109,15 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 					WithEnv(environment).
 					WithPromptFile(promptFile)
 
-	// Try to execute the LLM and catch any failures early
 	workEnv := work.Env()
 
-	// Get explanations first (safer string operation)
 	explanations, err := workEnv.Output("explanations").AsString(ctx)
 	if err != nil {
-		// If LLM fails completely, return original workspace
-		fmt.Println("LLM ERROR: ", err)
-		return source.WithoutDirectory("node_modules"), "LLM processing failed - returning original workspace unchanged", nil
+		return source, "", fmt.Errorf("LLM processing failed: %w", err)
 	}
 
-	// Only try to get workspace if explanations succeeded
 	completedWorkspace := workEnv.Output("completed").AsWorkspace()
 	completed := completedWorkspace.Source()
 
-	// Force materialization by copying through a container
-	// This breaks the lazy evaluation chain completely
-	materializeContainer := agent.client.Container().
-		From("alpine:latest").
-		WithDirectory("/workspace", completed).
-		WithWorkdir("/workspace")
-
-	// Get the directory back - now it's materialized through the copy operation
-	materializedDir := materializeContainer.Directory("/workspace")
-
-	return materializedDir.WithoutDirectory("node_modules"), explanations, nil
-
+	return completed, explanations, nil
 }

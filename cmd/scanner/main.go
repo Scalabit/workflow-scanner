@@ -42,6 +42,7 @@ func main() {
 		config.repository, config.commitSHA, config.useGitClone)
 
 	validateConfig(config)
+	setupLLMEnvironment(config.llmAPIKey)
 	validateDaggerEnvironment()
 
 	ctx := context.Background()
@@ -57,7 +58,6 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-
 	dag := dagger.Connect()
 
 	fmt.Println("Dagger connected successfully")
@@ -189,10 +189,6 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
-
-	log.Printf("DEBUG: Setting up LLM environment...")
-	setupLLMEnvironment(config.llmAPIKey)
-
 	cloneURL := config.repository
 	if !strings.HasPrefix(config.repository, "http") && !strings.Contains(config.repository, "@") {
 		if config.provider == "gitlab" {
