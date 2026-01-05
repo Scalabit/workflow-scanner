@@ -6,6 +6,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -62,11 +65,44 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 			"explanations",
 			"explanations of what fixes were applied and why")
 
-	promptFile := agent.client.CurrentModule().Source().File("llm_fix_prompt.md")
+	var promptContent []byte
 
-	work := agent.client.LLM().
-		WithEnv(environment).
-		WithPromptFile(promptFile)
+	if llmFixPrompt != "" {
+		promptContent = []byte(llmFixPrompt)
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return source, "", fmt.Errorf("failed to get current working directory: %w", err)
+		}
+
+		projectRoot := cwd
+		for {
+			if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
+				break
+			}
+			parent := projectRoot + "/.."
+			if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
+				break
+			} else {
+				projectRoot = abs
+			}
+		}
+
+		rootFS := os.DirFS(projectRoot)
+
+		promptContent, err = fs.ReadFile(rootFS, "llm_fix_prompt.md")
+		if err != nil {
+			return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
+		}
+
+	}
+
+	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
+	promptFile := sourceWithPrompt.File("llm_fix_prompt.md")
+
+	work := agent.client.LLM(). //internalDagger.LLMOpts{Model: "gemini-2.0-flash"}).
+					WithEnv(environment).
+					WithPromptFile(promptFile)
 
 	// Try to execute the LLM and catch any failures early
 	workEnv := work.Env()
