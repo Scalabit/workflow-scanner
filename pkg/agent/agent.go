@@ -105,9 +105,9 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
 	promptFile := sourceWithPrompt.File("llm_fix_prompt.md")
 
-	work := agent.client.LLM(). //internalDagger.LLMOpts{Model: "gemini-2.0-flash"}).
-					WithEnv(environment).
-					WithPromptFile(promptFile)
+	work := agent.client.LLM(internalDagger.LLMOpts{Model: "gemini-2.0-flash"}).
+		WithEnv(environment).
+		WithPromptFile(promptFile)
 
 	workEnv := work.Env()
 
