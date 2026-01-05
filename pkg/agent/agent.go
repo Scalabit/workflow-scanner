@@ -70,6 +70,20 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 			"explanations",
 			"explanations of what fixes were applied and why")
 
+	// Pass API keys from host environment to LLM container environment
+	if geminiKey := os.Getenv("GEMINI_API_KEY"); geminiKey != "" {
+		geminiSecret := agent.client.SetSecret("gemini-api-key", geminiKey)
+		environment = environment.WithSecretInput("GEMINI_API_KEY", geminiSecret, "Gemini API key for LLM operations")
+	}
+	if openaiKey := os.Getenv("OPENAI_API_KEY"); openaiKey != "" {
+		openaiSecret := agent.client.SetSecret("openai-api-key", openaiKey)
+		environment = environment.WithSecretInput("OPENAI_API_KEY", openaiSecret, "OpenAI API key for LLM operations")
+	}
+	if anthropicKey := os.Getenv("ANTHROPIC_API_KEY"); anthropicKey != "" {
+		anthropicSecret := agent.client.SetSecret("anthropic-api-key", anthropicKey)
+		environment = environment.WithSecretInput("ANTHROPIC_API_KEY", anthropicSecret, "Anthropic API key for LLM operations")
+	}
+
 	var promptContent []byte
 
 	if llmFixPrompt != "" {
