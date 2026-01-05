@@ -113,6 +113,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	explanations, err := workEnv.Output("explanations").AsString(ctx)
 	if err != nil {
+		fmt.Println("LLM ERROR: ", err)
 		return source, "", fmt.Errorf("LLM processing failed: %w", err)
 	}
 
