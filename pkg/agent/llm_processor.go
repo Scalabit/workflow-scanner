@@ -89,7 +89,7 @@ func processWorkflows() error {
 	// Generate response
 	log.Println("DEBUG: Sending request to OpenAI API")
 	req := openai.ChatCompletionRequest{
-		Model: openai.GPT4,
+		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,
