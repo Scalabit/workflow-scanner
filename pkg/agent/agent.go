@@ -90,9 +90,13 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
 
 	// Use custom container approach instead of Dagger's LLM module
-	openaiKey := os.Getenv("OPENAI_API_KEY")
-	if openaiKey == "" {
-		return source, "", fmt.Errorf("OPENAI_API_KEY not found in environment")
+	llmAPIKey := os.Getenv("LLM_API_KEY")
+	if llmAPIKey == "" {
+		openaiKey := os.Getenv("OPENAI_API_KEY")
+		if openaiKey == "" {
+			return source, "", fmt.Errorf("LLM_API_KEY or OPENAI_API_KEY not found in environment")
+		}
+		llmAPIKey = openaiKey
 	}
 
 	log.Printf("DEBUG: Using custom container approach with OpenAI API key")
@@ -101,13 +105,13 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	llmProcessorContent := GetLLMProcessorCode()
 
 	// Create custom container with Go and OpenAI client
-	log.Printf("DEBUG: Creating container with OpenAI API key (length: %d)", len(openaiKey))
+	log.Printf("DEBUG: Creating container with OpenAI API key (length: %d)", len(llmAPIKey))
 	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
 	
 	llmContainer := agent.client.Container().
 		From("golang:1.25-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
-		WithEnvVariable("OPENAI_API_KEY", openaiKey).
+		WithEnvVariable("OPENAI_API_KEY", llmAPIKey).
 		WithEnvVariable("ZIZMOR_ISSUES", issues).
 		WithDirectory("/workspace", sourceWithPrompt).
 		WithWorkdir("/workspace").
