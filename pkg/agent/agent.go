@@ -55,21 +55,6 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
-	// Create .env file with API key for the LLM container
-	envContent := ""
-	if geminiKey := os.Getenv("GEMINI_API_KEY"); geminiKey != "" {
-		envContent += fmt.Sprintf("GEMINI_API_KEY=%s\n", geminiKey)
-		log.Printf("DEBUG: Adding GEMINI_API_KEY to .env file")
-	}
-	if openaiKey := os.Getenv("OPENAI_API_KEY"); openaiKey != "" {
-		envContent += fmt.Sprintf("OPENAI_API_KEY=%s\n", openaiKey)
-		log.Printf("DEBUG: Adding OPENAI_API_KEY to .env file")
-	}
-	if anthropicKey := os.Getenv("ANTHROPIC_API_KEY"); anthropicKey != "" {
-		envContent += fmt.Sprintf("ANTHROPIC_API_KEY=%s\n", anthropicKey)
-		log.Printf("DEBUG: Adding ANTHROPIC_API_KEY to .env file")
-	}
-
 	var promptContent []byte
 
 	if llmFixPrompt != "" {
@@ -102,41 +87,43 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	}
 
-	sourceWithPromptAndEnv := source.
-		WithNewFile("llm_fix_prompt.md", string(promptContent)).
-		WithNewFile(".env", envContent)
+	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
 
-	environment := agent.client.Env().
-		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
-		WithStringInput("GO111MODULE", "on", "Enable Go modules").
-		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
-		WithDirectoryInput(
-			"workspace",
-			sourceWithPromptAndEnv,
-			"the workspace containing GitHub Actions workflows with remaining issues").
-		WithDirectoryOutput(
-			"completed",
-			"the workspace with remaining security vulnerabilities fixed").
-		WithStringOutput(
-			"explanations",
-			"explanations of what fixes were applied and why")
-
-	promptFile := sourceWithPromptAndEnv.File("llm_fix_prompt.md")
-
-	work := agent.client.LLM(internalDagger.LLMOpts{Model: "gemini-2.0-flash"}).
-		WithEnv(environment).
-		WithPromptFile(promptFile)
-
-	workEnv := work.Env()
-
-	explanations, err := workEnv.Output("explanations").AsString(ctx)
-	if err != nil {
-		fmt.Println("LLM ERROR: ", err)
-		return source, "", fmt.Errorf("LLM processing failed: %w", err)
+	// Use custom container approach instead of Dagger's LLM module
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	if geminiKey == "" {
+		return source, "", fmt.Errorf("GEMINI_API_KEY not found in environment")
 	}
 
-	completedWorkspace := workEnv.Output("completed").AsWorkspace()
-	completed := completedWorkspace.Source()
+	log.Printf("DEBUG: Using custom container approach with Gemini API key")
 
-	return completed, explanations, nil
+	// Get the LLM processor Go code
+	llmProcessorContent := GetLLMProcessorCode()
+
+	// Create custom container with Go and Gemini client
+	llmContainer := agent.client.Container().
+		From("golang:1.21-alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git"}).
+		WithEnvVariable("GEMINI_API_KEY", geminiKey).
+		WithEnvVariable("ZIZMOR_ISSUES", issues).
+		WithDirectory("/workspace", sourceWithPrompt).
+		WithWorkdir("/workspace").
+		WithExec([]string{"go", "mod", "init", "llm-processor"}).
+		WithExec([]string{"go", "get", "github.com/google/generative-ai-go/genai"}).
+		WithExec([]string{"go", "get", "google.golang.org/api/option"}).
+		WithNewFile("/workspace/main.go", llmProcessorContent).
+		WithExec([]string{"go", "run", "main.go"})
+
+	explanations, err := llmContainer.Stdout(ctx)
+	if err != nil {
+		log.Printf("ERROR: Custom LLM container failed: %v", err)
+		return source, "", fmt.Errorf("custom LLM processing failed: %w", err)
+	}
+
+	log.Printf("DEBUG: Custom LLM container completed successfully")
+
+	// Get the modified workspace directory
+	modifiedDirectory := llmContainer.Directory("/workspace")
+
+	return modifiedDirectory, explanations, nil
 }
