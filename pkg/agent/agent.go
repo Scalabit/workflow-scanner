@@ -101,6 +101,9 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	llmProcessorContent := GetLLMProcessorCode()
 
 	// Create custom container with Go and Gemini client
+	log.Printf("DEBUG: Creating container with Gemini API key (length: %d)", len(geminiKey))
+	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
+	
 	llmContainer := agent.client.Container().
 		From("golang:1.21-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
@@ -108,11 +111,17 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		WithEnvVariable("ZIZMOR_ISSUES", issues).
 		WithDirectory("/workspace", sourceWithPrompt).
 		WithWorkdir("/workspace").
-		WithExec([]string{"go", "mod", "init", "llm-processor"}).
-		WithExec([]string{"go", "get", "github.com/google/generative-ai-go/genai"}).
-		WithExec([]string{"go", "get", "google.golang.org/api/option"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Workspace contents:' && ls -la"}).
+		WithExec([]string{"rm", "-f", "go.mod", "go.sum"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Initializing Go module' && go mod init llm-processor"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting Gemini dependencies' && go get github.com/google/generative-ai-go/genai"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting Google API option' && go get google.golang.org/api/option"}).
 		WithNewFile("/workspace/main.go", llmProcessorContent).
-		WithExec([]string{"go", "run", "main.go"})
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(GEMINI|ZIZMOR)'"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: main.go size:' && wc -l main.go"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1 || (echo 'DEBUG: Go program failed with exit code:' && echo $?)"})
+		
+	log.Printf("DEBUG: Container pipeline created, executing...")
 
 	explanations, err := llmContainer.Stdout(ctx)
 	if err != nil {

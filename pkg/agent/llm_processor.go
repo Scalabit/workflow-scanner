@@ -29,40 +29,60 @@ type LLMResponse struct {
 }
 
 func main() {
+	log.Println("DEBUG: Starting LLM processor")
+	log.Printf("DEBUG: GEMINI_API_KEY length: %d", len(os.Getenv("GEMINI_API_KEY")))
+	log.Printf("DEBUG: ZIZMOR_ISSUES length: %d", len(os.Getenv("ZIZMOR_ISSUES")))
+	
 	if err := processWorkflows(); err != nil {
-		log.Fatalf("Error: %v", err)
+		log.Fatalf("ERROR: %v", err)
 	}
+	log.Println("DEBUG: LLM processor completed successfully")
 }
 
 func processWorkflows() error {
+	log.Println("DEBUG: Reading prompt file")
 	// Read the prompt file
 	promptContent, err := ioutil.ReadFile("llm_fix_prompt.md")
 	if err != nil {
 		return fmt.Errorf("failed to read prompt: %w", err)
 	}
+	log.Printf("DEBUG: Prompt file size: %d bytes", len(promptContent))
 
 	// Read issues input
 	issues := os.Getenv("ZIZMOR_ISSUES")
 	if issues == "" {
 		issues = "No issues found"
 	}
+	issuePreview := issues
+	if len(issues) > 200 {
+		issuePreview = issues[:200] + "..."
+	}
+	log.Printf("DEBUG: Issues: %s", issuePreview)
 
 	// Initialize Gemini client
+	log.Println("DEBUG: Creating Gemini client")
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("GEMINI_API_KEY environment variable not set")
+	}
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 	defer client.Close()
+	log.Println("DEBUG: Gemini client created successfully")
 
 	// Create the model
 	model := client.GenerativeModel("gemini-2.0-flash")
 
 	// Find all workflow files
+	log.Println("DEBUG: Finding workflow files")
 	workflowFiles, err := findWorkflowFiles()
 	if err != nil {
 		return fmt.Errorf("failed to find workflow files: %w", err)
 	}
+	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
 
 	// Prepare the enhanced prompt for file fixing
 	enhancedPrompt := fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
