@@ -5,6 +5,7 @@ package agent
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -74,6 +75,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	explanations, err := workEnv.Output("explanations").AsString(ctx)
 	if err != nil {
 		// If LLM fails completely, return original workspace
+		fmt.Println("LLM ERROR: ", err)
 		return source.WithoutDirectory("node_modules"), "LLM processing failed - returning original workspace unchanged", nil
 	}
 
