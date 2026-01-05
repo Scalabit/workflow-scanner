@@ -117,6 +117,8 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting Gemini dependencies' && go get github.com/google/generative-ai-go/genai"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting Google API option' && go get google.golang.org/api/option"}).
 		WithNewFile("/workspace/main.go", llmProcessorContent).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running go mod tidy' && go mod tidy"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting missing auto SDK' && go get go.opentelemetry.io/auto/sdk@latest"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(GEMINI|ZIZMOR)'"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: main.go size:' && wc -l main.go"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1"})
