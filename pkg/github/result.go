@@ -1,28 +1,35 @@
 package github
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+	"strings"
+	"workflow-scanner/pkg/zizmor"
+)
 
 const (
 	title   = "Security Audit & Fixes for GitHub Actions Workflows"
-	bodyFmt = `## Complete Security Audit Report
+	bodyFmt = `## Security Audit Summary
 
-This PR contains comprehensive security analysis and fixes for GitHub Actions workflows.
+**Findings:** %d
 
-### Auto-fixed by ZIZMOR
+### Files Auto-fixed by ZIZMOR
+| File | Fixes |
+| --- | ---: |
 %s
 
-### Manual Security Fixes Applied
-%s
-
----
-
-## %s Validation Report: %s
-
+### LLM Summary
 %s
 
 ---
 
-### External Dependencies Security Scan
+**Validation:** %s %s
+
+%s
+
+---
+
+### External Dependencies Scan
 %s
 
 ---
@@ -45,7 +52,46 @@ var (
 	}
 )
 
-func GetPrTitleBody(finalValidation string, zizmorOut, llmOut, summaryFindings string) (string, string) {
+var fixLineRe = regexp.MustCompile(`^\s*(.+?):\s*(\d+)`)
+
+func fixSummaryToTableRows(summary string) string {
+	if strings.TrimSpace(summary) == "" {
+		return "| (none) | 0 |\n"
+	}
+	var rows []string
+	lines := strings.Split(summary, "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		if strings.HasPrefix(l, "Successfully applied") {
+			continue
+		}
+		if m := fixLineRe.FindStringSubmatch(l); len(m) == 3 {
+			file := strings.TrimSpace(m[1])
+			count := m[2]
+			rows = append(rows, fmt.Sprintf("| %s | %s |\n", file, count))
+			continue
+		}
+		if idx := strings.Index(l, ":"); idx != -1 {
+			file := strings.TrimSpace(l[:idx])
+			rest := strings.TrimSpace(l[idx+1:])
+			numRe := regexp.MustCompile(`\d+`)
+			num := numRe.FindString(rest)
+			if num == "" {
+				rows = append(rows, fmt.Sprintf("| %s | - |\n", file))
+			} else {
+				rows = append(rows, fmt.Sprintf("| %s | %s |\n", file, num))
+			}
+			continue
+		}
+		rows = append(rows, fmt.Sprintf("| %s | - |\n", l))
+	}
+	return strings.Join(rows, "")
+}
+
+func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fixSummary string, llmOut string, summaryFindings string) (string, string) {
 	var result Result
 	success := finalValidation == "" || finalValidation == "[]" || finalValidation == "[]\n"
 
@@ -58,8 +104,11 @@ func GetPrTitleBody(finalValidation string, zizmorOut, llmOut, summaryFindings s
 		result = failed
 	}
 
+	tableRows := fixSummaryToTableRows(fixSummary)
+
 	body := fmt.Sprintf(bodyFmt,
-		zizmorOut,
+		len(zizmorFindings),
+		tableRows,
 		llmOut,
 		result.status,
 		result.text,
