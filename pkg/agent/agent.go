@@ -105,7 +105,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
 	
 	llmContainer := agent.client.Container().
-		From("golang:1.21-alpine").
+		From("golang:1.25-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
 		WithEnvVariable("GEMINI_API_KEY", geminiKey).
 		WithEnvVariable("ZIZMOR_ISSUES", issues).
@@ -119,7 +119,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		WithNewFile("/workspace/main.go", llmProcessorContent).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(GEMINI|ZIZMOR)'"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: main.go size:' && wc -l main.go"}).
-		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1 || (echo 'DEBUG: Go program failed with exit code:' && echo $?)"})
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1"})
 		
 	log.Printf("DEBUG: Container pipeline created, executing...")
 

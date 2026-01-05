@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -66,6 +67,11 @@ func processWorkflows() error {
 	if apiKey == "" {
 		return fmt.Errorf("GEMINI_API_KEY environment variable not set")
 	}
+	
+	// Add timeout for API operations
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+	
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return fmt.Errorf("failed to create Gemini client: %w", err)
@@ -89,34 +95,43 @@ func processWorkflows() error {
 		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
 
 	// Generate response
+	log.Println("DEBUG: Sending request to Gemini API")
 	resp, err := model.GenerateContent(ctx, genai.Text(enhancedPrompt))
 	if err != nil {
 		return fmt.Errorf("failed to generate content: %w", err)
 	}
+	log.Println("DEBUG: Received response from Gemini API")
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
 		return fmt.Errorf("no response generated from Gemini")
 	}
+	log.Printf("DEBUG: Response has %d candidates", len(resp.Candidates))
 
 	// Extract response text
 	responseText := fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0])
 
 	// Try to parse JSON response
+	log.Println("DEBUG: Parsing response as JSON")
 	var llmResponse LLMResponse
 	if err := parseJSONResponse(responseText, &llmResponse); err != nil {
 		// If JSON parsing fails, just return the explanation
+		log.Printf("DEBUG: JSON parsing failed: %v", err)
+		log.Println("DEBUG: Returning raw response text")
 		fmt.Print(responseText)
 		return nil
 	}
 
 	// Apply file changes
-	for _, change := range llmResponse.FileChanges {
+	log.Printf("DEBUG: Applying %d file changes", len(llmResponse.FileChanges))
+	for i, change := range llmResponse.FileChanges {
+		log.Printf("DEBUG: Applying change %d/%d to %s", i+1, len(llmResponse.FileChanges), change.Path)
 		if err := applyFileChange(change); err != nil {
 			log.Printf("Warning: Failed to apply change to %s: %v", change.Path, err)
 		}
 	}
 
 	// Output explanation
+	log.Printf("DEBUG: Returning explanation: %d chars", len(llmResponse.Explanation))
 	fmt.Print(llmResponse.Explanation)
 	return nil
 }
