@@ -99,7 +99,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		llmAPIKey = openaiKey
 	}
 
-	log.Printf("DEBUG: Using custom container approach with OpenAI API key")
+	log.Printf("DEBUG:Using custom container approach with OpenAI API key")
 
 	// Get the LLM processor Go code
 	llmProcessorContent := GetLLMProcessorCode()
