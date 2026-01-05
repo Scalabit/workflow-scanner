@@ -15,8 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"github.com/sashabaranov/go-openai"
 )
 
 type FileChange struct {
@@ -31,7 +30,7 @@ type LLMResponse struct {
 
 func main() {
 	log.Println("DEBUG: Starting LLM processor")
-	log.Printf("DEBUG: GEMINI_API_KEY length: %d", len(os.Getenv("GEMINI_API_KEY")))
+	log.Printf("DEBUG: OPENAI_API_KEY length: %d", len(os.Getenv("OPENAI_API_KEY")))
 	log.Printf("DEBUG: ZIZMOR_ISSUES length: %d", len(os.Getenv("ZIZMOR_ISSUES")))
 	
 	if err := processWorkflows(); err != nil {
@@ -60,27 +59,20 @@ func processWorkflows() error {
 	}
 	log.Printf("DEBUG: Issues: %s", issuePreview)
 
-	// Initialize Gemini client
-	log.Println("DEBUG: Creating Gemini client")
+	// Initialize OpenAI client
+	log.Println("DEBUG: Creating OpenAI client")
 	ctx := context.Background()
-	apiKey := os.Getenv("GEMINI_API_KEY")
+	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
-		return fmt.Errorf("GEMINI_API_KEY environment variable not set")
+		return fmt.Errorf("OPENAI_API_KEY environment variable not set")
 	}
 	
 	// Add timeout for API operations
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 	
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
-	if err != nil {
-		return fmt.Errorf("failed to create Gemini client: %w", err)
-	}
-	defer client.Close()
-	log.Println("DEBUG: Gemini client created successfully")
-
-	// Create the model
-	model := client.GenerativeModel("gemini-2.0-flash")
+	client := openai.NewClient(apiKey)
+	log.Println("DEBUG: OpenAI client created successfully")
 
 	// Find all workflow files
 	log.Println("DEBUG: Finding workflow files")
@@ -95,20 +87,32 @@ func processWorkflows() error {
 		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
 
 	// Generate response
-	log.Println("DEBUG: Sending request to Gemini API")
-	resp, err := model.GenerateContent(ctx, genai.Text(enhancedPrompt))
+	log.Println("DEBUG: Sending request to OpenAI API")
+	req := openai.ChatCompletionRequest{
+		Model: openai.GPT4,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: enhancedPrompt,
+			},
+		},
+		MaxTokens:   4000,
+		Temperature: 0.1,
+	}
+	
+	resp, err := client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to generate content: %w", err)
 	}
-	log.Println("DEBUG: Received response from Gemini API")
+	log.Println("DEBUG: Received response from OpenAI API")
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return fmt.Errorf("no response generated from Gemini")
+	if len(resp.Choices) == 0 {
+		return fmt.Errorf("no response generated from OpenAI")
 	}
-	log.Printf("DEBUG: Response has %d candidates", len(resp.Candidates))
+	log.Printf("DEBUG: Response has %d choices", len(resp.Choices))
 
 	// Extract response text
-	responseText := fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0])
+	responseText := resp.Choices[0].Message.Content
 
 	// Try to parse JSON response
 	log.Println("DEBUG: Parsing response as JSON")

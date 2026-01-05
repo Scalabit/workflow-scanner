@@ -90,36 +90,34 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
 
 	// Use custom container approach instead of Dagger's LLM module
-	geminiKey := os.Getenv("GEMINI_API_KEY")
-	if geminiKey == "" {
-		return source, "", fmt.Errorf("GEMINI_API_KEY not found in environment")
+	openaiKey := os.Getenv("OPENAI_API_KEY")
+	if openaiKey == "" {
+		return source, "", fmt.Errorf("OPENAI_API_KEY not found in environment")
 	}
 
-	log.Printf("DEBUG: Using custom container approach with Gemini API key")
+	log.Printf("DEBUG: Using custom container approach with OpenAI API key")
 
 	// Get the LLM processor Go code
 	llmProcessorContent := GetLLMProcessorCode()
 
-	// Create custom container with Go and Gemini client
-	log.Printf("DEBUG: Creating container with Gemini API key (length: %d)", len(geminiKey))
+	// Create custom container with Go and OpenAI client
+	log.Printf("DEBUG: Creating container with OpenAI API key (length: %d)", len(openaiKey))
 	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
 	
 	llmContainer := agent.client.Container().
 		From("golang:1.25-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
-		WithEnvVariable("GEMINI_API_KEY", geminiKey).
+		WithEnvVariable("OPENAI_API_KEY", openaiKey).
 		WithEnvVariable("ZIZMOR_ISSUES", issues).
 		WithDirectory("/workspace", sourceWithPrompt).
 		WithWorkdir("/workspace").
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Workspace contents:' && ls -la"}).
 		WithExec([]string{"rm", "-f", "go.mod", "go.sum"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Initializing Go module' && go mod init llm-processor"}).
-		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting Gemini dependencies' && go get github.com/google/generative-ai-go/genai"}).
-		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting Google API option' && go get google.golang.org/api/option"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting OpenAI Go client' && go get github.com/sashabaranov/go-openai"}).
 		WithNewFile("/workspace/main.go", llmProcessorContent).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running go mod tidy' && go mod tidy"}).
-		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting missing auto SDK' && go get go.opentelemetry.io/auto/sdk@latest"}).
-		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(GEMINI|ZIZMOR)'"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(OPENAI|ZIZMOR)'"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: main.go size:' && wc -l main.go"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1"})
 		
