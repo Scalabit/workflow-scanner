@@ -195,6 +195,7 @@ func parseJSONResponse(responseText string, llmResponse *LLMResponse) error {
 
 	end := strings.LastIndex(responseText, "}")
 	if start == -1 || end == -1 || start >= end {
+
 		return fmt.Errorf("no valid JSON found in response")
 	}
 
