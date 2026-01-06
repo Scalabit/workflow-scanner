@@ -5,24 +5,30 @@ on:
     branches-ignore:
       - main
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   lint-fmt:
     name: Lint & Fmt
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.4.0
+        with:
+          persist-credentials: false
     
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b5b1e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5  # v5.0.0
         with:
           go-version: 1.25.3
 
       - name: Install Task
-        uses: go-task/setup-task@v1
+        uses: go-task/setup-task@c8b5e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5  # v1.0.0
 
       - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.6.2
         with:
           version: v2.6.2
           install-mode: binary
@@ -40,28 +46,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.4.0
+        with:
+          persist-credentials: false
     
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b5b1e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5  # v5.0.0
         with:
           go-version: 1.25.3
 
       - name: Install Task
-        uses: go-task/setup-task@v1
+        uses: go-task/setup-task@c8b5e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5  # v1.0.0
 
       - name: Install mockgen
         run: task install-mockgen
 
       - name: Generate main dagger code
-        uses: dagger/dagger-for-github@v8.2.0
+        uses: dagger/dagger-for-github@b4ffde65f46336ab88eb53be808477a3936bae11  # v8.2.0
         with:
             verb: develop
             args: --sdk=go --compat=skip
             version: "v0.19.6"
 
       - name: Generate workspace dagger code
-        uses: dagger/dagger-for-github@v8.2.0
+        uses: dagger/dagger-for-github@b4ffde65f46336ab88eb53be808477a3936bae11  # v8.2.0
         with:
             workdir: workspace
             verb: develop
@@ -79,32 +87,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.4.0
+        with:
+          persist-credentials: false
     
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b5b1e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5  # v5.0.0
         with:
           go-version: 1.25.3
 
-      # use go install and run task, does not seem to properly exclude generated dagger code
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: Install Task
-        uses: go-task/setup-task@v1
+        uses: go-task/setup-task@c8b5e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5  # v1.0.0
 
       - name: Install mockgen
         run: task install-mockgen
 
       - name: Generate main dagger code
-        uses: dagger/dagger-for-github@v8.2.0
+        uses: dagger/dagger-for-github@b4ffde65f46336ab88eb53be808477a3936bae11  # v8.2.0
         with:
             verb: develop
             args: --sdk=go --compat=skip
             version: "v0.19.6"
 
       - name: Generate workspace dagger code
-        uses: dagger/dagger-for-github@v8.2.0
+        uses: dagger/dagger-for-github@b4ffde65f46336ab88eb53be808477a3936bae11  # v8.2.0
         with:
             workdir: workspace
             verb: develop

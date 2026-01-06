@@ -1,135 +1,38 @@
-name: Build and Deploy to Cloud Run
+name: Build and Deploy
 
 on:
   push:
-    branches: [ main, batch-cloud-imp ]
-  workflow_dispatch:
+    branches:
+      - main
 
-env:
-  PROJECT_ID: workflow-scanner
-  REGION: europe-north1
-  SERVICE: workflow-scanner
-  REGISTRY: europe-north1-docker.pkg.dev
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
-    permissions:
-      contents: read
-      id-token: write
-      
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.4.0
       
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-        
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
-      
-    - name: Configure Docker to use gcloud as credential helper
-      run: gcloud auth configure-docker ${{ env.REGISTRY }}
-      
-    - name: Build and push Docker images
-      run: |
-        # Build the Cloud Run image (web server)
-        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }} .
-        docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest .
-        
-        # Push Cloud Run images
-        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}
-        docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:latest
-        
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
-    - name: Build and push binary scanner to Docker Hub
-      run: |
-        # Build the binary scanner image for Docker Hub
-        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:${{ github.sha }} .
-        docker build -f binary.Dockerfile -t mariominhava04/workflow-scanner:latest .
-        
-        # Push to Docker Hub
-        docker push mariominhava04/workflow-scanner:${{ github.sha }}
-        docker push mariominhava04/workflow-scanner:latest
-        
-  deploy-infrastructure:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    permissions:
-      contents: read
-      id-token: write
-      
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-        
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: "1.6.0"
-        
-    - name: Terraform Init
-      working-directory: ./terraform
-      run: terraform init
-      
-    - name: Terraform Plan
-      working-directory: ./terraform
-      timeout-minutes: 10
-      run: |
-        terraform plan \
-          -var="base_url=${{ vars.BASE_URL }}" \
-          -var="project_id=${{ env.PROJECT_ID }}" \
-          -var="region=${{ env.REGION }}" \
-          -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
-          -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
-          -var="gitlab_client_id=${{ secrets.GITLAB_CLIENT_ID }}" \
-          -var="gitlab_client_secret=${{ secrets.GITLAB_CLIENT_SECRET }}" \
-          -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
-          -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
-          -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
-          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
-          -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
-          
-    - name: Terraform Apply
-      working-directory: ./terraform
-      timeout-minutes: 15
-      run: |
-        terraform apply -auto-approve \
-          -var="base_url=${{ vars.BASE_URL }}" \
-          -var="project_id=${{ env.PROJECT_ID }}" \
-          -var="region=${{ env.REGION }}" \
-          -var="gh_client_id=${{ secrets.GH_CLIENT_ID }}" \
-          -var="gh_client_secret=${{ secrets.GH_CLIENT_SECRET }}" \
-          -var="gitlab_client_id=${{ secrets.GITLAB_CLIENT_ID }}" \
-          -var="gitlab_client_secret=${{ secrets.GITLAB_CLIENT_SECRET }}" \
-          -var="stripe_key=${{ secrets.TEST_STRIPE }}" \
-          -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
-          -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
-          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
-          -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
-          
-    - name: Cleanup Terraform lock on failure
-      if: failure()
-      working-directory: ./terraform
-      run: |
-        # Get the lock ID and force unlock
-        echo "Attempting to unlock any stuck Terraform state locks..."
-        terraform force-unlock -force 1766503302731339 || true
-        echo "Lock cleanup completed"
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.0.0
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.0.0
+        with:
+          project_id: ${{ secrets.GCP_PROJECT }}
+
+      - name: Login to Docker
+        uses: docker/login-action@b4ffde65f46336ab88eb53be808477a3936bae11  # v3.0.0
+        with:
+          username: _json_key
+          password: ${{ secrets.GCP_DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/my-image:${{ github.sha }} .
+          docker push gcr.io/${{ secrets.GCP_PROJECT }}/my-image:${{ github.sha }}

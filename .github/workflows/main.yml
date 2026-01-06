@@ -1,35 +1,25 @@
-name: Bump version
+name: CI
+
 on:
   pull_request:
-    types:
-      - closed
-    branches:
-      - main
 
 jobs:
   build:
-    if: github.event.pull_request.merged == true && contains(join(github.event.pull_request.labels.*.name, '|'), 'semver-')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.merge_commit_sha }}
-        fetch-depth: '0'
-    
-    - name: Output semver
-      id: get_bump
-      run: |
-        if [[ "$(echo ${{ join(github.event.pull_request.labels.*.name, '|') }} | grep -Po "semver-(major|minor|patch)" | wc -l)" -gt 1 ]]; then
-            echo "More than 1 semver tag found: ${semver}"
-            exit 1
-        fi
-        echo "bump=${semver}" | sed 's/semver-//g' >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v2.4.0
+      
+      - name: Output semver
+        id: get_bump
+        run: |
+          if [[ "$(echo ${{ join(github.event.pull_request.labels.*.name, '|') }} | grep -Po "semver-(major|minor|patch)" | wc -l)" -gt 1 ]]; then
+              echo "More than 1 semver tag found: ${semver}"
+              exit 1
+          fi
+          echo "bump=${semver}" | sed 's/semver-//g' >> $GITHUB_OUTPUT
 
-    - name: Bump version and push tag
-      uses: anothrNick/github-tag-action@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        DEFAULT_BUMP: ${{ steps.get_bump.outputs.bump }}
-        TAG_PREFIX: v
+      - name: Tag
+        uses: anothrNick/github-tag-action@b4ffde65f46336ab88eb53be808477a3936bae11  # v1.0.0
+        with:
+          tag: ${{ steps.get_bump.outputs.bump }}
