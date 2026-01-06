@@ -12,10 +12,15 @@ type Client interface {
 	Workspace(source *dagger.Directory) Workspace
 	CurrentModule() CurrentModule
 	LLM(opts ...dagger.LLMOpts) LLM
+	SetSecret(name, plaintext string) *dagger.Secret
 }
 
 type ClientImpl struct {
 	internal *dagger.Client
+}
+
+func (clientImpl *ClientImpl) SetSecret(name, plaintext string) *dagger.Secret {
+	return clientImpl.internal.SetSecret(name, plaintext)
 }
 
 func NewClient(client *dagger.Client) Client {
