@@ -25,7 +25,7 @@ type WrapperIssueClientImpl struct {
 	gitlabToken  string
 }
 
-func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory) (string, error) {
+func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory, targetBranch string) (string, error) {
 	branchName := fmt.Sprintf("workflow-security-fixes-%d", time.Now().Unix())
 
 	repoURL := fmt.Sprintf("https://gitlab.com/%s.git", repo)
@@ -36,7 +36,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		HTTPAuthToken:    gitAuth,
 	})
 
-	mainBranch := gitRepo.Branch("main")
+	mainBranch := gitRepo.Branch(targetBranch)
 
 	workingDir := mainBranch.Tree().WithoutDirectory(".git")
 
@@ -55,8 +55,8 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	gitContainer = gitContainer.WithExec([]string{"git", "remote", "add", "origin", remoteURL})
 
 	gitContainer = gitContainer.
-		WithExec([]string{"git", "fetch", "origin", "main"}).
-		WithExec([]string{"git", "branch", branchName, "origin/main"}).
+		WithExec([]string{"git", "fetch", "origin", targetBranch}).
+		WithExec([]string{"git", "branch", branchName, "origin/" + targetBranch}).
 		WithExec([]string{"git", "symbolic-ref", "HEAD", "refs/heads/" + branchName}).
 		WithExec([]string{"git", "reset"}).
 		WithExec([]string{"git", "add", "."})
@@ -83,7 +83,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	apiURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests", url.PathEscape(repo))
 	mrData := map[string]interface{}{
 		"source_branch": branchName,
-		"target_branch": "main",
+		"target_branch": targetBranch,
 		"title":         title,
 		"description":   body,
 	}
