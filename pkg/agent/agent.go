@@ -135,7 +135,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 
 	log.Printf("DEBUG: Custom LLM container completed successfully")
 
-	// Get the modified workspace directory
+	// Get the modified workspace dir
 	modifiedDirectory := llmContainer.Directory("/workspace")
 
 	return modifiedDirectory, explanations, nil
