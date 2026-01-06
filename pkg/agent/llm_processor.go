@@ -94,7 +94,7 @@ func createOpenAIClient() (*openai.Client, context.Context, context.CancelFunc, 
 	ctx := context.Background()
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
-		return nil, nil, nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+		return nil, ctx, func() {}, fmt.Errorf("OPENAI_API_KEY environment variable not set")
 	}
 	
 	const apiTimeoutMinutes = 5
