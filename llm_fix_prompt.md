@@ -43,40 +43,31 @@ You have been provided with ZIZMOR scan results in the `zizmor_issues` input tha
 When ZIZMOR reports `unpinned-uses` findings:
 - **NEVER use branch names** like `@main`, `@master`, `@v1` - these are mutable and insecure
 - **ALWAYS use full 40-character commit SHA hashes** (e.g., `@3fb27e8b4e5c6a9d1f2e7a8b9c0d1e2f3a4b5c6d`)
+- **ALWAYS verify that the commit SHA actually exists before changing**
 - **DO NOT use short hashes** or fake/placeholder hashes (e.g., `@a1b2c3d`)
 
-**For PUBLIC well-known actions (actions/checkout, actions/setup-node, etc.):**
-- You SHOULD know the commit hashes for common versions
-- Look up the hash and FIX the code directly
-- **PREFER updating to the latest stable version** when fixing older versions
-- Pin to the full 40-character commit SHA of the latest stable release
-- Add a comment showing which version the hash corresponds to
-- These are public repositories - you can reference their release tags
-
-**For PRIVATE or CUSTOM actions (organization-specific actions):**
-- **IF YOU DON'T KNOW THE REAL HASH:**
-  - **DO NOT change the code or make up a fake hash**
-  - **LEAVE the line unchanged**
-  - **ADD a comment above the line** explaining that a manual fix is needed
-  - **Example:**
-    ```yaml
-    # TODO: Pin this action to a commit SHA - visit https://github.com/owner/repo/releases to find the hash
-    uses: owner/repo@main
-    ```
-- **How to get the correct hash:**
-  1. Go to the action's GitHub repository
-  2. Find the tag/release you want to use (e.g., `v4`)
-  3. Click on the tag to see the commit
-  4. Copy the full 40-character commit SHA
-- **Example fix:**
+**For ALL actions (public and private):**
+- **YOU DO NOT HAVE ACCESS TO LIVE GITHUB DATA** and cannot look up real commit SHAs
+- **NEVER generate or guess commit SHA hashes**
+- **DO NOT change unpinned action references to fake SHAs**
+- **INSTEAD: ADD A TODO COMMENT** explaining that manual pinning is needed
+- **Example fix for unpinned actions:**
   ```yaml
-  # ❌ WRONG - mutable reference
-  uses: actions/checkout@v4
-  
-  # ✅ CORRECT - pinned to immutable commit hash
-  uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+  # TODO: Pin to commit SHA - visit https://github.com/actions/checkout/releases to get the real hash for your desired version
+  uses: actions/checkout@v4  # Consider pinning to commit SHA for security
   ```
-- Add a comment showing which version the hash corresponds to for maintainability 
+- The repository maintainer must manually look up and apply the correct commit SHAs
+
+**CRITICAL: DO NOT GENERATE FAKE COMMIT HASHES**
+- **NEVER replace version tags with made-up commit SHAs**
+- **NEVER use patterns like `b5b1e3f5e1c5c1c8d7c5b7e5e5b5e5b5e5b5b5b5`**
+- **IF an action is unpinned, ADD A TODO COMMENT instead of changing the reference**
+- **Example of CORRECT handling:**
+  ```yaml
+  # TODO: Pin this action to a commit SHA for security
+  # Visit https://github.com/actions/setup-go/releases to find the real hash for v5
+  uses: actions/setup-go@v5  # SECURITY: Should be pinned to commit SHA
+  ``` 
 
 ## SECRET EXPOSURE WARNING
 If you find any hardcoded secrets, API keys, passwords, or tokens in the workflow files:

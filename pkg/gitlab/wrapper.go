@@ -99,19 +99,41 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		return "", fmt.Errorf("failed to create MR: %w", err)
 	}
 
-	// Try to parse web_url
+	// Try to parse web_url and iid
 	var mrResp struct {
 		WebURL string `json:"web_url"`
+		IID    int    `json:"iid"`
 	}
 	if err := json.Unmarshal([]byte(resp), &mrResp); err != nil {
 		return "", fmt.Errorf("failed to parse MR response: %w - raw: %s", err, resp)
 	}
 
-	if mrResp.WebURL != "" {
-		return mrResp.WebURL, nil
+	if mrResp.WebURL == "" {
+		return "", fmt.Errorf("MR creation failed, response: %s", resp)
 	}
 
-	return "", fmt.Errorf("MR creation failed, response: %s", resp)
+	// Add semver-minor label to the created MR
+	if mrResp.IID > 0 {
+		labelData := map[string]interface{}{
+			"labels": "semver-minor",
+		}
+		labelJSON, _ := json.Marshal(labelData)
+		
+		labelURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests/%d", url.PathEscape(repo), mrResp.IID)
+		
+		labelContainer := w.daggerClient.Container().From("alpine:latest").
+			WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+			WithNewFile("/tmp/label.json", string(labelJSON)).
+			WithExec([]string{"curl", "-s", "-X", "PUT", "-H", "Authorization: Bearer " + w.gitlabToken, "-H", "Content-Type: application/json", "-d", "@/tmp/label.json", labelURL})
+
+		_, labelErr := labelContainer.Stdout(ctx)
+		if labelErr != nil {
+			// Don't fail the entire process if labeling fails
+			fmt.Printf("Warning: failed to add semver-minor label to MR !%d: %v", mrResp.IID, labelErr)
+		}
+	}
+
+	return mrResp.WebURL, nil
 }
 
 func timeNowUnix() int64 {

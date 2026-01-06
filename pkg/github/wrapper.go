@@ -141,9 +141,40 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		return "", fmt.Errorf("failed to parse PR response: %w", err)
 	}
 
-	if prResponse.HTMLURL != "" {
-		return prResponse.HTMLURL, nil
+	if prResponse.HTMLURL == "" {
+		return "", fmt.Errorf("PR creation failed, response: %s", responseContent)
 	}
 
-	return "", fmt.Errorf("PR creation failed, response: %s", responseContent)
+	// Add semver-minor label to the created PR
+	if prResponse.Number > 0 {
+		labelData := map[string]interface{}{
+			"labels": []string{"semver-minor"},
+		}
+		labelJSON, err := json.Marshal(labelData)
+		if err != nil {
+			// Don't fail the entire process if labeling fails
+			fmt.Printf("Warning: failed to marshal label data: %v", err)
+		} else {
+			labelURL := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/labels", repo, prResponse.Number)
+			
+			labelResponse := w.daggerClient.Container().
+				From("alpine:latest").
+				WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+				WithNewFile("/tmp/label_data.json", string(labelJSON)).
+				WithExec([]string{"curl", "-X", "POST",
+					"-H", "Authorization: Bearer " + w.githubToken,
+					"-H", "Accept: application/vnd.github.v3+json",
+					"-H", "Content-Type: application/json",
+					"-d", "@/tmp/label_data.json",
+					labelURL})
+
+			_, labelErr := labelResponse.Stdout(ctx)
+			if labelErr != nil {
+				// Don't fail the entire process if labeling fails
+				fmt.Printf("Warning: failed to add semver-minor label to PR #%d: %v", prResponse.Number, labelErr)
+			}
+		}
+	}
+
+	return prResponse.HTMLURL, nil
 }
