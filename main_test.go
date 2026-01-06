@@ -63,7 +63,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 
 				// Step 7: Create PR
 				mockGithub.EXPECT().
-					CreatePullRequest(gomock.Any(), "owner/repo", gomock.Any(), gomock.Any(), gomock.Any()).
+					CreatePullRequest(gomock.Any(), "owner/repo", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("https://github.com/owner/repo/pull/123", nil)
 
 				return mockZizmor, mockAgent, mockGithub, mockDirectory
@@ -114,7 +114,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 
 				// Step 7: Create PR
 				mockGithub.EXPECT().
-					CreatePullRequest(gomock.Any(), "owner/repo", gomock.Any(), gomock.Any(), gomock.Any()).
+					CreatePullRequest(gomock.Any(), "owner/repo", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("https://github.com/owner/repo/pull/456", nil)
 
 				return mockZizmor, mockAgent, mockGithub, mockDirectory
@@ -217,7 +217,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 
 				// Step 6: Create PR - should receive truncated findings
 				mockGithub.EXPECT().
-					CreatePullRequest(gomock.Any(), "owner/repo", gomock.Any(), gomock.Any(), gomock.Any()).
+					CreatePullRequest(gomock.Any(), "owner/repo", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("https://github.com/owner/repo/pull/789", nil)
 
 				return mockZizmor, mockAgent, mockGithub, mockDirectory
@@ -241,6 +241,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 				mockZizmor,
 				mockAgent,
 				mockGithub,
+				"main",
 			)
 
 			assert.Equal(t, tt.expectedResult, result)

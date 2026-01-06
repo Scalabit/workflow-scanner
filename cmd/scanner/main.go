@@ -333,8 +333,14 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 		wrapperClient = github.NewWrapperIssueClientImpl(dag, config.githubToken)
 	}
 
+	// Default to "main" if no target branch is specified in environment
+	targetBranch := os.Getenv("TARGET_BRANCH")
+	if targetBranch == "" {
+		targetBranch = "main"
+	}
+	
 	log.Printf("DEBUG: Starting scanAndFixWorkflows...")
-	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient)
+	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient, targetBranch)
 
 	// Increment usage regardless of scan success/failure (user still consumed quota)
 	usageErr := incrementUsage(config.repository, err == nil)
@@ -351,7 +357,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 }
 
 // Same as scanAndFixWorflowsImpl from main.go.
-func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
+func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient, targetBranch string) (string, error) {
 	log.Printf("DEBUG: Running ZIZMOR auto-fix on source directory...")
 	autoFixedDirectory, zizmorFindings, fixSummary, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
@@ -406,5 +412,5 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 
 	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorFindings, fixSummary, llmExplanations, summaryExternalFindings)
 
-	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
+	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory, targetBranch)
 }

@@ -12,7 +12,7 @@ import (
 )
 
 type WrapperIssueClient interface {
-	CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory) (string, error)
+	CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory, targetBranch string) (string, error)
 }
 
 type WrapperIssueClientImpl struct {
@@ -27,7 +27,7 @@ func NewWrapperIssueClientImpl(daggerClient *dagger.Client, githubToken string) 
 	}
 }
 
-func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory) (string, error) {
+func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory, targetBranch string) (string, error) {
 	// Generate branch name with timestamp
 	branchName := fmt.Sprintf("workflow-security-fixes-%d", time.Now().Unix())
 
@@ -38,8 +38,8 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		HTTPAuthUsername: "x-access-token",
 	})
 
-	// Step 2: Get the main branch
-	mainBranch := gitRepo.Branch("main")
+	// Step 2: Get the target branch
+	mainBranch := gitRepo.Branch(targetBranch)
 
 	// Step 3: Get the tree and CLEAN the .git directory
 	workingDir := mainBranch.Tree().WithoutDirectory(".git")
@@ -65,12 +65,12 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 
 	// Fetch and prepare branch WITHOUT overwriting files
 	gitContainer = gitContainer.
-		WithExec([]string{"git", "fetch", "origin", "main"}).
-		// Create the branch label pointing to main's history
-		WithExec([]string{"git", "branch", branchName, "origin/main"}).
+		WithExec([]string{"git", "fetch", "origin", targetBranch}).
+		// Create the branch label pointing to target branch's history
+		WithExec([]string{"git", "branch", branchName, "origin/" + targetBranch}).
 		// Soft-switch: Point HEAD to the new branch without touching the working directory
 		WithExec([]string{"git", "symbolic-ref", "HEAD", "refs/heads/" + branchName}).
-		// Reset: Sync the git index with main, leaving your fixed files on disk as "modifications"
+		// Reset: Sync the git index with target branch, leaving your fixed files on disk as "modifications"
 		WithExec([]string{"git", "reset"}).
 		// Stage everything (this captures your fixes)
 		WithExec([]string{"git", "add", "."})
@@ -102,7 +102,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		"title": title,
 		"body":  body,
 		"head":  branchName,
-		"base":  "main",
+		"base":  targetBranch,
 	}
 
 	jsonData, err := json.Marshal(prData)
