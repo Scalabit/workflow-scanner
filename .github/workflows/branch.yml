@@ -5,6 +5,9 @@ on:
     branches-ignore:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   lint-fmt:
     name: Lint & Fmt
@@ -12,25 +15,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-    
+        with:
+          persist-credentials: false
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25.3
-
       - name: Install Task
+        # TODO: Pin this action to a commit SHA for security
         uses: go-task/setup-task@v1
-
       - name: Install golangci-lint
+        # TODO: Pin this action to a commit SHA for security
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.6.2
           install-mode: binary
           install-only: true
-
       - name: Lint
         run: task lint
-
       - name: Format
         if: always()
         run: task fmt
@@ -41,36 +43,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-    
+        with:
+          persist-credentials: false
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25.3
-
       - name: Install Task
+        # TODO: Pin this action to a commit SHA for security
         uses: go-task/setup-task@v1
-
       - name: Install mockgen
         run: task install-mockgen
-
       - name: Generate main dagger code
+        # TODO: Pin this action to a commit SHA for security
         uses: dagger/dagger-for-github@v8.2.0
         with:
             verb: develop
             args: --sdk=go --compat=skip
             version: "v0.19.6"
-
       - name: Generate workspace dagger code
+        # TODO: Pin this action to a commit SHA for security
         uses: dagger/dagger-for-github@v8.2.0
         with:
             workdir: workspace
             verb: develop
             args: --sdk=go --compat=skip
             version: "v0.19.6"
-
       - name: Generate mocks
         run: task mocks
-
       - name: Run tests with task
         run: task unit-tests
 
@@ -80,39 +80,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-    
+        with:
+          persist-credentials: false
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25.3
-
-      # use go install and run task, does not seem to properly exclude generated dagger code
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-
       - name: Install Task
+        # TODO: Pin this action to a commit SHA for security
         uses: go-task/setup-task@v1
-
       - name: Install mockgen
         run: task install-mockgen
-
       - name: Generate main dagger code
+        # TODO: Pin this action to a commit SHA for security
         uses: dagger/dagger-for-github@v8.2.0
         with:
             verb: develop
             args: --sdk=go --compat=skip
             version: "v0.19.6"
-
       - name: Generate workspace dagger code
+        # TODO: Pin this action to a commit SHA for security
         uses: dagger/dagger-for-github@v8.2.0
         with:
             workdir: workspace
             verb: develop
             args: --sdk=go --compat=skip
             version: "v0.19.6"
-
       - name: Generate mocks
         run: task mocks
-
       - name: Run gosec
         run: task gosec
