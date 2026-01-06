@@ -14,6 +14,8 @@ type Container interface {
 	WithExec(args []string, opts ...dagger.ContainerWithExecOpts) Container
 	WithDirectory(path string, source *dagger.Directory, opts ...dagger.ContainerWithDirectoryOpts) Container
 	WithWorkdir(path string, opts ...dagger.ContainerWithWorkdirOpts) Container
+	WithEnvVariable(name, value string, opts ...dagger.ContainerWithEnvVariableOpts) Container
+	WithNewFile(path, contents string, opts ...dagger.ContainerWithNewFileOpts) Container
 }
 
 type ContainerImpl struct {
@@ -42,4 +44,12 @@ func (containerImpl *ContainerImpl) WithDirectory(path string, source *dagger.Di
 
 func (containerImpl *ContainerImpl) WithWorkdir(path string, opts ...dagger.ContainerWithWorkdirOpts) Container {
 	return &ContainerImpl{internal: containerImpl.internal.WithWorkdir(path, opts...)}
+}
+
+func (containerImpl *ContainerImpl) WithEnvVariable(name, value string, opts ...dagger.ContainerWithEnvVariableOpts) Container {
+	return &ContainerImpl{internal: containerImpl.internal.WithEnvVariable(name, value, opts...)}
+}
+
+func (containerImpl *ContainerImpl) WithNewFile(path, contents string, opts ...dagger.ContainerWithNewFileOpts) Container {
+	return &ContainerImpl{internal: containerImpl.internal.WithNewFile(path, contents, opts...)}
 }
