@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"io/fs"
 	"log"
@@ -12,6 +13,9 @@ import (
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
+
+//go:embed llm_fix_prompt.md
+var llmFixPrompt string
 
 type Agent interface {
 	FixRemainingIssues(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error)
@@ -44,107 +48,95 @@ func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internal
 }
 
 func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
-	log.Printf("DEBUG: Starting fixRemainingIssuesImpl with %d chars of issues", len(issues))
 
-	// Only skip LLM if truly no issues found
 	if areThereIssues(issues) {
 		log.Printf("DEBUG: No issues found, skipping LLM processing")
 
 		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
-	log.Printf("DEBUG: Setting up LLM environment with issues to fix")
+	var promptContent []byte
 
-	log.Printf("DEBUG: Creating Dagger environment...")
-
-	// Create workspace with Go module context for LLM
-	log.Printf("DEBUG: Creating workspace with Go module context...")
-	workspace := agent.client.Workspace(source)
-	log.Printf("DEBUG: Workspace created")
-
-	environment := agent.client.Env().
-		WithStringInput("zizmor_issues", issues, "ZIZMOR scan results showing remaining security issues to fix").
-		WithStringInput("GO111MODULE", "on", "Enable Go modules").
-		WithStringInput("GOWORK", "off", "Disable Go workspace mode").
-		WithWorkspaceInput(
-			"workspace",
-			workspace,
-			"the workspace containing GitHub Actions workflows with remaining issues").
-		WithWorkspaceOutput(
-			"completed",
-			"the workspace with remaining security vulnerabilities fixed").
-		WithStringOutput(
-			"explanations",
-			"explanations of what fixes were applied and why")
-
-	log.Printf("DEBUG: Environment created successfully")
-
-	log.Printf("DEBUG: Reading prompt file directly from filesystem...")
-	// Use os.DirFS to safely scope file access and prevent directory traversal
-	cwd, err := os.Getwd()
-	if err != nil {
-		return source, "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	// Find project root by looking for go.mod file
-	projectRoot := cwd
-	for {
-		if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
-			break
+	if llmFixPrompt != "" {
+		promptContent = []byte(llmFixPrompt)
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return source, "", fmt.Errorf("failed to get current working directory: %w", err)
 		}
-		parent := projectRoot + "/.."
-		if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
-			// Can't find project root, use current directory
-			break
-		} else {
-			projectRoot = abs
+
+		projectRoot := cwd
+		for {
+			if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
+				break
+			}
+			parent := projectRoot + "/.."
+			if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
+				break
+			} else {
+				projectRoot = abs
+			}
 		}
+
+		rootFS := os.DirFS(projectRoot)
+
+		promptContent, err = fs.ReadFile(rootFS, "llm_fix_prompt.md")
+		if err != nil {
+			return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
+		}
+
 	}
 
-	// Create a root filesystem scoped to the project root
-	rootFS := os.DirFS(projectRoot)
-
-	// Try to find the prompt file relative to project root
-	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
-	if err != nil {
-		return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
-	}
-	log.Printf("DEBUG: Successfully read prompt file: %d chars", len(promptContent))
-
-	log.Printf("DEBUG: Creating prompt file in source directory...")
-	// Add the prompt file to the source directory so Dagger can access it
 	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
-	promptFile := sourceWithPrompt.File("llm_fix_prompt.md")
-	log.Printf("DEBUG: Prompt file created in source directory")
 
-	log.Printf("DEBUG: Creating LLM work instance...")
-	work := agent.client.LLM().
-		WithEnv(environment).
-		WithPromptFile(promptFile)
-	log.Printf("DEBUG: LLM work instance created successfully")
-
-	log.Printf("DEBUG: Getting LLM work environment...")
-	// Try to execute the LLM and catch any failures early
-	workEnv := work.Env()
-	log.Printf("DEBUG: LLM work environment obtained")
-
-	log.Printf("DEBUG: Requesting explanations from LLM...")
-	// Get explanations first (safer string operation)
-	explanations, err := workEnv.Output("explanations").AsString(ctx)
-	if err != nil {
-		log.Printf("ERROR: LLM explanations failed: %v", err)
-		// If LLM fails completely, return error to caller
-		return source, "", fmt.Errorf("LLM processing failed: %w", err)
+	// Use custom container approach instead of Dagger's LLM module
+	llmAPIKey := os.Getenv("LLM_API_KEY")
+	if llmAPIKey == "" {
+		openaiKey := os.Getenv("OPENAI_API_KEY")
+		if openaiKey == "" {
+			return source, "", fmt.Errorf("LLM_API_KEY or OPENAI_API_KEY not found in environment")
+		}
+		llmAPIKey = openaiKey
 	}
-	log.Printf("DEBUG: LLM explanations received: %d chars", len(explanations))
 
-	log.Printf("DEBUG: Requesting completed workspace from LLM...")
-	// Get the completed workspace from LLM
-	completedWorkspace := workEnv.Output("completed").AsWorkspace()
-	completed := completedWorkspace.Source()
-	log.Printf("DEBUG: LLM completed workspace obtained")
+	log.Printf("DEBUG: Using custom container approach with OpenAI API key")
 
-	log.Printf("DEBUG: LLM processing completed successfully")
+	// Get the LLM processor Go code
+	llmProcessorContent := GetLLMProcessorCode()
 
-	return completed, explanations, nil
+	// Create custom container with Go and OpenAI client
+	log.Printf("DEBUG: Creating container with OpenAI API key (length: %d)", len(llmAPIKey))
+	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
+	
+	llmContainer := agent.client.Container().
+		From("golang:1.25-alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git"}).
+		WithEnvVariable("OPENAI_API_KEY", llmAPIKey).
+		WithEnvVariable("ZIZMOR_ISSUES", issues).
+		WithDirectory("/workspace", sourceWithPrompt).
+		WithWorkdir("/workspace").
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Workspace contents:' && ls -la"}).
+		WithExec([]string{"rm", "-f", "go.mod", "go.sum"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Initializing Go module' && go mod init llm-processor"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting OpenAI Go client' && go get github.com/sashabaranov/go-openai"}).
+		WithNewFile("/workspace/main.go", llmProcessorContent).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running go mod tidy' && go mod tidy"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(OPENAI|ZIZMOR)'"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: main.go size:' && wc -l main.go"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1"})
+		
+	log.Printf("DEBUG: Container pipeline created, executing...")
+
+	explanations, err := llmContainer.Stdout(ctx)
+	if err != nil {
+		log.Printf("ERROR: Custom LLM container failed: %v", err)
+		return source, "", fmt.Errorf("custom LLM processing failed: %w", err)
+	}
+
+	log.Printf("DEBUG: Custom LLM container completed successfully")
+
+	// Get the modified workspace directory
+	modifiedDirectory := llmContainer.Directory("/workspace")
+
+	return modifiedDirectory, explanations, nil
 }

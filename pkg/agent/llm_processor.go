@@ -1,4 +1,8 @@
-package main
+package agent
+
+// GetLLMProcessorCode returns the Go code for the LLM processor
+func GetLLMProcessorCode() string {
+	return `package main
 
 import (
 	"context"
@@ -15,13 +19,13 @@ import (
 )
 
 type FileChange struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
+	Path    string ` + "`json:\"path\"`" + `
+	Content string ` + "`json:\"content\"`" + `
 }
 
 type LLMResponse struct {
-	Explanation string       `json:"explanation"`
-	FileChanges []FileChange `json:"file_changes"`
+	Explanation string       ` + "`json:\"explanation\"`" + `
+	FileChanges []FileChange ` + "`json:\"file_changes\"`" + `
 }
 
 func main() {
@@ -79,26 +83,7 @@ func processWorkflows() error {
 	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
 
 	// Prepare the enhanced prompt for file fixing
-	enhancedPrompt := fmt.Sprintf(`%s
-
-ZIZMOR ISSUES TO FIX:
-%s
-
-WORKFLOW FILES FOUND:
-%s
-
-Please provide your response in the following JSON format:
-{
-  "explanation": "Brief explanation of what fixes were applied",
-  "file_changes": [
-    {
-      "path": "relative/path/to/file.yml",
-      "content": "complete fixed file content"
-    }
-  ]
-}
-
-Only include files that need changes in the file_changes array. Provide the complete corrected content for each file.`,
+	enhancedPrompt := fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
 		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
 
 	// Generate response
@@ -170,12 +155,12 @@ func findWorkflowFiles() ([]string, error) {
 }
 
 func parseJSONResponse(responseText string, llmResponse *LLMResponse) error {
-	// Find JSON content between ```json and ``` markers
-	start := strings.Index(responseText, "```json")
+	// Find JSON content between ` + "```json and ```" + ` markers
+	start := strings.Index(responseText, "` + "```json" + `")
 	if start == -1 {
 		start = strings.Index(responseText, "{")
 	} else {
-		start += 7 // skip ```json
+		start += 7 // skip ` + "```json" + `
 	}
 
 	end := strings.LastIndex(responseText, "}")
@@ -201,4 +186,5 @@ func applyFileChange(change FileChange) error {
 
 	log.Printf("Applied fix to %s", change.Path)
 	return nil
+}`
 }
