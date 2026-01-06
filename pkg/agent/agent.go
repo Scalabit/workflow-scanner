@@ -163,9 +163,11 @@ func (agent *AgentImpl) executeLLMContainer(ctx context.Context, llmContainer da
 	explanations, err := llmContainer.Stdout(ctx)
 	if err != nil {
 		log.Printf("ERROR: Custom LLM container failed: %v", err)
+
 		return "", fmt.Errorf("custom LLM processing failed: %w", err)
 	}
 
 	log.Printf("DEBUG: Custom LLM container completed successfully")
+
 	return explanations, nil
 }

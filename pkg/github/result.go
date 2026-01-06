@@ -58,8 +58,8 @@ func fixSummaryToTableRows(summary string) string {
 	if strings.TrimSpace(summary) == "" {
 		return "| (none) | 0 |\n"
 	}
-	var rows []string
 	lines := strings.Split(summary, "\n")
+	rows := make([]string, 0, len(lines))
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
 		if l == "" {

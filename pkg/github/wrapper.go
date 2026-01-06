@@ -168,6 +168,7 @@ func (w *WrapperIssueClientImpl) addSemverLabelHelper(ctx context.Context, repo 
 	labelJSON, err := json.Marshal(labelData)
 	if err != nil {
 		fmt.Printf("Warning: failed to marshal label data: %v", err)
+
 		return
 	}
 
