@@ -118,9 +118,9 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 			"labels": "semver-minor",
 		}
 		labelJSON, _ := json.Marshal(labelData)
-		
+
 		labelURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests/%d", url.PathEscape(repo), mrResp.IID)
-		
+
 		labelContainer := w.daggerClient.Container().From("alpine:latest").
 			WithExec([]string{"apk", "add", "--no-cache", "curl"}).
 			WithNewFile("/tmp/label.json", string(labelJSON)).

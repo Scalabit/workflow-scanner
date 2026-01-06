@@ -73,6 +73,7 @@ func fixSummaryToTableRows(summary string) string {
 			file := strings.TrimSpace(m[1])
 			count := m[2]
 			rows = append(rows, fmt.Sprintf("| %s | %s |\n", file, count))
+
 			continue
 		}
 		if idx := strings.Index(l, ":"); idx != -1 {
@@ -85,10 +86,12 @@ func fixSummaryToTableRows(summary string) string {
 			} else {
 				rows = append(rows, fmt.Sprintf("| %s | %s |\n", file, num))
 			}
+
 			continue
 		}
 		rows = append(rows, fmt.Sprintf("| %s | - |\n", l))
 	}
+
 	return strings.Join(rows, "")
 }
 

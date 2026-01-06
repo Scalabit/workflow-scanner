@@ -50,6 +50,7 @@ func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internal
 func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
 	if areThereIssues(issues) {
 		log.Printf("DEBUG: No issues found, skipping LLM processing")
+
 		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
@@ -73,6 +74,7 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 	}
 
 	modifiedDirectory := llmContainer.Directory("/workspace")
+
 	return modifiedDirectory, explanations, nil
 }
 
@@ -126,6 +128,7 @@ func (agent *AgentImpl) getLLMAPIKey() (string, error) {
 		}
 		llmAPIKey = openaiKey
 	}
+
 	return llmAPIKey, nil
 }
 
