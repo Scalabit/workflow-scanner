@@ -55,7 +55,7 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockGithub.EXPECT().
-				CreatePullRequest(gomock.Any(), tt.repo, tt.title, tt.body, gomock.Any()).
+				CreatePullRequest(gomock.Any(), tt.repo, tt.title, tt.body, gomock.Any(), gomock.Any()).
 				Return(tt.mockURL, tt.mockError)
 
 			result, err := mockGithub.CreatePullRequest(
@@ -64,6 +64,7 @@ func TestWrapperIssueClient_Interface(t *testing.T) {
 				tt.title,
 				tt.body,
 				&dagger.Directory{},
+				"main",
 			)
 
 			assert.Equal(t, tt.expectedURL, result)
