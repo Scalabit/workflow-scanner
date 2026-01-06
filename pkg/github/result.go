@@ -68,7 +68,8 @@ func fixSummaryToTableRows(summary string) string {
 		if strings.HasPrefix(l, "Successfully applied") {
 			continue
 		}
-		if m := fixLineRe.FindStringSubmatch(l); len(m) == 3 {
+		const expectedRegexGroups = 3
+		if m := fixLineRe.FindStringSubmatch(l); len(m) == expectedRegexGroups {
 			file := strings.TrimSpace(m[1])
 			count := m[2]
 			rows = append(rows, fmt.Sprintf("| %s | %s |\n", file, count))

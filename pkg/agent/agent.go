@@ -48,67 +48,95 @@ func (agent *AgentImpl) FixRemainingIssues(ctx context.Context, source *internal
 }
 
 func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *internalDagger.Directory, issues string) (*internalDagger.Directory, string, error) {
-
 	if areThereIssues(issues) {
 		log.Printf("DEBUG: No issues found, skipping LLM processing")
-
 		return source, "No remaining issues found after ZIZMOR auto-fix", nil
 	}
 
-	var promptContent []byte
-
-	if llmFixPrompt != "" {
-		promptContent = []byte(llmFixPrompt)
-	} else {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return source, "", fmt.Errorf("failed to get current working directory: %w", err)
-		}
-
-		projectRoot := cwd
-		for {
-			if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
-				break
-			}
-			parent := projectRoot + "/.."
-			if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
-				break
-			} else {
-				projectRoot = abs
-			}
-		}
-
-		rootFS := os.DirFS(projectRoot)
-
-		promptContent, err = fs.ReadFile(rootFS, "llm_fix_prompt.md")
-		if err != nil {
-			return source, "", fmt.Errorf("failed to read prompt file from project root: %w", err)
-		}
-
+	promptContent, err := agent.loadPromptContent()
+	if err != nil {
+		return source, "", err
 	}
 
 	sourceWithPrompt := source.WithNewFile("llm_fix_prompt.md", string(promptContent))
 
-	// Use custom container approach instead of Dagger's LLM module
+	llmAPIKey, err := agent.getLLMAPIKey()
+	if err != nil {
+		return source, "", err
+	}
+
+	llmContainer := agent.createLLMContainer(sourceWithPrompt, llmAPIKey, issues)
+
+	explanations, err := agent.executeLLMContainer(ctx, llmContainer)
+	if err != nil {
+		return source, "", err
+	}
+
+	modifiedDirectory := llmContainer.Directory("/workspace")
+	return modifiedDirectory, explanations, nil
+}
+
+func (agent *AgentImpl) loadPromptContent() ([]byte, error) {
+	if llmFixPrompt != "" {
+		return []byte(llmFixPrompt), nil
+	}
+
+	projectRoot, err := agent.findProjectRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	rootFS := os.DirFS(projectRoot)
+	promptContent, err := fs.ReadFile(rootFS, "llm_fix_prompt.md")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read prompt file from project root: %w", err)
+	}
+
+	return promptContent, nil
+}
+
+func (agent *AgentImpl) findProjectRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	projectRoot := cwd
+	for {
+		if _, err := os.Stat(projectRoot + "/go.mod"); err == nil {
+			break
+		}
+		parent := projectRoot + "/.."
+		if abs, err := filepath.Abs(parent); err != nil || abs == projectRoot {
+			break
+		} else {
+			projectRoot = abs
+		}
+	}
+
+	return projectRoot, nil
+}
+
+func (agent *AgentImpl) getLLMAPIKey() (string, error) {
 	llmAPIKey := os.Getenv("LLM_API_KEY")
 	if llmAPIKey == "" {
 		openaiKey := os.Getenv("OPENAI_API_KEY")
 		if openaiKey == "" {
-			return source, "", fmt.Errorf("LLM_API_KEY or OPENAI_API_KEY not found in environment")
+			return "", fmt.Errorf("LLM_API_KEY or OPENAI_API_KEY not found in environment")
 		}
 		llmAPIKey = openaiKey
 	}
+	return llmAPIKey, nil
+}
 
+func (agent *AgentImpl) createLLMContainer(sourceWithPrompt *internalDagger.Directory, llmAPIKey, issues string) dagger.Container {
 	log.Printf("DEBUG: Using custom container approach with OpenAI API key")
-
-	// Get the LLM processor Go code
-	llmProcessorContent := GetLLMProcessorCode()
-
-	// Create custom container with Go and OpenAI client
 	log.Printf("DEBUG: Creating container with OpenAI API key (length: %d)", len(llmAPIKey))
 	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
-	
-	llmContainer := agent.client.Container().
+
+	llmProcessorContent := GetLLMProcessorCode()
+
+	return agent.client.Container().
 		From("golang:1.25-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
 		WithEnvVariable("OPENAI_API_KEY", llmAPIKey).
@@ -124,19 +152,17 @@ func (agent *AgentImpl) fixRemainingIssuesImpl(ctx context.Context, source *inte
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Environment variables:' && printenv | grep -E '(OPENAI|ZIZMOR)'"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: main.go size:' && wc -l main.go"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Running Go program' && go run main.go 2>&1"})
-		
+}
+
+func (agent *AgentImpl) executeLLMContainer(ctx context.Context, llmContainer dagger.Container) (string, error) {
 	log.Printf("DEBUG: Container pipeline created, executing...")
 
 	explanations, err := llmContainer.Stdout(ctx)
 	if err != nil {
 		log.Printf("ERROR: Custom LLM container failed: %v", err)
-		return source, "", fmt.Errorf("custom LLM processing failed: %w", err)
+		return "", fmt.Errorf("custom LLM processing failed: %w", err)
 	}
 
 	log.Printf("DEBUG: Custom LLM container completed successfully")
-
-	// Get the modified workspace directory
-	modifiedDirectory := llmContainer.Directory("/workspace")
-
-	return modifiedDirectory, explanations, nil
+	return explanations, nil
 }

@@ -1,6 +1,6 @@
 package agent
 
-// GetLLMProcessorCode returns the Go code for the LLM processor
+// GetLLMProcessorCode returns the Go code for the LLM processor.
 func GetLLMProcessorCode() string {
 	return `package main
 
@@ -40,54 +40,83 @@ func main() {
 }
 
 func processWorkflows() error {
-	log.Println("DEBUG: Reading prompt file")
-	// Read the prompt file
-	promptContent, err := ioutil.ReadFile("llm_fix_prompt.md")
+	promptContent, issues, err := loadInputData()
 	if err != nil {
-		return fmt.Errorf("failed to read prompt: %w", err)
+		return err
 	}
-	log.Printf("DEBUG: Prompt file size: %d bytes", len(promptContent))
 
-	// Read issues input
-	issues := os.Getenv("ZIZMOR_ISSUES")
-	if issues == "" {
-		issues = "No issues found"
+	client, ctx, cancel, err := createOpenAIClient()
+	if err != nil {
+		return err
 	}
-	issuePreview := issues
-	if len(issues) > 200 {
-		issuePreview = issues[:200] + "..."
-	}
-	log.Printf("DEBUG: Issues: %s", issuePreview)
-
-	// Initialize OpenAI client
-	log.Println("DEBUG: Creating OpenAI client")
-	ctx := context.Background()
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("OPENAI_API_KEY environment variable not set")
-	}
-	
-	// Add timeout for API operations
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
-	
-	client := openai.NewClient(apiKey)
-	log.Println("DEBUG: OpenAI client created successfully")
 
-	// Find all workflow files
-	log.Println("DEBUG: Finding workflow files")
 	workflowFiles, err := findWorkflowFiles()
 	if err != nil {
 		return fmt.Errorf("failed to find workflow files: %w", err)
 	}
 	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
 
-	// Prepare the enhanced prompt for file fixing
-	enhancedPrompt := fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
-		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
+	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowFiles)
 
-	// Generate response
+	resp, err := callOpenAI(ctx, client, enhancedPrompt)
+	if err != nil {
+		return err
+	}
+
+	return processOpenAIResponse(resp)
+}
+
+func loadInputData() ([]byte, string, error) {
+	log.Println("DEBUG: Reading prompt file")
+	promptContent, err := ioutil.ReadFile("llm_fix_prompt.md")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read prompt: %w", err)
+	}
+	log.Printf("DEBUG: Prompt file size: %d bytes", len(promptContent))
+
+	issues := os.Getenv("ZIZMOR_ISSUES")
+	if issues == "" {
+		issues = "No issues found"
+	}
+	const maxIssuePreviewLength = 200
+	issuePreview := issues
+	if len(issues) > maxIssuePreviewLength {
+		issuePreview = issues[:maxIssuePreviewLength] + "..."
+	}
+	log.Printf("DEBUG: Issues: %s", issuePreview)
+
+	return promptContent, issues, nil
+}
+
+func createOpenAIClient() (*openai.Client, context.Context, context.CancelFunc, error) {
+	log.Println("DEBUG: Creating OpenAI client")
+	ctx := context.Background()
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, nil, nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+	}
+	
+	const apiTimeoutMinutes = 5
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*apiTimeoutMinutes)
+	
+	client := openai.NewClient(apiKey)
+	log.Println("DEBUG: OpenAI client created successfully")
+
+	return client, ctx, cancel, nil
+}
+
+func buildEnhancedPrompt(promptContent []byte, issues string, workflowFiles []string) string {
+	return fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
+		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
+}
+
+func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt string) (*openai.ChatCompletionResponse, error) {
 	log.Println("DEBUG: Sending request to OpenAI API")
+	const (
+		maxTokens      = 4000
+		lowTemperature = 0.1
+	)
 	req := openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
@@ -96,36 +125,36 @@ func processWorkflows() error {
 				Content: enhancedPrompt,
 			},
 		},
-		MaxTokens:   4000,
-		Temperature: 0.1,
+		MaxTokens:   maxTokens,
+		Temperature: lowTemperature,
 	}
 	
 	resp, err := client.CreateChatCompletion(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to generate content: %w", err)
+		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
 	log.Println("DEBUG: Received response from OpenAI API")
 
 	if len(resp.Choices) == 0 {
-		return fmt.Errorf("no response generated from OpenAI")
+		return nil, fmt.Errorf("no response generated from OpenAI")
 	}
 	log.Printf("DEBUG: Response has %d choices", len(resp.Choices))
 
-	// Extract response text
+	return &resp, nil
+}
+
+func processOpenAIResponse(resp *openai.ChatCompletionResponse) error {
 	responseText := resp.Choices[0].Message.Content
 
-	// Try to parse JSON response
 	log.Println("DEBUG: Parsing response as JSON")
 	var llmResponse LLMResponse
 	if err := parseJSONResponse(responseText, &llmResponse); err != nil {
-		// If JSON parsing fails, just return the explanation
 		log.Printf("DEBUG: JSON parsing failed: %v", err)
 		log.Println("DEBUG: Returning raw response text")
 		fmt.Print(responseText)
 		return nil
 	}
 
-	// Apply file changes
 	log.Printf("DEBUG: Applying %d file changes", len(llmResponse.FileChanges))
 	for i, change := range llmResponse.FileChanges {
 		log.Printf("DEBUG: Applying change %d/%d to %s", i+1, len(llmResponse.FileChanges), change.Path)
@@ -134,9 +163,9 @@ func processWorkflows() error {
 		}
 	}
 
-	// Output explanation
 	log.Printf("DEBUG: Returning explanation: %d chars", len(llmResponse.Explanation))
 	fmt.Print(llmResponse.Explanation)
+
 	return nil
 }
 
@@ -151,6 +180,7 @@ func findWorkflowFiles() ([]string, error) {
 		}
 		return nil
 	})
+
 	return files, err
 }
 
@@ -169,22 +199,28 @@ func parseJSONResponse(responseText string, llmResponse *LLMResponse) error {
 	}
 
 	jsonStr := strings.TrimSpace(responseText[start : end+1])
+
 	return json.Unmarshal([]byte(jsonStr), llmResponse)
 }
 
 func applyFileChange(change FileChange) error {
 	// Ensure the directory exists
+	const (
+		dirPermissions  = 0755
+		filePermissions = 0644
+	)
 	dir := filepath.Dir(change.Path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, dirPermissions); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	// Write the file
-	if err := ioutil.WriteFile(change.Path, []byte(change.Content), 0644); err != nil {
+	if err := ioutil.WriteFile(change.Path, []byte(change.Content), filePermissions); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", change.Path, err)
 	}
 
 	log.Printf("Applied fix to %s", change.Path)
+
 	return nil
 }`
 }

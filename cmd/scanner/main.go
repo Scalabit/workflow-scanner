@@ -338,7 +338,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 	if targetBranch == "" {
 		targetBranch = "main"
 	}
-	
+
 	log.Printf("DEBUG: Starting scanAndFixWorkflows...")
 	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient, targetBranch)
 
