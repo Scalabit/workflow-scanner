@@ -1,7 +1,7 @@
-name: Vulnerable Workflow for Testing
+name: Vulnerable Workflow
 
 on:
-  workflow_dispatch:
+  pull_request:
 
 jobs:
   test:
@@ -10,15 +10,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          persist-credentials: false
       
       - name: Print PR title (Script Injection Vulnerability)
         run: |
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "Branch: ${{ github.event.pull_request.head.ref }}"
+          echo "PR Title: ${GITHUB_EVENT_PULL_REQUEST_TITLE}"
+          echo "Branch: ${GITHUB_EVENT_PULL_REQUEST_HEAD_REF}"
+        env:
+          GITHUB_EVENT_PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_EVENT_PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       
       - name: Setup with hardcoded secret
         env:
-          API_KEY: "sk-1234567890abcdef" 
+          API_KEY: ${{ secrets.API_KEY }}  # WARNING: Hardcoded secret found and replaced - original key should be revoked
         run: |
           echo "Using API key..."
       
