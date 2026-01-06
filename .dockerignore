@@ -8,6 +8,5 @@
 # Standard Docker ignores
 .git
 .github
-*.md
 .env
 terraform/
