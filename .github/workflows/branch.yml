@@ -9,24 +9,24 @@ jobs:
   lint-fmt:
     name: Lint & Fmt
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-    
+        with:
+          persist-credentials: false
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25.3
 
-      - name: Install Task
-        uses: go-task/setup-task@v1
+      # TODO: Pin to commit SHA - visit https://github.com/go-task/setup-task/releases to get the real hash
+      uses: go-task/setup-task@v1  # SECURITY: Should be pinned to commit SHA
 
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.6.2
-          install-mode: binary
-          install-only: true
+      # TODO: Pin to commit SHA - visit https://github.com/golangci/golangci-lint-action/releases to get the real hash
+      uses: golangci/golangci-lint-action@v9  # SECURITY: Should be pinned to commit SHA
 
       - name: Lint
         run: task lint
@@ -38,27 +38,27 @@ jobs:
   unittest:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-    
+        with:
+          persist-credentials: false
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25.3
 
-      - name: Install Task
-        uses: go-task/setup-task@v1
+      # TODO: Pin to commit SHA - visit https://github.com/go-task/setup-task/releases to get the real hash
+      uses: go-task/setup-task@v1  # SECURITY: Should be pinned to commit SHA
 
       - name: Install mockgen
         run: task install-mockgen
 
-      - name: Generate main dagger code
-        uses: dagger/dagger-for-github@v8.2.0
-        with:
-            verb: develop
-            args: --sdk=go --compat=skip
-            version: "v0.19.6"
+      # TODO: Pin to commit SHA - visit https://github.com/dagger/dagger-for-github/releases to get the real hash
+      uses: dagger/dagger-for-github@v8.2.0  # SECURITY: Should be pinned to commit SHA
 
       - name: Generate workspace dagger code
         uses: dagger/dagger-for-github@v8.2.0
@@ -77,10 +77,14 @@ jobs:
   security:
     name: Security checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-    
+        with:
+          persist-credentials: false
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -90,18 +94,14 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
-      - name: Install Task
-        uses: go-task/setup-task@v1
+      # TODO: Pin to commit SHA - visit https://github.com/go-task/setup-task/releases to get the real hash
+      uses: go-task/setup-task@v1  # SECURITY: Should be pinned to commit SHA
 
       - name: Install mockgen
         run: task install-mockgen
 
-      - name: Generate main dagger code
-        uses: dagger/dagger-for-github@v8.2.0
-        with:
-            verb: develop
-            args: --sdk=go --compat=skip
-            version: "v0.19.6"
+      # TODO: Pin to commit SHA - visit https://github.com/dagger/dagger-for-github/releases to get the real hash
+      uses: dagger/dagger-for-github@v8.2.0  # SECURITY: Should be pinned to commit SHA
 
       - name: Generate workspace dagger code
         uses: dagger/dagger-for-github@v8.2.0
