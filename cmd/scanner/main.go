@@ -364,7 +364,7 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 		wrapperClient = github.NewWrapperIssueClientImpl(dag, config.githubToken)
 	}
 
-	// Default to "main" if no target branch is specified in environment
+	// Default to "main" if no target branch is specified in env
 	targetBranch := os.Getenv("TARGET_BRANCH")
 	if targetBranch == "" {
 		targetBranch = "main"
