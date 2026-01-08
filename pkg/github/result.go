@@ -112,7 +112,7 @@ func formatRemainingIssues(finalValidation string) string {
 	fileIssues := groupFindingsByFile(allFindings)
 
 	for filePath, issues := range fileIssues {
-		result.WriteString(fmt.Sprintf("### 📄 `%s`\n", filePath))
+		result.WriteString(fmt.Sprintf("📄 **%s**\n\n", filePath))
 
 		for _, issue := range issues {
 			formatIssueDetails(&result, issue)
