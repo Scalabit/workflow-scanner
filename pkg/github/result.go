@@ -3,6 +3,7 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"workflow-scanner/pkg/zizmor"
@@ -100,8 +101,12 @@ func formatRemainingIssues(finalValidation string) string {
 
 	var findings []zizmor.Finding
 	if err := json.Unmarshal([]byte(finalValidation), &findings); err != nil {
+		log.Printf("ERROR: Failed to unmarshal ZIZMOR findings: %v", err)
+		log.Printf("DEBUG: Raw finalValidation (first 500 chars): %s", finalValidation[:min(500, len(finalValidation))])
 		return fmt.Sprintf("**Manual review needed - some issues remain:**\n```json\n%s\n```", finalValidation)
 	}
+
+	log.Printf("DEBUG: Successfully parsed %d findings", len(findings))
 
 	var result strings.Builder
 	result.WriteString("**Manual review needed - some issues remain:**\n\n")
