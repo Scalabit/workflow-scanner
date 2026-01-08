@@ -119,24 +119,24 @@ func formatRemainingIssues(finalValidation string) string {
 
 	for filePath, issues := range fileIssues {
 		result.WriteString(fmt.Sprintf("### 📄 `%s`\n", filePath))
-		
+
 		for _, issue := range issues {
 			result.WriteString(fmt.Sprintf("**Issue:** %s\n", issue.Desc))
 			result.WriteString(fmt.Sprintf("**Severity:** %s\n", issue.Determinations.Severity))
-			
+
 			for _, loc := range issue.Locations {
 				if loc.Concrete.Location.StartPoint.Row > 0 {
 					result.WriteString(fmt.Sprintf("**Location:** Line %d\n", loc.Concrete.Location.StartPoint.Row))
-					
+
 					if loc.Symbolic.Annotation != "" {
 						result.WriteString(fmt.Sprintf("**Details:** %s\n", loc.Symbolic.Annotation))
 					}
 					break
 				}
 			}
-			
+
 			result.WriteString("**Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n")
-			
+
 			result.WriteString("---\n")
 		}
 	}
