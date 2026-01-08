@@ -106,42 +106,53 @@ func formatRemainingIssues(finalValidation string) string {
 	var result strings.Builder
 	result.WriteString("**Manual review needed - some issues remain:**\n\n")
 
+	fileIssues := groupFindingsByFile(findings)
+
+	for filePath, issues := range fileIssues {
+		result.WriteString(fmt.Sprintf("### 📄 `%s`\n", filePath))
+
+		for _, issue := range issues {
+			formatIssueDetails(&result, issue)
+		}
+	}
+
+	return result.String()
+}
+
+func groupFindingsByFile(findings []zizmor.Finding) map[string][]zizmor.Finding {
 	fileIssues := make(map[string][]zizmor.Finding)
 	for _, finding := range findings {
 		for _, loc := range finding.Locations {
 			if loc.Symbolic.Key.Local != nil {
 				filePath := loc.Symbolic.Key.Local.GivenPath
 				fileIssues[filePath] = append(fileIssues[filePath], finding)
+
 				break
 			}
 		}
 	}
 
-	for filePath, issues := range fileIssues {
-		result.WriteString(fmt.Sprintf("### 📄 `%s`\n", filePath))
+	return fileIssues
+}
 
-		for _, issue := range issues {
-			result.WriteString(fmt.Sprintf("**Issue:** %s\n", issue.Desc))
-			result.WriteString(fmt.Sprintf("**Severity:** %s\n", issue.Determinations.Severity))
+func formatIssueDetails(result *strings.Builder, issue zizmor.Finding) {
+	result.WriteString(fmt.Sprintf("**Issue:** %s\n", issue.Desc))
+	result.WriteString(fmt.Sprintf("**Severity:** %s\n", issue.Determinations.Severity))
 
-			for _, loc := range issue.Locations {
-				if loc.Concrete.Location.StartPoint.Row > 0 {
-					result.WriteString(fmt.Sprintf("**Location:** Line %d\n", loc.Concrete.Location.StartPoint.Row))
+	for _, loc := range issue.Locations {
+		if loc.Concrete.Location.StartPoint.Row > 0 {
+			result.WriteString(fmt.Sprintf("**Location:** Line %d\n", loc.Concrete.Location.StartPoint.Row))
 
-					if loc.Symbolic.Annotation != "" {
-						result.WriteString(fmt.Sprintf("**Details:** %s\n", loc.Symbolic.Annotation))
-					}
-					break
-				}
+			if loc.Symbolic.Annotation != "" {
+				result.WriteString(fmt.Sprintf("**Details:** %s\n", loc.Symbolic.Annotation))
 			}
 
-			result.WriteString("**Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n")
-
-			result.WriteString("---\n")
+			break
 		}
 	}
 
-	return result.String()
+	result.WriteString("**Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n")
+	result.WriteString("---\n")
 }
 
 func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fixSummary string, llmOut string, summaryFindings string) (string, string) {
