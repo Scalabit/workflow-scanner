@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	internalDagger "workflow-scanner/internal/dagger"
 	"workflow-scanner/pkg/dagger"
 )
@@ -120,33 +121,65 @@ func (agent *AgentImpl) findProjectRoot() (string, error) {
 }
 
 func (agent *AgentImpl) getLLMAPIKey() (string, error) {
-	llmAPIKey := os.Getenv("LLM_API_KEY")
-	if llmAPIKey == "" {
-		openaiKey := os.Getenv("OPENAI_API_KEY")
-		if openaiKey == "" {
-			return "", fmt.Errorf("LLM_API_KEY or OPENAI_API_KEY not found in environment")
+	// Check for specific API keys and validate their formats
+	if openaiKey := os.Getenv("OPENAI_API_KEY"); openaiKey != "" {
+		if !strings.HasPrefix(openaiKey, "sk-") {
+			return "", fmt.Errorf("OPENAI_API_KEY appears to be invalid format (should start with 'sk-')")
 		}
-		llmAPIKey = openaiKey
+		return openaiKey, nil
+	}
+	if anthropicKey := os.Getenv("ANTHROPIC_API_KEY"); anthropicKey != "" {
+		if !strings.HasPrefix(anthropicKey, "sk-ant-") {
+			return "", fmt.Errorf("ANTHROPIC_API_KEY appears to be invalid format (should start with 'sk-ant-')")
+		}
+		return anthropicKey, nil
+	}
+	if geminiKey := os.Getenv("GEMINI_API_KEY"); geminiKey != "" {
+		if strings.HasPrefix(geminiKey, "sk-") {
+			if strings.HasPrefix(geminiKey, "sk-ant-") {
+				return "", fmt.Errorf("GEMINI_API_KEY appears to be an Anthropic key (starts with 'sk-ant-'), please use anthropic-api-key input instead")
+			}
+			return "", fmt.Errorf("GEMINI_API_KEY appears to be an OpenAI key (starts with 'sk-'), please use openai-api-key input instead")
+		}
+		if !strings.HasPrefix(geminiKey, "AIza") {
+			return "", fmt.Errorf("GEMINI_API_KEY appears to be invalid format (should start with 'AIza')")
+		}
+		return geminiKey, nil
 	}
 
-	return llmAPIKey, nil
+	return "", fmt.Errorf("no API key found (need OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY)")
 }
 
 func (agent *AgentImpl) createLLMContainer(sourceWithPrompt *internalDagger.Directory, llmAPIKey, issues string) dagger.Container {
-	log.Printf("DEBUG: Using custom container approach with OpenAI API key")
-	log.Printf("DEBUG: Creating container with OpenAI API key (length: %d)", len(llmAPIKey))
+	log.Printf("DEBUG: Using custom container approach with LLM API key")
+	log.Printf("DEBUG: Creating container with API key (length: %d)", len(llmAPIKey))
 	log.Printf("DEBUG: ZIZMOR issues length: %d", len(issues))
 
 	llmProcessorContent := GetLLMProcessorCode()
 
-	return agent.client.Container().
+	container := agent.client.Container().
 		From("golang:1.25-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "git"}).
-		WithEnvVariable("OPENAI_API_KEY", llmAPIKey).
 		WithEnvVariable("ZIZMOR_ISSUES", issues).
 		WithDirectory("/workspace", sourceWithPrompt).
 		WithWorkdir("/workspace").
-		WithExec([]string{"sh", "-c", "echo 'DEBUG: Workspace contents:' && ls -la"}).
+		WithExec([]string{"sh", "-c", "echo 'DEBUG: Workspace contents:' && ls -la"})
+
+	// Set all API keys from environment
+	if openaiKey := os.Getenv("OPENAI_API_KEY"); openaiKey != "" {
+		container = container.WithEnvVariable("OPENAI_API_KEY", openaiKey)
+	}
+	if anthropicKey := os.Getenv("ANTHROPIC_API_KEY"); anthropicKey != "" {
+		container = container.WithEnvVariable("ANTHROPIC_API_KEY", anthropicKey)
+	}
+	if geminiKey := os.Getenv("GEMINI_API_KEY"); geminiKey != "" {
+		container = container.WithEnvVariable("GEMINI_API_KEY", geminiKey)
+	}
+	if model := os.Getenv("MODEL"); model != "" {
+		container = container.WithEnvVariable("MODEL", model)
+	}
+
+	return container.
 		WithExec([]string{"rm", "-f", "go.mod", "go.sum"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Initializing Go module' && go mod init llm-processor"}).
 		WithExec([]string{"sh", "-c", "echo 'DEBUG: Getting OpenAI Go client' && go get github.com/sashabaranov/go-openai"}).

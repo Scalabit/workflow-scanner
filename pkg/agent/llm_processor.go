@@ -31,6 +31,9 @@ type LLMResponse struct {
 func main() {
 	log.Println("DEBUG: Starting LLM processor")
 	log.Printf("DEBUG: OPENAI_API_KEY length: %d", len(os.Getenv("OPENAI_API_KEY")))
+	log.Printf("DEBUG: ANTHROPIC_API_KEY length: %d", len(os.Getenv("ANTHROPIC_API_KEY")))
+	log.Printf("DEBUG: GEMINI_API_KEY length: %d", len(os.Getenv("GEMINI_API_KEY")))
+	log.Printf("DEBUG: MODEL: %s", os.Getenv("MODEL"))
 	log.Printf("DEBUG: ZIZMOR_ISSUES length: %d", len(os.Getenv("ZIZMOR_ISSUES")))
 	
 	if err := processWorkflows(); err != nil {
@@ -117,8 +120,15 @@ func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt strin
 		maxTokens      = 4000
 		lowTemperature = 0.1
 	)
+	
+	// Get model from environment or default to gpt-4o
+	model := os.Getenv("MODEL")
+	if model == "" {
+		model = "gpt-4o"
+	}
+	
 	req := openai.ChatCompletionRequest{
-		Model: openai.GPT4oMini,
+		Model: model,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,

@@ -22,14 +22,17 @@ import (
 )
 
 type batchConfig struct {
-	repository   string
-	provider     string
-	githubToken  string
-	gitlabToken  string
-	llmAPIKey    string
-	commitSHA    string
-	sourceBase64 string
-	useGitClone  bool
+	repository    string
+	provider      string
+	githubToken   string
+	gitlabToken   string
+	openaiKey     string
+	anthropicKey  string
+	geminiKey     string
+	model         string
+	commitSHA     string
+	sourceBase64  string
+	useGitClone   bool
 }
 
 var dummyVal = 5
@@ -42,7 +45,6 @@ func main() {
 		config.repository, config.commitSHA, config.useGitClone)
 
 	validateConfig(config)
-	setupLLMEnvironment(config.llmAPIKey)
 	validateDaggerEnvironment()
 
 	ctx := context.Background()
@@ -71,11 +73,46 @@ func loadConfig() batchConfig {
 	provider := strings.ToLower(os.Getenv("PROVIDER")) // optional override
 	githubToken := os.Getenv("GITHUB_TOKEN")
 	gitlabToken := os.Getenv("GITLAB_TOKEN")
-	llmAPIKey := os.Getenv("LLM_API_KEY")
+	openaiKey := os.Getenv("OPENAI_API_KEY")
+	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	model := os.Getenv("MODEL")
 	commitSHA := os.Getenv("COMMIT_SHA")
 	sourceBase64 := os.Getenv("SOURCE_BASE64")
 
-	useGitClone := sourceBase64 == "" && llmAPIKey != ""
+	// Check if any LLM key is available
+	hasLLMKey := openaiKey != "" || anthropicKey != "" || geminiKey != ""
+	useGitClone := sourceBase64 == "" && hasLLMKey
+	
+	// Validate API key formats to catch user errors early
+	if openaiKey != "" && !strings.HasPrefix(openaiKey, "sk-") {
+		log.Fatal("OPENAI_API_KEY appears to be invalid format (should start with 'sk-')")
+	}
+	if anthropicKey != "" && !strings.HasPrefix(anthropicKey, "sk-ant-") {
+		log.Fatal("ANTHROPIC_API_KEY appears to be invalid format (should start with 'sk-ant-')")
+	}
+	if geminiKey != "" {
+		if strings.HasPrefix(geminiKey, "sk-") {
+			if strings.HasPrefix(geminiKey, "sk-ant-") {
+				log.Fatal("GEMINI_API_KEY appears to be an Anthropic key (starts with 'sk-ant-'), please use anthropic-api-key input instead")
+			}
+			log.Fatal("GEMINI_API_KEY appears to be an OpenAI key (starts with 'sk-'), please use openai-api-key input instead")
+		}
+		if !strings.HasPrefix(geminiKey, "AIza") {
+			log.Fatal("GEMINI_API_KEY appears to be invalid format (should start with 'AIza')")
+		}
+	}
+	
+	// Set default model based on available API key if not specified
+	if model == "" {
+		if openaiKey != "" {
+			model = "gpt-4o"
+		} else if anthropicKey != "" {
+			model = "claude-3-5-sonnet"
+		} else if geminiKey != "" {
+			model = "gemini-2.0-flash"
+		}
+	}
 
 	if provider == "" {
 		if strings.Contains(repository, "gitlab.com") {
@@ -86,14 +123,17 @@ func loadConfig() batchConfig {
 	}
 
 	return batchConfig{
-		repository:   repository,
-		provider:     provider,
-		githubToken:  githubToken,
-		gitlabToken:  gitlabToken,
-		llmAPIKey:    llmAPIKey,
-		commitSHA:    commitSHA,
-		sourceBase64: sourceBase64,
-		useGitClone:  useGitClone,
+		repository:    repository,
+		provider:      provider,
+		githubToken:   githubToken,
+		gitlabToken:   gitlabToken,
+		openaiKey:     openaiKey,
+		anthropicKey:  anthropicKey,
+		geminiKey:     geminiKey,
+		model:         model,
+		commitSHA:     commitSHA,
+		sourceBase64:  sourceBase64,
+		useGitClone:   useGitClone,
 	}
 }
 
@@ -116,8 +156,8 @@ func validateConfig(config batchConfig) {
 		log.Fatal("Missing SOURCE_BASE64 for legacy mode")
 	}
 
-	if config.useGitClone && config.llmAPIKey == "" {
-		log.Fatal("Missing LLM_API_KEY for git clone mode")
+	if config.useGitClone && config.openaiKey == "" && config.anthropicKey == "" && config.geminiKey == "" {
+		log.Fatal("Missing API key for git clone mode (need OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY)")
 	}
 }
 
@@ -239,33 +279,6 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 	return dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
 }
 
-func setupLLMEnvironment(llmAPIKey string) {
-	// Detect provider based on key format and set only the appropriate env var
-	var providerKey string
-	var providerName string
-
-	if strings.HasPrefix(llmAPIKey, "sk-") {
-		providerKey = "OPENAI_API_KEY"
-		providerName = "OpenAI"
-	} else if strings.HasPrefix(llmAPIKey, "sk-ant-") {
-		providerKey = "ANTHROPIC_API_KEY"
-		providerName = "Anthropic"
-	} else if strings.HasPrefix(llmAPIKey, "AIza") {
-		providerKey = "GEMINI_API_KEY"
-		providerName = "Gemini"
-	} else {
-		// Default to OpenAI if format is unknown
-		providerKey = "OPENAI_API_KEY"
-		providerName = "OpenAI (default)"
-		log.Printf("Warning: Unknown API key format, defaulting to OpenAI")
-	}
-
-	if err := os.Setenv(providerKey, llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set %s: %v", providerKey, err)
-	} else {
-		log.Printf("Set LLM environment for %s", providerName)
-	}
-}
 
 func incrementUsage(repository string, success bool) error {
 	serviceURL := os.Getenv("SERVICE_URL")
