@@ -99,19 +99,17 @@ func formatRemainingIssues(finalValidation string) string {
 		return ""
 	}
 
-	var findings []zizmor.Finding
-	if err := json.Unmarshal([]byte(finalValidation), &findings); err != nil {
-		log.Printf("ERROR: Failed to unmarshal ZIZMOR findings: %v", err)
-		log.Printf("DEBUG: Raw finalValidation (first 500 chars): %s", finalValidation[:min(500, len(finalValidation))])
+	allFindings := parseZizmorFindings(finalValidation)
+	if allFindings == nil {
 		return fmt.Sprintf("**Manual review needed - some issues remain:**\n```json\n%s\n```", finalValidation)
 	}
 
-	log.Printf("DEBUG: Successfully parsed %d findings", len(findings))
+	log.Printf("DEBUG: Successfully parsed %d findings", len(allFindings))
 
 	var result strings.Builder
 	result.WriteString("**Manual review needed - some issues remain:**\n\n")
 
-	fileIssues := groupFindingsByFile(findings)
+	fileIssues := groupFindingsByFile(allFindings)
 
 	for filePath, issues := range fileIssues {
 		result.WriteString(fmt.Sprintf("### 📄 `%s`\n", filePath))
@@ -122,6 +120,22 @@ func formatRemainingIssues(finalValidation string) string {
 	}
 
 	return result.String()
+}
+
+func parseZizmorFindings(finalValidation string) []zizmor.Finding {
+	var allFindings []zizmor.Finding
+
+	cleanedInput := strings.TrimSuffix(finalValidation, "[]")
+
+	if err := json.Unmarshal([]byte(cleanedInput), &allFindings); err != nil {
+		log.Printf("ERROR: Failed to unmarshal ZIZMOR findings: %v", err)
+		const maxLogChars = 500
+		log.Printf("DEBUG: Raw input (first %d chars): %s", maxLogChars, finalValidation[:min(maxLogChars, len(finalValidation))])
+
+		return nil
+	}
+
+	return allFindings
 }
 
 func groupFindingsByFile(findings []zizmor.Finding) map[string][]zizmor.Finding {
