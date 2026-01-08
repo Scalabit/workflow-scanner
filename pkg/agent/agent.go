@@ -126,12 +126,14 @@ func (agent *AgentImpl) getLLMAPIKey() (string, error) {
 		if !strings.HasPrefix(openaiKey, "sk-") {
 			return "", fmt.Errorf("OPENAI_API_KEY appears to be invalid format (should start with 'sk-')")
 		}
+
 		return openaiKey, nil
 	}
 	if anthropicKey := os.Getenv("ANTHROPIC_API_KEY"); anthropicKey != "" {
 		if !strings.HasPrefix(anthropicKey, "sk-ant-") {
 			return "", fmt.Errorf("ANTHROPIC_API_KEY appears to be invalid format (should start with 'sk-ant-')")
 		}
+
 		return anthropicKey, nil
 	}
 	if geminiKey := os.Getenv("GEMINI_API_KEY"); geminiKey != "" {
@@ -144,6 +146,7 @@ func (agent *AgentImpl) getLLMAPIKey() (string, error) {
 		if !strings.HasPrefix(geminiKey, "AIza") {
 			return "", fmt.Errorf("GEMINI_API_KEY appears to be invalid format (should start with 'AIza')")
 		}
+
 		return geminiKey, nil
 	}
 

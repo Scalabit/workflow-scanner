@@ -22,17 +22,17 @@ import (
 )
 
 type batchConfig struct {
-	repository    string
-	provider      string
-	githubToken   string
-	gitlabToken   string
-	openaiKey     string
-	anthropicKey  string
-	geminiKey     string
-	model         string
-	commitSHA     string
-	sourceBase64  string
-	useGitClone   bool
+	repository   string
+	provider     string
+	githubToken  string
+	gitlabToken  string
+	openaiKey    string
+	anthropicKey string
+	geminiKey    string
+	model        string
+	commitSHA    string
+	sourceBase64 string
+	useGitClone  bool
 }
 
 var dummyVal = 5
@@ -83,8 +83,39 @@ func loadConfig() batchConfig {
 	// Check if any LLM key is available
 	hasLLMKey := openaiKey != "" || anthropicKey != "" || geminiKey != ""
 	useGitClone := sourceBase64 == "" && hasLLMKey
-	
+
 	// Validate API key formats to catch user errors early
+	validateAPIKeyFormats(openaiKey, anthropicKey, geminiKey)
+
+	// Set default model based on available API key if not specified
+	if model == "" {
+		model = getDefaultModel(openaiKey, anthropicKey, geminiKey)
+	}
+
+	if provider == "" {
+		if strings.Contains(repository, "gitlab.com") {
+			provider = "gitlab"
+		} else {
+			provider = "github"
+		}
+	}
+
+	return batchConfig{
+		repository:   repository,
+		provider:     provider,
+		githubToken:  githubToken,
+		gitlabToken:  gitlabToken,
+		openaiKey:    openaiKey,
+		anthropicKey: anthropicKey,
+		geminiKey:    geminiKey,
+		model:        model,
+		commitSHA:    commitSHA,
+		sourceBase64: sourceBase64,
+		useGitClone:  useGitClone,
+	}
+}
+
+func validateAPIKeyFormats(openaiKey, anthropicKey, geminiKey string) {
 	if openaiKey != "" && !strings.HasPrefix(openaiKey, "sk-") {
 		log.Fatal("OPENAI_API_KEY appears to be invalid format (should start with 'sk-')")
 	}
@@ -102,39 +133,19 @@ func loadConfig() batchConfig {
 			log.Fatal("GEMINI_API_KEY appears to be invalid format (should start with 'AIza')")
 		}
 	}
-	
-	// Set default model based on available API key if not specified
-	if model == "" {
-		if openaiKey != "" {
-			model = "gpt-4o"
-		} else if anthropicKey != "" {
-			model = "claude-3-5-sonnet"
-		} else if geminiKey != "" {
-			model = "gemini-2.0-flash"
-		}
-	}
+}
 
-	if provider == "" {
-		if strings.Contains(repository, "gitlab.com") {
-			provider = "gitlab"
-		} else {
-			provider = "github"
-		}
+func getDefaultModel(openaiKey, anthropicKey, geminiKey string) string {
+	if openaiKey != "" {
+		return "gpt-4o"
 	}
-
-	return batchConfig{
-		repository:    repository,
-		provider:      provider,
-		githubToken:   githubToken,
-		gitlabToken:   gitlabToken,
-		openaiKey:     openaiKey,
-		anthropicKey:  anthropicKey,
-		geminiKey:     geminiKey,
-		model:         model,
-		commitSHA:     commitSHA,
-		sourceBase64:  sourceBase64,
-		useGitClone:   useGitClone,
+	if anthropicKey != "" {
+		return "claude-3-5-sonnet"
 	}
+	if geminiKey != "" {
+		return "gemini-2.0-flash"
+	}
+	return ""
 }
 
 func validateConfig(config batchConfig) {
@@ -142,6 +153,11 @@ func validateConfig(config batchConfig) {
 		log.Fatal("Missing required environment variable: REPOSITORY")
 	}
 
+	validateProviderTokens(config)
+	validateModeRequirements(config)
+}
+
+func validateProviderTokens(config batchConfig) {
 	if config.provider == "gitlab" {
 		if config.gitlabToken == "" {
 			log.Fatal("Missing GITLAB_TOKEN for gitlab provider")
@@ -151,7 +167,9 @@ func validateConfig(config batchConfig) {
 			log.Fatal("Missing GITHUB_TOKEN for github provider")
 		}
 	}
+}
 
+func validateModeRequirements(config batchConfig) {
 	if !config.useGitClone && config.sourceBase64 == "" {
 		log.Fatal("Missing SOURCE_BASE64 for legacy mode")
 	}
@@ -278,7 +296,6 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 
 	return dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
 }
-
 
 func incrementUsage(repository string, success bool) error {
 	serviceURL := os.Getenv("SERVICE_URL")
