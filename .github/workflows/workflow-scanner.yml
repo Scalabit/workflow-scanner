@@ -1,7 +1,9 @@
 name: Test Workflow Scanner
 
 on:
-  pull_request:
+  push:
+    branches:
+      - improve-pr
 
 jobs:
   test-scanner:
