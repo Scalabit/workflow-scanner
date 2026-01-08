@@ -5,13 +5,16 @@ func GetLLMProcessorCode() string {
 	return `package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,12 +51,6 @@ func processWorkflows() error {
 		return err
 	}
 
-	client, ctx, cancel, err := createOpenAIClient()
-	if err != nil {
-		return err
-	}
-	defer cancel()
-
 	workflowFiles, err := findWorkflowFiles()
 	if err != nil {
 		return fmt.Errorf("failed to find workflow files: %w", err)
@@ -62,12 +59,29 @@ func processWorkflows() error {
 
 	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowFiles)
 
-	resp, err := callOpenAI(ctx, client, enhancedPrompt)
-	if err != nil {
-		return err
-	}
+	// Determine which provider to use based on available API keys
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		log.Println("DEBUG: Using OpenAI provider")
+		client, ctx, cancel, err := createOpenAIClient()
+		if err != nil {
+			return err
+		}
+		defer cancel()
 
-	return processOpenAIResponse(resp)
+		resp, err := callOpenAI(ctx, client, enhancedPrompt)
+		if err != nil {
+			return err
+		}
+		return processOpenAIResponse(resp)
+	} else if os.Getenv("GEMINI_API_KEY") != "" {
+		log.Println("DEBUG: Using Gemini provider")
+		return callGemini(enhancedPrompt)
+	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		log.Println("DEBUG: Using Anthropic provider")
+		return callAnthropic(enhancedPrompt)
+	} else {
+		return fmt.Errorf("no API key found (need OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY)")
+	}
 }
 
 func loadInputData() ([]byte, string, error) {
@@ -233,5 +247,167 @@ func applyFileChange(change FileChange) error {
 	log.Printf("Applied fix to %s", change.Path)
 
 	return nil
-}`
+}
+
+func callGemini(enhancedPrompt string) error {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	model := os.Getenv("MODEL")
+	if model == "" {
+		model = "gemini-2.0-flash"
+	}
+	
+	log.Printf("DEBUG: Calling Gemini API with model: %s", model)
+	
+	// Gemini API request structure
+	requestBody := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"parts": []map[string]interface{}{
+					{
+						"text": enhancedPrompt,
+					},
+				},
+			},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature":   0.1,
+			"maxOutputTokens": 4000,
+		},
+	}
+	
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+	
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to call Gemini API: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Gemini API returned status %d", resp.StatusCode)
+	}
+	
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode Gemini response: %w", err)
+	}
+	
+	// Extract text from Gemini response
+	candidates, ok := response["candidates"].([]interface{})
+	if !ok || len(candidates) == 0 {
+		return fmt.Errorf("no candidates in Gemini response")
+	}
+	
+	candidate := candidates[0].(map[string]interface{})
+	content := candidate["content"].(map[string]interface{})
+	parts := content["parts"].([]interface{})
+	if len(parts) == 0 {
+		return fmt.Errorf("no parts in Gemini response")
+	}
+	
+	part := parts[0].(map[string]interface{})
+	text := part["text"].(string)
+	
+	log.Printf("DEBUG: Gemini response received, length: %d", len(text))
+	
+	// Parse and process the response using the same logic as OpenAI
+	var llmResponse LLMResponse
+	if err := parseJSONResponse(text, &llmResponse); err != nil {
+		return fmt.Errorf("failed to parse JSON from Gemini response: %w", err)
+	}
+	
+	return processGenericResponse(&llmResponse)
+}
+
+func callAnthropic(enhancedPrompt string) error {
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	model := os.Getenv("MODEL")
+	if model == "" {
+		model = "claude-3-5-sonnet-20241022"
+	}
+	
+	log.Printf("DEBUG: Calling Anthropic API with model: %s", model)
+	
+	// Anthropic API request structure
+	requestBody := map[string]interface{}{
+		"model": model,
+		"max_tokens": 4000,
+		"temperature": 0.1,
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": enhancedPrompt,
+			},
+		},
+	}
+	
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+	
+	req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to call Anthropic API: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Anthropic API returned status %d", resp.StatusCode)
+	}
+	
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode Anthropic response: %w", err)
+	}
+	
+	// Extract text from Anthropic response
+	content, ok := response["content"].([]interface{})
+	if !ok || len(content) == 0 {
+		return fmt.Errorf("no content in Anthropic response")
+	}
+	
+	contentItem := content[0].(map[string]interface{})
+	text := contentItem["text"].(string)
+	
+	log.Printf("DEBUG: Anthropic response received, length: %d", len(text))
+	
+	// Parse and process the response using the same logic as OpenAI
+	var llmResponse LLMResponse
+	if err := parseJSONResponse(text, &llmResponse); err != nil {
+		return fmt.Errorf("failed to parse JSON from Anthropic response: %w", err)
+	}
+	
+	return processGenericResponse(&llmResponse)
+}
+
+func processGenericResponse(llmResponse *LLMResponse) error {
+	log.Printf("DEBUG: Applying %d file changes", len(llmResponse.FileChanges))
+	for i, change := range llmResponse.FileChanges {
+		log.Printf("DEBUG: Applying change %d/%d to %s", i+1, len(llmResponse.FileChanges), change.Path)
+		if err := applyFileChange(change); err != nil {
+			log.Printf("Warning: Failed to apply change to %s: %v", change.Path, err)
+		}
+	}
+
+	log.Printf("DEBUG: Returning explanation: %d chars", len(llmResponse.Explanation))
+	fmt.Print(llmResponse.Explanation)
+
+	return nil
+}
+`
 }
