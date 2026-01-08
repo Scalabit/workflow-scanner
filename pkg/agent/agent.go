@@ -141,6 +141,7 @@ func (agent *AgentImpl) getLLMAPIKey() (string, error) {
 			if strings.HasPrefix(geminiKey, "sk-ant-") {
 				return "", fmt.Errorf("GEMINI_API_KEY appears to be an Anthropic key (starts with 'sk-ant-'), please use anthropic-api-key input instead")
 			}
+
 			return "", fmt.Errorf("GEMINI_API_KEY appears to be an OpenAI key (starts with 'sk-'), please use openai-api-key input instead")
 		}
 		if !strings.HasPrefix(geminiKey, "AIza") {

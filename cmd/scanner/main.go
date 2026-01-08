@@ -145,6 +145,7 @@ func getDefaultModel(openaiKey, anthropicKey, geminiKey string) string {
 	if geminiKey != "" {
 		return "gemini-2.0-flash"
 	}
+
 	return ""
 }
 
