@@ -1,6 +1,7 @@
 package github
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -16,9 +17,6 @@ const (
 ### Files Auto-fixed by ZIZMOR
 | File | Fixes |
 | --- | ---: |
-%s
-
-### LLM Summary
 %s
 
 ---
@@ -95,6 +93,68 @@ func fixSummaryToTableRows(summary string) string {
 	return strings.Join(rows, "")
 }
 
+func formatRemainingIssues(finalValidation string) string {
+	if finalValidation == "" || finalValidation == "[]" || finalValidation == "[]\n" {
+		return ""
+	}
+
+	var findings []zizmor.Finding
+	if err := json.Unmarshal([]byte(finalValidation), &findings); err != nil {
+		return fmt.Sprintf("**Manual review needed - some issues remain:**\n```json\n%s\n```", finalValidation)
+	}
+
+	var result strings.Builder
+	result.WriteString("**Manual review needed - some issues remain:**\n\n")
+
+	fileIssues := groupFindingsByFile(findings)
+
+	for filePath, issues := range fileIssues {
+		result.WriteString(fmt.Sprintf("### 📄 `%s`\n", filePath))
+
+		for _, issue := range issues {
+			formatIssueDetails(&result, issue)
+		}
+	}
+
+	return result.String()
+}
+
+func groupFindingsByFile(findings []zizmor.Finding) map[string][]zizmor.Finding {
+	fileIssues := make(map[string][]zizmor.Finding)
+	for _, finding := range findings {
+		for _, loc := range finding.Locations {
+			if loc.Symbolic.Key.Local != nil {
+				filePath := loc.Symbolic.Key.Local.GivenPath
+				fileIssues[filePath] = append(fileIssues[filePath], finding)
+
+				break
+			}
+		}
+	}
+
+	return fileIssues
+}
+
+func formatIssueDetails(result *strings.Builder, issue zizmor.Finding) {
+	result.WriteString(fmt.Sprintf("**Issue:** %s\n", issue.Desc))
+	result.WriteString(fmt.Sprintf("**Severity:** %s\n", issue.Determinations.Severity))
+
+	for _, loc := range issue.Locations {
+		if loc.Concrete.Location.StartPoint.Row > 0 {
+			result.WriteString(fmt.Sprintf("**Location:** Line %d\n", loc.Concrete.Location.StartPoint.Row))
+
+			if loc.Symbolic.Annotation != "" {
+				result.WriteString(fmt.Sprintf("**Details:** %s\n", loc.Symbolic.Annotation))
+			}
+
+			break
+		}
+	}
+
+	result.WriteString("**Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n")
+	result.WriteString("---\n")
+}
+
 func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fixSummary string, llmOut string, summaryFindings string) (string, string) {
 	var result Result
 	success := finalValidation == "" || finalValidation == "[]" || finalValidation == "[]\n"
@@ -104,7 +164,7 @@ func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fix
 		validationStatus = "**All security issues resolved!** No vulnerabilities detected."
 		result = passed
 	} else {
-		validationStatus = fmt.Sprintf("**Manual review needed - some issues remain:**\n```json\n%s\n```", finalValidation)
+		validationStatus = formatRemainingIssues(finalValidation)
 		result = failed
 	}
 
@@ -113,7 +173,7 @@ func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fix
 	body := fmt.Sprintf(bodyFmt,
 		len(zizmorFindings),
 		tableRows,
-		llmOut,
+		// llmOut,
 		result.status,
 		result.text,
 		validationStatus,
