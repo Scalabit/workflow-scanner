@@ -155,23 +155,22 @@ func groupFindingsByFile(findings []zizmor.Finding) map[string][]zizmor.Finding 
 }
 
 func formatIssueDetails(result *strings.Builder, issue zizmor.Finding) {
-	result.WriteString(fmt.Sprintf("**Issue:** %s\n", issue.Desc))
-	result.WriteString(fmt.Sprintf("**Severity:** %s\n", issue.Determinations.Severity))
+	result.WriteString(fmt.Sprintf("- **Issue:** %s\n", issue.Desc))
+	result.WriteString(fmt.Sprintf("- **Severity:** %s\n", issue.Determinations.Severity))
 
 	for _, loc := range issue.Locations {
 		if loc.Concrete.Location.StartPoint.Row > 0 {
-			result.WriteString(fmt.Sprintf("**Location:** Line %d\n", loc.Concrete.Location.StartPoint.Row))
+			result.WriteString(fmt.Sprintf("- **Location:** Line %d\n", loc.Concrete.Location.StartPoint.Row))
 
 			if loc.Symbolic.Annotation != "" {
-				result.WriteString(fmt.Sprintf("**Details:** %s\n", loc.Symbolic.Annotation))
+				result.WriteString(fmt.Sprintf("- **Details:** %s\n", loc.Symbolic.Annotation))
 			}
 
 			break
 		}
 	}
 
-	result.WriteString("**Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n")
-	result.WriteString("---\n")
+	result.WriteString("- **Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n\n")
 }
 
 func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fixSummary string, llmOut string, summaryFindings string) (string, string) {
