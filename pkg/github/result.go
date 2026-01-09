@@ -115,7 +115,10 @@ func formatRemainingIssues(finalValidation string) string {
 		result.WriteString(fmt.Sprintf("📄 **%s**\n", filePath))
 
 		for i, issue := range issues {
-			formatIssueDetails(&result, issue, i == len(issues)-1)
+			formatIssueDetails(&result, issue)
+			if i < len(issues)-1 {
+				result.WriteString("---\n\n")
+			}
 		}
 		result.WriteString("\n")
 	}
@@ -155,7 +158,7 @@ func groupFindingsByFile(findings []zizmor.Finding) map[string][]zizmor.Finding 
 	return fileIssues
 }
 
-func formatIssueDetails(result *strings.Builder, issue zizmor.Finding, isLast bool) {
+func formatIssueDetails(result *strings.Builder, issue zizmor.Finding) {
 	result.WriteString(fmt.Sprintf("- **Issue:** %s\n", issue.Desc))
 	result.WriteString(fmt.Sprintf("- **Severity:** %s\n", issue.Determinations.Severity))
 
@@ -171,10 +174,7 @@ func formatIssueDetails(result *strings.Builder, issue zizmor.Finding, isLast bo
 		}
 	}
 
-	result.WriteString("- **Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n")
-	if !isLast {
-		result.WriteString("\n")
-	}
+	result.WriteString("- **Manual Fix Needed:** Review the TODO comments added in the code changes for suggested fixes.\n\n")
 }
 
 func GetPrTitleBody(finalValidation string, zizmorFindings []zizmor.Finding, fixSummary string, llmOut string, summaryFindings string) (string, string) {
