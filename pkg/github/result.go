@@ -286,11 +286,13 @@ func buildExternalDetailedFindings(data *externalDepData) string {
 	result.WriteString("<summary>📋 <b>Detailed Findings</b> (click to expand)</summary>\n\n")
 
 	for repo, details := range data.repoDetails {
-		result.WriteString(fmt.Sprintf("#### 📦 %s\n\n", repo))
+		result.WriteString("<details>\n")
+		result.WriteString(fmt.Sprintf("<summary>📦 <b>%s</b></summary>\n\n", repo))
 		for _, finding := range details {
 			result.WriteString(finding)
 			result.WriteString("\n---\n\n")
 		}
+		result.WriteString("</details>\n\n")
 	}
 
 	result.WriteString("</details>\n")
