@@ -121,7 +121,7 @@ func formatRemainingIssues(finalValidation string) string {
 
 	for filePath, issues := range fileIssues {
 		result.WriteString("<details>\n")
-		result.WriteString(fmt.Sprintf("<summary>📄 <b>%s</b></summary>\n\n", filePath))
+		result.WriteString(fmt.Sprintf("<summary>📄 <b>%s</b> (click to expand)</summary>\n\n", filePath))
 
 		for _, issue := range issues {
 			formatIssueDetails(&result, issue)
