@@ -15,7 +15,7 @@ const (
 
 **Findings:** %d
 
-### Files Auto-fixed by ZIZMOR
+### Automatic Fixes Applied
 | File | Fixes |
 | --- | ---: |
 %s
@@ -67,6 +67,10 @@ func fixSummaryToTableRows(summary string) string {
 		if strings.HasPrefix(l, "Successfully applied") {
 			continue
 		}
+		// Skip unwanted lines
+		if l == "}" || l == "Fix Summary" || l == "]" || strings.TrimSpace(l) == "}" || strings.TrimSpace(l) == "]" {
+			continue
+		}
 		const expectedRegexGroups = 3
 		if m := fixLineRe.FindStringSubmatch(l); len(m) == expectedRegexGroups {
 			file := strings.TrimSpace(m[1])
@@ -114,11 +118,9 @@ func formatRemainingIssues(finalValidation string) string {
 	for filePath, issues := range fileIssues {
 		result.WriteString(fmt.Sprintf("📄 **%s**\n", filePath))
 
-		for i, issue := range issues {
+		for _, issue := range issues {
 			formatIssueDetails(&result, issue)
-			if i < len(issues)-1 {
-				result.WriteString("---\n\n")
-			}
+			result.WriteString("---\n\n")
 		}
 		result.WriteString("\n")
 	}
