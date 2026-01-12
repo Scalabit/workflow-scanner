@@ -32,7 +32,7 @@ func TestGetPrTitleBody(t *testing.T) {
 				"PASSED",
 				"All security issues resolved!",
 				"No issues in external dependencies",
-				"Automated security audit by ZIZMOR + AI analysis",
+				"Automated security audit by AI analysis",
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func TestGetPrTitleBody(t *testing.T) {
 					"Expected body to contain: %s", expectedPart)
 			}
 
-			assert.Contains(t, body, "Auto-fixed by ZIZMOR")
+			assert.Contains(t, body, "Automatic Fixes Applied")
 			assert.Contains(t, body, "External Dependencies Scan")
 		})
 	}
