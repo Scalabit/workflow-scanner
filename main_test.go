@@ -36,7 +36,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 				// Step 1: Run ZIZMOR auto-fix
 				mockZizmor.EXPECT().
 					RunZizmorAutoFix(gomock.Any(), mockDirectory).
-				Return(mockDirectory, []zizmor.Finding{}, "Fixed 2 security issues automatically", nil)
+					Return(mockDirectory, []zizmor.Finding{}, "Fixed 2 security issues automatically", nil)
 
 				// Step 2: Check remaining issues - none found
 				mockZizmor.EXPECT().
@@ -84,7 +84,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 				// Step 1: Run ZIZMOR auto-fix
 				mockZizmor.EXPECT().
 					RunZizmorAutoFix(gomock.Any(), mockDirectory).
-				Return(mockDirectory, []zizmor.Finding{}, "Fixed some issues", nil)
+					Return(mockDirectory, []zizmor.Finding{}, "Fixed some issues", nil)
 
 				// Step 2: Check remaining issues - some found
 				remainingIssues := `[{"desc": "manual fix needed"}]`
@@ -134,7 +134,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 				// Step 1: ZIZMOR auto-fix fails
 				mockZizmor.EXPECT().
 					RunZizmorAutoFix(gomock.Any(), mockDirectory).
-				Return(nil, []zizmor.Finding{}, "", errors.New("ZIZMOR container failed"))
+					Return(nil, []zizmor.Finding{}, "", errors.New("ZIZMOR container failed"))
 				return mockZizmor, mockAgent, mockGithub, mockDirectory
 			},
 			expectedResult: "",
@@ -153,7 +153,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 				// Step 1: Run ZIZMOR auto-fix
 				mockZizmor.EXPECT().
 					RunZizmorAutoFix(gomock.Any(), mockDirectory).
-				Return(mockDirectory, []zizmor.Finding{}, "Fixed some issues", nil)
+					Return(mockDirectory, []zizmor.Finding{}, "Fixed some issues", nil)
 
 				// Step 2: Check remaining issues - some found
 				remainingIssues := `[{"desc": "complex issue"}]`
@@ -190,7 +190,7 @@ func TestScanAndFixWorflowsImpl(t *testing.T) {
 				// Step 1: Run ZIZMOR auto-fix
 				mockZizmor.EXPECT().
 					RunZizmorAutoFix(gomock.Any(), mockDirectory).
-				Return(mockDirectory, []zizmor.Finding{}, "Fixed issues", nil)
+					Return(mockDirectory, []zizmor.Finding{}, "Fixed issues", nil)
 
 				// Step 2: Check remaining issues - none
 				mockZizmor.EXPECT().
