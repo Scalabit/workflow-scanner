@@ -143,7 +143,7 @@ func getDefaultModel(openaiKey, anthropicKey, geminiKey string) string {
 		return "claude-3-5-sonnet"
 	}
 	if geminiKey != "" {
-		return "gemini-1.5-flash"
+		return "gemini-2.5-flash"
 	}
 
 	return ""

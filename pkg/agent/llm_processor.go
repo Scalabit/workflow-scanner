@@ -252,7 +252,7 @@ func callGemini(enhancedPrompt string) error {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gemini-1.5-flash"
+		model = "gemini-2.5-flash"
 	}
 	
 	log.Printf("DEBUG: Calling Gemini API with model: %s", model)
