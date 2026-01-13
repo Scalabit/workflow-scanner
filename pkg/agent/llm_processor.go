@@ -316,6 +316,8 @@ func callGemini(enhancedPrompt string) error {
 	// Parse and process the response using the same logic as OpenAI
 	var llmResponse LLMResponse
 	if err := parseJSONResponse(text, &llmResponse); err != nil {
+		log.Printf("DEBUG: Gemini JSON parsing failed: %v", err)
+		log.Printf("DEBUG: Raw Gemini response: %s", text)
 		return fmt.Errorf("failed to parse JSON from Gemini response: %w", err)
 	}
 	
