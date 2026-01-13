@@ -270,7 +270,7 @@ func callGemini(enhancedPrompt string) error {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":   0.1,
-			"maxOutputTokens": 4000,
+			"maxOutputTokens": 8000,
 		},
 	}
 	
