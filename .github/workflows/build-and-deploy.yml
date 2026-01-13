@@ -85,12 +85,12 @@ jobs:
       with:
         terraform_version: "1.6.0"
         
-    - name: Terraform Init
-      working-directory: ./terraform
+    - name: Terraform Init (Production)
+      working-directory: ./terraform/environments/production
       run: terraform init
       
-    - name: Terraform Plan
-      working-directory: ./terraform
+    - name: Terraform Plan (Production)
+      working-directory: ./terraform/environments/production
       timeout-minutes: 10
       run: |
         terraform plan \
@@ -107,8 +107,8 @@ jobs:
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
           
-    - name: Terraform Apply
-      working-directory: ./terraform
+    - name: Terraform Apply (Production)
+      working-directory: ./terraform/environments/production
       timeout-minutes: 15
       run: |
         terraform apply -auto-approve \
@@ -127,7 +127,7 @@ jobs:
           
     - name: Cleanup Terraform lock on failure
       if: failure()
-      working-directory: ./terraform
+      working-directory: ./terraform/environments/production
       run: |
         # Get the lock ID and force unlock
         echo "Attempting to unlock any stuck Terraform state locks..."

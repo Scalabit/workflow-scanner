@@ -1,11 +1,11 @@
 terraform {
   required_version = ">= 1.0"
-  
+
   backend "gcs" {
     bucket = "workflow-scanner-terraform-state-34659588692"
-    prefix = "terraform/state"
+    prefix = "terraform/sandbox/state"
   }
-  
+
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -43,10 +43,10 @@ resource "google_project_service" "apis" {
     "storage.googleapis.com",
     "compute.googleapis.com"
   ])
-  
+
   project = var.project_id
   service = each.value
-  
+
   disable_on_destroy = false
 }
 
@@ -60,14 +60,14 @@ data "google_service_account" "github_actions_sa" {
 resource "google_project_iam_member" "github_actions_permissions" {
   for_each = toset([
     "roles/run.admin",
-    "roles/artifactregistry.admin", 
+    "roles/artifactregistry.admin",
     "roles/secretmanager.admin",
     "roles/serviceusage.serviceUsageAdmin",
     "roles/iam.serviceAccountAdmin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/cloudsql.admin"
   ])
-  
+
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${data.google_service_account.github_actions_sa.email}"
@@ -76,18 +76,18 @@ resource "google_project_iam_member" "github_actions_permissions" {
 # Create Artifact Registry repository for container images
 resource "google_artifact_registry_repository" "workflow_scanner" {
   location      = var.region
-  repository_id = "workflow-scanner"
+  repository_id = "workflow-scanner-sandbox"
   description   = "Container images for workflow scanner"
   format        = "DOCKER"
-  
+
   depends_on = [google_project_service.apis]
 }
 
 # Service account for Cloud Run
 resource "google_service_account" "cloud_run_sa" {
-  account_id   = "workflow-scanner-sa"
-  display_name = "Workflow Scanner Service Account"
-  description  = "Service account for workflow scanner Cloud Run service"
+  account_id   = "workflow-scanner-sandbox-sa"
+  display_name = "Workflow Scanner Sandbox Service Account"
+  description  = "Service account for workflow scanner sandbox Cloud Run service"
 }
 
 # IAM bindings for Cloud Run service account
@@ -95,47 +95,46 @@ resource "google_project_iam_member" "cloud_run_sa_bindings" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
     "roles/artifactregistry.reader",
-    "roles/cloudsql.client",           # Required for CloudSQL access
+    "roles/cloudsql.client", # Required for CloudSQL access
     "roles/storage.objectAdmin"
   ])
-  
+
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
 
-# Secrets in Secret Manager
+# Secrets in Secret Manager (sandbox-specific names)
 locals {
   secrets = {
-    "base-url"                  = var.base_url
-    "gh-client-id"              = var.gh_client_id
-    "gh-client-secret"          = var.gh_client_secret
-    "gitlab-client-id"          = var.gitlab_client_id
-    "gitlab-client-secret"      = var.gitlab_client_secret
-    "stripe-key"                = var.stripe_key
-    "stripe-publishable-key"    = var.stripe_publishable_key
-    "stripe-webhook-secret"     = var.stripe_webhook_secret
-    "openai-api-key"            = var.openai_api_key
+    "sandbox-base-url"               = var.base_url
+    "sandbox-gh-client-id"           = var.gh_client_id
+    "sandbox-gh-client-secret"       = var.gh_client_secret
+    "sandbox-stripe-key"             = var.stripe_key
+    "sandbox-stripe-publishable-key" = var.stripe_publishable_key
+    "sandbox-stripe-webhook-secret"  = var.stripe_webhook_secret
+    "sandbox-openai-api-key"         = var.openai_api_key
+    "sandbox-allowed-users"          = var.sandbox_allowed_users
   }
 }
 
 resource "google_secret_manager_secret" "secrets" {
   for_each = local.secrets
-  
+
   secret_id = each.key
-  
+
   replication {
     auto {}
   }
-  
+
   depends_on = [google_project_service.apis]
 }
 
 # Create secret versions with actual values
 resource "google_secret_manager_secret_version" "secret_versions" {
   for_each = local.secrets
-  
+
   secret      = google_secret_manager_secret.secrets[each.key].id
   secret_data = each.value
 }
@@ -143,7 +142,7 @@ resource "google_secret_manager_secret_version" "secret_versions" {
 # Grant Cloud Run service account access to secrets
 resource "google_secret_manager_secret_iam_member" "secret_access" {
   for_each = local.secrets
-  
+
   secret_id = each.key
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
@@ -151,12 +150,12 @@ resource "google_secret_manager_secret_iam_member" "secret_access" {
 
 # Cloud Run service
 resource "google_cloud_run_v2_service" "workflow_scanner" {
-  name     = "workflow-scanner"
+  name     = "workflow-scanner-sandbox"
   location = var.region
-  
+
   template {
     service_account = google_service_account.cloud_run_sa.email
-    
+
     # Add CloudSQL connection
     volumes {
       name = "cloudsql"
@@ -164,19 +163,19 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         instances = [google_sql_database_instance.workflow_scanner_db.connection_name]
       }
     }
-    
+
     scaling {
       min_instance_count = 0
       max_instance_count = 10
     }
-    
+
     containers {
       image = var.container_image != "" ? var.container_image : "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.workflow_scanner.repository_id}/workflow-scanner:latest"
-      
+
       ports {
         container_port = 8080
       }
-      
+
       resources {
         limits = {
           cpu    = "2000m"
@@ -189,17 +188,17 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name       = "cloudsql"
         mount_path = "/cloudsql"
       }
-      
+
       env {
-        name  = "BASE_URL"
+        name = "BASE_URL"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["base-url"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-base-url"].secret_id
             version = "latest"
           }
         }
       }
-      
+
       # Database configuration
       env {
         name = "DATABASE_URL"
@@ -210,13 +209,13 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
           }
         }
       }
-      
+
       # GitHub OAuth secrets
       env {
         name = "GH_CLIENT_ID"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gh-client-id"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-gh-client-id"].secret_id
             version = "latest"
           }
         }
@@ -226,89 +225,95 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         name = "GH_CLIENT_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gh-client-secret"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-gh-client-secret"].secret_id
             version = "latest"
           }
         }
       }
 
-      # GitLab OAuth secrets
+      # GitLab OAuth secrets (using dummy values)
       env {
         name = "GITLAB_CLIENT_ID"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gitlab-client-id"].secret_id
-            version = "latest"
-          }
-        }
+        value = "dummy"
       }
 
       env {
         name = "GITLAB_CLIENT_SECRET"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["gitlab-client-secret"].secret_id
-            version = "latest"
-          }
-        }
+        value = "dummy"
       }
-      
+
       # Stripe secrets
       env {
         name = "TEST_STRIPE"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["stripe-key"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-stripe-key"].secret_id
             version = "latest"
           }
         }
       }
-      
+
       env {
         name = "TEST_STRIPE_PK"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["stripe-publishable-key"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-stripe-publishable-key"].secret_id
             version = "latest"
           }
         }
       }
-      
+
       env {
         name = "TEST_STRIPE_WEBHOOK_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["stripe-webhook-secret"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-stripe-webhook-secret"].secret_id
             version = "latest"
           }
         }
       }
-      
+
       # LLM API secrets
       env {
         name = "OPENAI_API_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.secrets["openai-api-key"].secret_id
+            secret  = google_secret_manager_secret.secrets["sandbox-openai-api-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      # Sandbox access control
+      env {
+        name  = "ENVIRONMENT"
+        value = "sandbox"
+      }
+
+      env {
+        name = "ALLOWED_USERS"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["sandbox-allowed-users"].secret_id
             version = "latest"
           }
         }
       }
     }
   }
-  
+
   traffic {
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
     percent = 100
   }
-  
+
   depends_on = [
-      google_project_service.apis,
-      google_artifact_registry_repository.workflow_scanner,
-      google_sql_database_instance.workflow_scanner_db,
-      google_secret_manager_secret_version.database_url,
-      google_secret_manager_secret_version.secret_versions
-    ]
+    google_project_service.apis,
+    google_artifact_registry_repository.workflow_scanner,
+    google_sql_database_instance.workflow_scanner_db,
+    google_secret_manager_secret_version.database_url,
+    google_secret_manager_secret_version.secret_versions
+  ]
 }
 
 
