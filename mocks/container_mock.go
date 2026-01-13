@@ -109,6 +109,25 @@ func (mr *MockContainerMockRecorder) WithDirectory(path, source any, opts ...any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithDirectory", reflect.TypeOf((*MockContainer)(nil).WithDirectory), varargs...)
 }
 
+// WithEnvVariable mocks base method.
+func (m *MockContainer) WithEnvVariable(name, value string, opts ...dagger.ContainerWithEnvVariableOpts) dagger0.Container {
+	m.ctrl.T.Helper()
+	varargs := []any{name, value}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "WithEnvVariable", varargs...)
+	ret0, _ := ret[0].(dagger0.Container)
+	return ret0
+}
+
+// WithEnvVariable indicates an expected call of WithEnvVariable.
+func (mr *MockContainerMockRecorder) WithEnvVariable(name, value any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{name, value}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithEnvVariable", reflect.TypeOf((*MockContainer)(nil).WithEnvVariable), varargs...)
+}
+
 // WithExec mocks base method.
 func (m *MockContainer) WithExec(args []string, opts ...dagger.ContainerWithExecOpts) dagger0.Container {
 	m.ctrl.T.Helper()
@@ -126,6 +145,25 @@ func (mr *MockContainerMockRecorder) WithExec(args any, opts ...any) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{args}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithExec", reflect.TypeOf((*MockContainer)(nil).WithExec), varargs...)
+}
+
+// WithNewFile mocks base method.
+func (m *MockContainer) WithNewFile(path, contents string, opts ...dagger.ContainerWithNewFileOpts) dagger0.Container {
+	m.ctrl.T.Helper()
+	varargs := []any{path, contents}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "WithNewFile", varargs...)
+	ret0, _ := ret[0].(dagger0.Container)
+	return ret0
+}
+
+// WithNewFile indicates an expected call of WithNewFile.
+func (mr *MockContainerMockRecorder) WithNewFile(path, contents any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{path, contents}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithNewFile", reflect.TypeOf((*MockContainer)(nil).WithNewFile), varargs...)
 }
 
 // WithWorkdir mocks base method.

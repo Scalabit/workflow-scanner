@@ -109,6 +109,20 @@ func (mr *MockClientMockRecorder) LLM(opts ...any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LLM", reflect.TypeOf((*MockClient)(nil).LLM), opts...)
 }
 
+// SetSecret mocks base method.
+func (m *MockClient) SetSecret(name, plaintext string) *dagger.Secret {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSecret", name, plaintext)
+	ret0, _ := ret[0].(*dagger.Secret)
+	return ret0
+}
+
+// SetSecret indicates an expected call of SetSecret.
+func (mr *MockClientMockRecorder) SetSecret(name, plaintext any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSecret", reflect.TypeOf((*MockClient)(nil).SetSecret), name, plaintext)
+}
+
 // Workspace mocks base method.
 func (m *MockClient) Workspace(source *dagger.Directory) dagger0.Workspace {
 	m.ctrl.T.Helper()

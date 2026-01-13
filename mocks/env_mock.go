@@ -69,6 +69,48 @@ func (mr *MockEnvMockRecorder) Output(name any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Output", reflect.TypeOf((*MockEnv)(nil).Output), name)
 }
 
+// WithDirectoryInput mocks base method.
+func (m *MockEnv) WithDirectoryInput(name string, value *dagger.Directory, description string) dagger0.Env {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithDirectoryInput", name, value, description)
+	ret0, _ := ret[0].(dagger0.Env)
+	return ret0
+}
+
+// WithDirectoryInput indicates an expected call of WithDirectoryInput.
+func (mr *MockEnvMockRecorder) WithDirectoryInput(name, value, description any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithDirectoryInput", reflect.TypeOf((*MockEnv)(nil).WithDirectoryInput), name, value, description)
+}
+
+// WithDirectoryOutput mocks base method.
+func (m *MockEnv) WithDirectoryOutput(name, description string) dagger0.Env {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithDirectoryOutput", name, description)
+	ret0, _ := ret[0].(dagger0.Env)
+	return ret0
+}
+
+// WithDirectoryOutput indicates an expected call of WithDirectoryOutput.
+func (mr *MockEnvMockRecorder) WithDirectoryOutput(name, description any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithDirectoryOutput", reflect.TypeOf((*MockEnv)(nil).WithDirectoryOutput), name, description)
+}
+
+// WithSecretInput mocks base method.
+func (m *MockEnv) WithSecretInput(name string, secret *dagger.Secret, description string) dagger0.Env {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithSecretInput", name, secret, description)
+	ret0, _ := ret[0].(dagger0.Env)
+	return ret0
+}
+
+// WithSecretInput indicates an expected call of WithSecretInput.
+func (mr *MockEnvMockRecorder) WithSecretInput(name, secret, description any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithSecretInput", reflect.TypeOf((*MockEnv)(nil).WithSecretInput), name, secret, description)
+}
+
 // WithStringInput mocks base method.
 func (m *MockEnv) WithStringInput(name, value, description string) dagger0.Env {
 	m.ctrl.T.Helper()

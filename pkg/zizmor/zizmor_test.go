@@ -93,7 +93,7 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 		{
 			name:                "successful auto-fix execution",
 			containerFindings:   []Finding{},
-			containerFixSummary: "Fixed 3 security vulnerabilities in workflows",
+			containerFixSummary: `{"desc": "test"} Fixed 3 security vulnerabilities in workflows`,
 			containerError:      nil,
 			expectedOutput:      "Fixed 3 security vulnerabilities in workflows",
 			expectedError:       "",
@@ -101,7 +101,7 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 		{
 			name:                "auto-fix with no changes",
 			containerFindings:   []Finding{},
-			containerFixSummary: "No security issues found to fix",
+			containerFixSummary: `{"desc": "test"} No security issues found to fix`,
 			containerError:      nil,
 			expectedOutput:      "No security issues found to fix",
 			expectedError:       "",
@@ -124,8 +124,8 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 			mockContainer.EXPECT().WithWorkdir("/workspace").Return(mockContainer)
 
 			// Setup the auto-fix execution
-			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"}).Return(mockContainer)
-			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerFindings, tt.containerFixSummary, tt.containerError)
+			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "zizmor -q --format=json --fix=all .github/workflows/ 2>&1 || true"}).Return(mockContainer)
+			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerFixSummary, tt.containerError)
 
 			if tt.containerError == nil {
 				mockContainer.EXPECT().Directory("/workspace").Return(resultDir)
