@@ -127,7 +127,7 @@ func scanAndFixWorflowsImpl(ctx context.Context, repository string, source *dagg
 		summaryExternalFindings = fmt.Sprintf("Failed to scan external dependencies: %s", err.Error())
 	}
 
-	// Truncate external findings if too long to fit GitHub's 65,536 char limit
+	// Truncate external findings if too long to fit GitHub's 65,536 char  limit
 	maxExternalLength := 20000 // Leave room for other content
 	if len(summaryExternalFindings) > maxExternalLength {
 		summaryExternalFindings = summaryExternalFindings[:maxExternalLength] +
