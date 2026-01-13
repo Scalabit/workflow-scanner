@@ -23,7 +23,7 @@ jobs:
 
       - name: Run workflow scanner
         id: scanner
-        uses: Scalabit/workflow-scanner-action@7e2fcef8f62f188b19d823d3b30bc706f2bba234 # master
+        uses: Scalabit/workflow-scanner-action@7e2fcef8f62f188b19d823d3b30bc706f2bba234 # master branch
         with:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.GH_PAT }}
