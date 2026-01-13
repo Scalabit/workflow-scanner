@@ -29,4 +29,4 @@ jobs:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.GH_PAT }}
           llm-api-key: ${{ secrets.GEMINI_API_KEY }}
-          target-branch: test-locally
+          target-branch: test1
