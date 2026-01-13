@@ -9,9 +9,13 @@ jobs:
   lint-fmt:
     name: Lint & Fmt
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
     
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -19,9 +23,13 @@ jobs:
           go-version: 1.25.3
 
       - name: Install Task
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/go-task/setup-task/releases to find the real hash for v1
         uses: go-task/setup-task@v1
 
       - name: Install golangci-lint
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/golangci/golangci-lint-action/releases to find the real hash for v9
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.6.2
@@ -38,9 +46,13 @@ jobs:
   unittest:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
     
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -48,12 +60,16 @@ jobs:
           go-version: 1.25.3
 
       - name: Install Task
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/go-task/setup-task/releases to find the real hash for v1
         uses: go-task/setup-task@v1
 
       - name: Install mockgen
         run: task install-mockgen
 
       - name: Generate main dagger code
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/dagger/dagger-for-github/releases to find the real hash for v8.2.0
         uses: dagger/dagger-for-github@v8.2.0
         with:
             verb: develop
@@ -61,6 +77,8 @@ jobs:
             version: "v0.19.6"
 
       - name: Generate workspace dagger code
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/dagger/dagger-for-github/releases to find the real hash for v8.2.0
         uses: dagger/dagger-for-github@v8.2.0
         with:
             workdir: workspace
@@ -77,9 +95,13 @@ jobs:
   security:
     name: Security checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
     
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -91,12 +113,16 @@ jobs:
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: Install Task
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/go-task/setup-task/releases to find the real hash for v1
         uses: go-task/setup-task@v1
 
       - name: Install mockgen
         run: task install-mockgen
 
       - name: Generate main dagger code
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/dagger/dagger-for-github/releases to find the real hash for v8.2.0
         uses: dagger/dagger-for-github@v8.2.0
         with:
             verb: develop
@@ -104,6 +130,8 @@ jobs:
             version: "v0.19.6"
 
       - name: Generate workspace dagger code
+        # TODO: Pin this action to a commit SHA for security
+        # Visit https://github.com/dagger/dagger-for-github/releases to find the real hash for v8.2.0
         uses: dagger/dagger-for-github@v8.2.0
         with:
             workdir: workspace
