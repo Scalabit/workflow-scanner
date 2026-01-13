@@ -83,32 +83,36 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 	resultDir := &dagger.Directory{}
 
 	tests := []struct {
-		name            string
-		containerOutput string
-		containerError  error
-		expectedOutput  string
-		expectedError   string
+		name                string
+		containerFindings   []Finding
+		containerFixSummary string
+		containerError      error
+		expectedOutput      string
+		expectedError       string
 	}{
 		{
-			name:            "successful auto-fix execution",
-			containerOutput: "Fixed 3 security vulnerabilities in workflows",
-			containerError:  nil,
-			expectedOutput:  "Fixed 3 security vulnerabilities in workflows",
-			expectedError:   "",
+			name:                "successful auto-fix execution",
+			containerFindings:   []Finding{},
+			containerFixSummary: "Fixed 3 security vulnerabilities in workflows",
+			containerError:      nil,
+			expectedOutput:      "Fixed 3 security vulnerabilities in workflows",
+			expectedError:       "",
 		},
 		{
-			name:            "auto-fix with no changes",
-			containerOutput: "No security issues found to fix",
-			containerError:  nil,
-			expectedOutput:  "No security issues found to fix",
-			expectedError:   "",
+			name:                "auto-fix with no changes",
+			containerFindings:   []Finding{},
+			containerFixSummary: "No security issues found to fix",
+			containerError:      nil,
+			expectedOutput:      "No security issues found to fix",
+			expectedError:       "",
 		},
 		{
-			name:            "container execution fails",
-			containerOutput: "",
-			containerError:  errors.New("auto-fix execution failed"),
-			expectedOutput:  "",
-			expectedError:   "failed to run ZIZMOR: auto-fix execution failed",
+			name:                "container execution fails",
+			containerFindings:   []Finding{},
+			containerFixSummary: "",
+			containerError:      errors.New("auto-fix execution failed"),
+			expectedOutput:      "",
+			expectedError:       "failed to run ZIZMOR: auto-fix execution failed",
 		},
 	}
 
@@ -121,16 +125,16 @@ func TestZizmorImpl_RunZizmorAutoFix(t *testing.T) {
 
 			// Setup the auto-fix execution
 			mockContainer.EXPECT().WithExec([]string{"sh", "-c", "zizmor --fix=all .github/workflows/ 2>&1 || true"}).Return(mockContainer)
-			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerOutput, tt.containerError)
+			mockContainer.EXPECT().Stdout(gomock.Any()).Return(tt.containerFindings, tt.containerFixSummary, tt.containerError)
 
 			if tt.containerError == nil {
 				mockContainer.EXPECT().Directory("/workspace").Return(resultDir)
 			}
 
 			zizmor := NewZizmor(mockClient)
-			fixedDirectory, output, err := zizmor.RunZizmorAutoFix(context.Background(), &dagger.Directory{})
+			fixedDirectory, _, fixSummary, err := zizmor.RunZizmorAutoFix(context.Background(), &dagger.Directory{})
 
-			assert.Equal(t, tt.expectedOutput, output)
+			assert.Equal(t, tt.expectedOutput, fixSummary)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)

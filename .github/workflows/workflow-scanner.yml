@@ -1,10 +1,13 @@
 name: Test Workflow Scanner
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - improve-pr
 
 jobs:
   test-scanner:
+    if: ${{ !contains(github.event.pull_request.title, 'Security Audit & Fixes for GitHub Actions Workflows') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,8 +26,9 @@ jobs:
 
       - name: Run workflow scanner
         id: scanner
-        uses: Scalabit/workflow-scanner-action@7e2fcef8f62f188b19d823d3b30bc706f2bba234 # master branch
+        uses: Scalabit/workflow-scanner-action@other-repos 
         with:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.GH_PAT }}
-          llm-api-key: ${{ secrets.OPENAI_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          target-branch: main

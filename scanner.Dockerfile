@@ -38,6 +38,9 @@ RUN curl -L https://dl.dagger.io/dagger/install.sh | sh && \
 # Copy the workflow scanner binary
 COPY --from=builder /app/workflow-scanner /usr/local/bin/
 
+# Copy the LLM prompt file that's needed at runtime
+COPY --from=builder /app/llm_fix_prompt.md /llm_fix_prompt.md
+
 # Copy Dagger configuration to enable modules
 COPY --from=builder /app/dagger.json /app/dagger.json
 COPY --from=builder /app/workspace /app/workspace

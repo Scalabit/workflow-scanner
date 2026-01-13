@@ -25,7 +25,7 @@ type WrapperIssueClientImpl struct {
 	gitlabToken  string
 }
 
-func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory) (string, error) {
+func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo string, title string, body string, source *dagger.Directory, targetBranch string) (string, error) {
 	branchName := fmt.Sprintf("workflow-security-fixes-%d", time.Now().Unix())
 
 	repoURL := fmt.Sprintf("https://gitlab.com/%s.git", repo)
@@ -36,7 +36,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		HTTPAuthToken:    gitAuth,
 	})
 
-	mainBranch := gitRepo.Branch("main")
+	mainBranch := gitRepo.Branch(targetBranch)
 
 	workingDir := mainBranch.Tree().WithoutDirectory(".git")
 
@@ -55,8 +55,8 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	gitContainer = gitContainer.WithExec([]string{"git", "remote", "add", "origin", remoteURL})
 
 	gitContainer = gitContainer.
-		WithExec([]string{"git", "fetch", "origin", "main"}).
-		WithExec([]string{"git", "branch", branchName, "origin/main"}).
+		WithExec([]string{"git", "fetch", "origin", targetBranch}).
+		WithExec([]string{"git", "branch", branchName, "origin/" + targetBranch}).
 		WithExec([]string{"git", "symbolic-ref", "HEAD", "refs/heads/" + branchName}).
 		WithExec([]string{"git", "reset"}).
 		WithExec([]string{"git", "add", "."})
@@ -83,7 +83,7 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 	apiURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests", url.PathEscape(repo))
 	mrData := map[string]interface{}{
 		"source_branch": branchName,
-		"target_branch": "main",
+		"target_branch": targetBranch,
 		"title":         title,
 		"description":   body,
 	}
@@ -99,19 +99,41 @@ func (w *WrapperIssueClientImpl) CreatePullRequest(ctx context.Context, repo str
 		return "", fmt.Errorf("failed to create MR: %w", err)
 	}
 
-	// Try to parse web_url
+	// Try to parse web_url and iid
 	var mrResp struct {
 		WebURL string `json:"web_url"`
+		IID    int    `json:"iid"`
 	}
 	if err := json.Unmarshal([]byte(resp), &mrResp); err != nil {
 		return "", fmt.Errorf("failed to parse MR response: %w - raw: %s", err, resp)
 	}
 
-	if mrResp.WebURL != "" {
-		return mrResp.WebURL, nil
+	if mrResp.WebURL == "" {
+		return "", fmt.Errorf("MR creation failed, response: %s", resp)
 	}
 
-	return "", fmt.Errorf("MR creation failed, response: %s", resp)
+	// Add semver-minor label to the created MR
+	if mrResp.IID > 0 {
+		labelData := map[string]interface{}{
+			"labels": "semver-minor",
+		}
+		labelJSON, _ := json.Marshal(labelData)
+
+		labelURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests/%d", url.PathEscape(repo), mrResp.IID)
+
+		labelContainer := w.daggerClient.Container().From("alpine:latest").
+			WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+			WithNewFile("/tmp/label.json", string(labelJSON)).
+			WithExec([]string{"curl", "-s", "-X", "PUT", "-H", "Authorization: Bearer " + w.gitlabToken, "-H", "Content-Type: application/json", "-d", "@/tmp/label.json", labelURL})
+
+		_, labelErr := labelContainer.Stdout(ctx)
+		if labelErr != nil {
+			// Don't fail the entire process if labeling fails
+			fmt.Printf("Warning: failed to add semver-minor label to MR !%d: %v", mrResp.IID, labelErr)
+		}
+	}
+
+	return mrResp.WebURL, nil
 }
 
 func timeNowUnix() int64 {

@@ -26,7 +26,10 @@ type batchConfig struct {
 	provider     string
 	githubToken  string
 	gitlabToken  string
-	llmAPIKey    string
+	openaiKey    string
+	anthropicKey string
+	geminiKey    string
+	model        string
 	commitSHA    string
 	sourceBase64 string
 	useGitClone  bool
@@ -45,8 +48,8 @@ func main() {
 	validateDaggerEnvironment()
 
 	ctx := context.Background()
+	dagger.SetMarshalContext(ctx)
 
-	// Recover from any panics in dagger.Connect()
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "CRITICAL: Dagger connection panic: %v\n", r)
@@ -57,7 +60,6 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-
 	dag := dagger.Connect()
 
 	fmt.Println("Dagger connected successfully")
@@ -71,11 +73,24 @@ func loadConfig() batchConfig {
 	provider := strings.ToLower(os.Getenv("PROVIDER")) // optional override
 	githubToken := os.Getenv("GITHUB_TOKEN")
 	gitlabToken := os.Getenv("GITLAB_TOKEN")
-	llmAPIKey := os.Getenv("LLM_API_KEY")
+	openaiKey := os.Getenv("OPENAI_API_KEY")
+	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	model := os.Getenv("MODEL")
 	commitSHA := os.Getenv("COMMIT_SHA")
 	sourceBase64 := os.Getenv("SOURCE_BASE64")
 
-	useGitClone := sourceBase64 == "" && llmAPIKey != ""
+	// Check if any LLM key is available
+	hasLLMKey := openaiKey != "" || anthropicKey != "" || geminiKey != ""
+	useGitClone := sourceBase64 == "" && hasLLMKey
+
+	// Validate API key formats to catch user errors early
+	validateAPIKeyFormats(openaiKey, anthropicKey, geminiKey)
+
+	// Set default model based on available API key if not specified
+	if model == "" {
+		model = getDefaultModel(openaiKey, anthropicKey, geminiKey)
+	}
 
 	if provider == "" {
 		if strings.Contains(repository, "gitlab.com") {
@@ -90,11 +105,48 @@ func loadConfig() batchConfig {
 		provider:     provider,
 		githubToken:  githubToken,
 		gitlabToken:  gitlabToken,
-		llmAPIKey:    llmAPIKey,
+		openaiKey:    openaiKey,
+		anthropicKey: anthropicKey,
+		geminiKey:    geminiKey,
+		model:        model,
 		commitSHA:    commitSHA,
 		sourceBase64: sourceBase64,
 		useGitClone:  useGitClone,
 	}
+}
+
+func validateAPIKeyFormats(openaiKey, anthropicKey, geminiKey string) {
+	if openaiKey != "" && !strings.HasPrefix(openaiKey, "sk-") {
+		log.Fatal("OPENAI_API_KEY appears to be invalid format (should start with 'sk-')")
+	}
+	if anthropicKey != "" && !strings.HasPrefix(anthropicKey, "sk-ant-") {
+		log.Fatal("ANTHROPIC_API_KEY appears to be invalid format (should start with 'sk-ant-')")
+	}
+	if geminiKey != "" {
+		if strings.HasPrefix(geminiKey, "sk-") {
+			if strings.HasPrefix(geminiKey, "sk-ant-") {
+				log.Fatal("GEMINI_API_KEY appears to be an Anthropic key (starts with 'sk-ant-'), please use anthropic-api-key input instead")
+			}
+			log.Fatal("GEMINI_API_KEY appears to be an OpenAI key (starts with 'sk-'), please use openai-api-key input instead")
+		}
+		if !strings.HasPrefix(geminiKey, "AIza") {
+			log.Fatal("GEMINI_API_KEY appears to be invalid format (should start with 'AIza')")
+		}
+	}
+}
+
+func getDefaultModel(openaiKey, anthropicKey, geminiKey string) string {
+	if openaiKey != "" {
+		return "gpt-4o"
+	}
+	if anthropicKey != "" {
+		return "claude-3-5-sonnet"
+	}
+	if geminiKey != "" {
+		return "gemini-2.5-flash"
+	}
+
+	return ""
 }
 
 func validateConfig(config batchConfig) {
@@ -102,6 +154,11 @@ func validateConfig(config batchConfig) {
 		log.Fatal("Missing required environment variable: REPOSITORY")
 	}
 
+	validateProviderTokens(config)
+	validateModeRequirements(config)
+}
+
+func validateProviderTokens(config batchConfig) {
 	if config.provider == "gitlab" {
 		if config.gitlabToken == "" {
 			log.Fatal("Missing GITLAB_TOKEN for gitlab provider")
@@ -111,13 +168,15 @@ func validateConfig(config batchConfig) {
 			log.Fatal("Missing GITHUB_TOKEN for github provider")
 		}
 	}
+}
 
+func validateModeRequirements(config batchConfig) {
 	if !config.useGitClone && config.sourceBase64 == "" {
 		log.Fatal("Missing SOURCE_BASE64 for legacy mode")
 	}
 
-	if config.useGitClone && config.llmAPIKey == "" {
-		log.Fatal("Missing LLM_API_KEY for git clone mode")
+	if config.useGitClone && config.openaiKey == "" && config.anthropicKey == "" && config.geminiKey == "" {
+		log.Fatal("Missing API key for git clone mode (need OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY)")
 	}
 }
 
@@ -189,10 +248,6 @@ func getSourceDirectory(dag *dagger.Client, config batchConfig) *dagger.Director
 
 func cloneRepository(dag *dagger.Client, config batchConfig) *dagger.Directory {
 	log.Printf("DEBUG: Cloning repository %s using Dagger Git (provider=%s)", config.repository, config.provider)
-
-	log.Printf("DEBUG: Setting up LLM environment...")
-	setupLLMEnvironment(config.llmAPIKey)
-
 	cloneURL := config.repository
 	if !strings.HasPrefix(config.repository, "http") && !strings.Contains(config.repository, "@") {
 		if config.provider == "gitlab" {
@@ -241,34 +296,6 @@ func decodeSourceData(dag *dagger.Client, sourceBase64 string) *dagger.Directory
 	}
 
 	return dag.Directory().WithNewFile("workflows.tar.gz", string(sourceData))
-}
-
-func setupLLMEnvironment(llmAPIKey string) {
-	// Detect provider based on key format and set only the appropriate env var
-	var providerKey string
-	var providerName string
-
-	if strings.HasPrefix(llmAPIKey, "sk-") {
-		providerKey = "OPENAI_API_KEY"
-		providerName = "OpenAI"
-	} else if strings.HasPrefix(llmAPIKey, "sk-ant-") {
-		providerKey = "ANTHROPIC_API_KEY"
-		providerName = "Anthropic"
-	} else if strings.HasPrefix(llmAPIKey, "AIza") {
-		providerKey = "GEMINI_API_KEY"
-		providerName = "Gemini"
-	} else {
-		// Default to OpenAI if format is unknown
-		providerKey = "OPENAI_API_KEY"
-		providerName = "OpenAI (default)"
-		log.Printf("Warning: Unknown API key format, defaulting to OpenAI")
-	}
-
-	if err := os.Setenv(providerKey, llmAPIKey); err != nil {
-		log.Printf("Warning: Failed to set %s: %v", providerKey, err)
-	} else {
-		log.Printf("Set LLM environment for %s", providerName)
-	}
 }
 
 func incrementUsage(repository string, success bool) error {
@@ -337,8 +364,14 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 		wrapperClient = github.NewWrapperIssueClientImpl(dag, config.githubToken)
 	}
 
+	// Default to "main" if no target branch is specified in environment
+	targetBranch := os.Getenv("TARGET_BRANCH")
+	if targetBranch == "" {
+		targetBranch = "main"
+	}
+
 	log.Printf("DEBUG: Starting scanAndFixWorkflows...")
-	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient)
+	prURL, err := scanAndFixWorkflows(ctx, config.repository, sourceDir, zizmor, agent, wrapperClient, targetBranch)
 
 	// Increment usage regardless of scan success/failure (user still consumed quota)
 	usageErr := incrementUsage(config.repository, err == nil)
@@ -355,9 +388,9 @@ func runScan(ctx context.Context, dag *dagger.Client, config batchConfig, source
 }
 
 // Same as scanAndFixWorflowsImpl from main.go.
-func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient) (string, error) {
+func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.Directory, zizmor zizmor.Zizmor, agent agent.Agent, githubClient github.WrapperIssueClient, targetBranch string) (string, error) {
 	log.Printf("DEBUG: Running ZIZMOR auto-fix on source directory...")
-	autoFixedDirectory, zizmorOutput, err := zizmor.RunZizmorAutoFix(ctx, source)
+	autoFixedDirectory, zizmorFindings, fixSummary, err := zizmor.RunZizmorAutoFix(ctx, source)
 	if err != nil {
 		log.Printf("ERROR: ZIZMOR auto-fix failed: %v", err)
 
@@ -378,7 +411,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 	llmExplanations := ""
 	if remainingIssues != "" && remainingIssues != "[]" && remainingIssues != "[]\n" {
 		log.Printf("DEBUG: Remaining issues detected, calling LLM agent to fix them...")
-		log.Printf("DEBUG: Issues to fix: %s", remainingIssues)
+		//log.Printf("DEBUG: Issues to fix: %s", remainingIssues)
 		finalDirectory, llmExplanations, err = agent.FixRemainingIssues(ctx, autoFixedDirectory, remainingIssues)
 		if err != nil {
 			log.Printf("ERROR: LLM agent failed to fix remaining issues: %v", err)
@@ -408,7 +441,7 @@ func scanAndFixWorkflows(ctx context.Context, repository string, source *dagger.
 			"\n\n... (truncated due to length - see full scan in workflow logs)"
 	}
 
-	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorOutput, llmExplanations, summaryExternalFindings)
+	prTitle, prBody := github.GetPrTitleBody(finalValidation, zizmorFindings, fixSummary, llmExplanations, summaryExternalFindings)
 
-	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory)
+	return githubClient.CreatePullRequest(ctx, repository, prTitle, prBody, finalDirectory, targetBranch)
 }
