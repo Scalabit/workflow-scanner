@@ -252,7 +252,7 @@ func callGemini(enhancedPrompt string) error {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gemini-2.5-flash"
+		model = "gemini-2.5-pro"
 	}
 	
 	log.Printf("DEBUG: Calling Gemini API with model: %s", model)
@@ -270,7 +270,7 @@ func callGemini(enhancedPrompt string) error {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":   0.1,
-			"maxOutputTokens": 16000,
+			"maxOutputTokens": 32000,
 		},
 	}
 	
