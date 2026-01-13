@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -252,7 +253,7 @@ func callGemini(enhancedPrompt string) error {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gemini-2.5-pro"
+		model = "gemini-2.5-flash"
 	}
 	
 	log.Printf("DEBUG: Calling Gemini API with model: %s", model)
@@ -287,7 +288,9 @@ func callGemini(enhancedPrompt string) error {
 	defer resp.Body.Close()
 	
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Gemini API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("DEBUG: Gemini API error response: %s", string(body))
+		return fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(body))
 	}
 	
 	var response map[string]interface{}
