@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -270,7 +271,7 @@ func callGemini(enhancedPrompt string) error {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":   0.1,
-			"maxOutputTokens": 4000,
+			"maxOutputTokens": 32000,
 		},
 	}
 	
@@ -287,13 +288,19 @@ func callGemini(enhancedPrompt string) error {
 	defer resp.Body.Close()
 	
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Gemini API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("DEBUG: Gemini API error response: %s", string(body))
+		return fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(body))
 	}
 	
 	var response map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return fmt.Errorf("failed to decode Gemini response: %w", err)
 	}
+	
+	// Debug: Log the full response structure
+	responseJSON, _ := json.MarshalIndent(response, "", "  ")
+	log.Printf("DEBUG: Full Gemini response: %s", string(responseJSON))
 	
 	// Extract text from Gemini response
 	candidates, ok := response["candidates"].([]interface{})
@@ -316,6 +323,8 @@ func callGemini(enhancedPrompt string) error {
 	// Parse and process the response using the same logic as OpenAI
 	var llmResponse LLMResponse
 	if err := parseJSONResponse(text, &llmResponse); err != nil {
+		log.Printf("DEBUG: Gemini JSON parsing failed: %v", err)
+		log.Printf("DEBUG: Raw Gemini response: %s", text)
 		return fmt.Errorf("failed to parse JSON from Gemini response: %w", err)
 	}
 	
