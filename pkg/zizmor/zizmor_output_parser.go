@@ -95,8 +95,8 @@ func ParseZizmorOutput(input string) ([]Finding, string, error) {
 	}
 
 	fixSummary := ""
-	if lastIndex < len(input) {
-		fixSummary = strings.TrimSpace(input[lastIndex:])
+	if lastIndex < len(input)-1 {
+		fixSummary = strings.TrimSpace(input[lastIndex+1:])
 	}
 
 	return findings, fixSummary, nil

@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 	dagger "workflow-scanner/internal/dagger"
 	dagger0 "workflow-scanner/pkg/dagger"
@@ -53,6 +54,21 @@ func (m *MockLLM) Env() dagger0.Env {
 func (mr *MockLLMMockRecorder) Env() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Env", reflect.TypeOf((*MockLLM)(nil).Env))
+}
+
+// LastReply mocks base method.
+func (m *MockLLM) LastReply(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LastReply", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LastReply indicates an expected call of LastReply.
+func (mr *MockLLMMockRecorder) LastReply(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastReply", reflect.TypeOf((*MockLLM)(nil).LastReply), ctx)
 }
 
 // WithEnv mocks base method.

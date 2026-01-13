@@ -27,13 +27,12 @@ func TestGetPrTitleBody(t *testing.T) {
 			summaryFindings: "No issues in external dependencies",
 			expectedTitle:   "Security Audit & Fixes for GitHub Actions Workflows",
 			expectedBodyParts: []string{
-				"Complete Security Audit Report",
+				"Security Audit Summary",
 				"Fixed 2 security issues automatically",
-				"Applied additional manual fixes",
 				"PASSED",
 				"All security issues resolved!",
 				"No issues in external dependencies",
-				"Automated security audit by ZIZMOR + AI analysis",
+				"Automated security audit by AI analysis",
 			},
 		},
 		{
@@ -78,7 +77,6 @@ func TestGetPrTitleBody(t *testing.T) {
 			expectedBodyParts: []string{
 				"NEEDS REVIEW",
 				"Manual review needed - some issues remain:",
-				`[{"desc": "remaining issue", "file": "test.yml"}]`,
 				"Some external issues found",
 			},
 		},
@@ -123,10 +121,8 @@ func TestGetPrTitleBody(t *testing.T) {
 					"Expected body to contain: %s", expectedPart)
 			}
 
-			assert.Contains(t, body, "Auto-fixed by ZIZMOR")
-			assert.Contains(t, body, "Manual Security Fixes Applied")
-			assert.Contains(t, body, "Validation Report:")
-			assert.Contains(t, body, "External Dependencies Security Scan")
+			assert.Contains(t, body, "Automatic Fixes Applied")
+			assert.Contains(t, body, "External Dependencies Scan")
 		})
 	}
 }

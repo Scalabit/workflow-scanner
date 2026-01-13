@@ -1,6 +1,6 @@
 package zizmor
 
-//go:generate mockgen -source=zizmor.go -destination=../../mocks/zizmor_mock.go -package=mocks Zizmor
+//go:generate mockgen -source=zizmor.go -destination=zizmor_mock.go -package=zizmor Zizmor
 
 import (
 	"context"
