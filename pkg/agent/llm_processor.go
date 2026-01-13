@@ -270,7 +270,7 @@ func callGemini(enhancedPrompt string) error {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":   0.1,
-			"maxOutputTokens": 8000,
+			"maxOutputTokens": 16000,
 		},
 	}
 	
@@ -294,6 +294,10 @@ func callGemini(enhancedPrompt string) error {
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return fmt.Errorf("failed to decode Gemini response: %w", err)
 	}
+	
+	// Debug: Log the full response structure
+	responseJSON, _ := json.MarshalIndent(response, "", "  ")
+	log.Printf("DEBUG: Full Gemini response: %s", string(responseJSON))
 	
 	// Extract text from Gemini response
 	candidates, ok := response["candidates"].([]interface{})
