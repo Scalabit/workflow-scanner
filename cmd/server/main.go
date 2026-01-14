@@ -136,7 +136,7 @@ type WorkflowScanResponse struct {
 }
 
 var (
-	// key is "provider:id" (e.g. "github:12345").
+	// key is "provider:id" (e.g. "github:1234").
 	premiumUsers = make(map[string]*PremiumUser)
 	premiumMutex = sync.RWMutex{}
 	// Track valid tokens - only tokens in this map are accepted.
