@@ -253,9 +253,9 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         }
       }
       
-      # Stripe secrets
+      # Stripe secrets (production)
       env {
-        name = "TEST_STRIPE"
+        name = "STRIPE_KEY"
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.secrets["stripe-key"].secret_id
@@ -265,7 +265,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
       }
       
       env {
-        name = "TEST_STRIPE_PK"
+        name = "STRIPE_PUBLISHABLE"
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.secrets["stripe-publishable-key"].secret_id
@@ -275,7 +275,7 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
       }
       
       env {
-        name = "TEST_STRIPE_WEBHOOK_SECRET"
+        name = "STRIPE_WEBHOOK_SECRET"
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.secrets["stripe-webhook-secret"].secret_id
