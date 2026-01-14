@@ -41,7 +41,7 @@ func TestAgentImpl_FixRemainingIssues_EarlyReturn(t *testing.T) {
 
 	mockClient := mocks.NewMockClient(ctrl)
 
-	// Use a real directory for the source since we're testing early return that doesn't use LLM
+	// Use a real directory for the source since we're testing early return that doesn't use LLMs
 	sourceDirectory := &internalDagger.Directory{}
 
 	// Test early return cases - these don't call LLM chain
