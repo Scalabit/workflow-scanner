@@ -31,4 +31,4 @@ jobs:
           api-token: ${{ secrets.FS_API_TOKEN }}
           github-token: ${{ secrets.GH_PAT }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          target-branch: testkey
+          target-branch: main
