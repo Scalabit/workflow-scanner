@@ -111,3 +111,13 @@ import {
   to = google_sql_user.workflow_user
   id = "workflow_user/workflow-scanner-db"
 }
+
+import {
+  to = google_secret_manager_secret_version.db_password
+  id = "projects/workflow-scanner/secrets/workflow-scanner-db-password/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.database_url
+  id = "projects/workflow-scanner/secrets/workflow-scanner-database-url/versions/latest"
+}

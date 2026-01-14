@@ -395,3 +395,126 @@ import {
   to = google_secret_manager_secret.secrets["openai-api-key"]
   id = "projects/workflow-scanner/secrets/openai-api-key"
 }
+
+import {
+  to = google_cloud_run_v2_service.workflow_scanner
+  id = "projects/workflow-scanner/locations/europe-north1/services/workflow-scanner"
+}
+
+import {
+  to = google_cloud_run_service_iam_member.public_access
+  id = "projects/workflow-scanner/locations/europe-north1/services/workflow-scanner roles/run.invoker allUsers"
+}
+
+# Import secret versions for all application secrets
+import {
+  to = google_secret_manager_secret_version.secret_versions["base-url"]
+  id = "projects/workflow-scanner/secrets/base-url/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["gh-client-id"]
+  id = "projects/workflow-scanner/secrets/gh-client-id/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["gh-client-secret"]
+  id = "projects/workflow-scanner/secrets/gh-client-secret/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["gitlab-client-id"]
+  id = "projects/workflow-scanner/secrets/gitlab-client-id/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["gitlab-client-secret"]
+  id = "projects/workflow-scanner/secrets/gitlab-client-secret/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["stripe-key"]
+  id = "projects/workflow-scanner/secrets/stripe-key/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["stripe-publishable-key"]
+  id = "projects/workflow-scanner/secrets/stripe-publishable-key/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["stripe-webhook-secret"]
+  id = "projects/workflow-scanner/secrets/stripe-webhook-secret/versions/latest"
+}
+
+import {
+  to = google_secret_manager_secret_version.secret_versions["openai-api-key"]
+  id = "projects/workflow-scanner/secrets/openai-api-key/versions/latest"
+}
+
+# Import secret IAM bindings
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["base-url"]
+  id = "projects/workflow-scanner/secrets/base-url roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["gh-client-id"]
+  id = "projects/workflow-scanner/secrets/gh-client-id roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["gh-client-secret"]
+  id = "projects/workflow-scanner/secrets/gh-client-secret roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["gitlab-client-id"]
+  id = "projects/workflow-scanner/secrets/gitlab-client-id roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["gitlab-client-secret"]
+  id = "projects/workflow-scanner/secrets/gitlab-client-secret roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["stripe-key"]
+  id = "projects/workflow-scanner/secrets/stripe-key roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["stripe-publishable-key"]
+  id = "projects/workflow-scanner/secrets/stripe-publishable-key roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["stripe-webhook-secret"]
+  id = "projects/workflow-scanner/secrets/stripe-webhook-secret roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_secret_manager_secret_iam_member.secret_access["openai-api-key"]
+  id = "projects/workflow-scanner/secrets/openai-api-key roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+# Import Cloud Run service account project IAM bindings
+import {
+  to = google_project_iam_member.cloud_run_sa_bindings["roles/secretmanager.secretAccessor"]
+  id = "workflow-scanner roles/secretmanager.secretAccessor serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_project_iam_member.cloud_run_sa_bindings["roles/artifactregistry.reader"]
+  id = "workflow-scanner roles/artifactregistry.reader serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_project_iam_member.cloud_run_sa_bindings["roles/cloudsql.client"]
+  id = "workflow-scanner roles/cloudsql.client serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_project_iam_member.cloud_run_sa_bindings["roles/storage.objectAdmin"]
+  id = "workflow-scanner roles/storage.objectAdmin serviceAccount:workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
