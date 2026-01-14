@@ -324,3 +324,74 @@ resource "google_cloud_run_service_iam_member" "public_access" {
 resource "random_id" "bucket_suffix" {
   byte_length = 8
 }
+
+# Import blocks for existing resources
+import {
+  to = google_sql_database_instance.workflow_scanner_db
+  id = "projects/workflow-scanner/instances/workflow-scanner-db"
+}
+
+import {
+  to = google_service_account.cloud_run_sa
+  id = "projects/workflow-scanner/serviceAccounts/workflow-scanner-sa@workflow-scanner.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_artifact_registry_repository.workflow_scanner
+  id = "projects/workflow-scanner/locations/europe-north1/repositories/workflow-scanner"
+}
+
+import {
+  to = google_secret_manager_secret.db_password
+  id = "projects/workflow-scanner/secrets/workflow-scanner-db-password"
+}
+
+import {
+  to = google_secret_manager_secret.database_url
+  id = "projects/workflow-scanner/secrets/workflow-scanner-database-url"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["base-url"]
+  id = "projects/workflow-scanner/secrets/base-url"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["gh-client-id"]
+  id = "projects/workflow-scanner/secrets/gh-client-id"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["gh-client-secret"]
+  id = "projects/workflow-scanner/secrets/gh-client-secret"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["gitlab-client-id"]
+  id = "projects/workflow-scanner/secrets/gitlab-client-id"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["gitlab-client-secret"]
+  id = "projects/workflow-scanner/secrets/gitlab-client-secret"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["stripe-key"]
+  id = "projects/workflow-scanner/secrets/stripe-key"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["stripe-publishable-key"]
+  id = "projects/workflow-scanner/secrets/stripe-publishable-key"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["stripe-webhook-secret"]
+  id = "projects/workflow-scanner/secrets/stripe-webhook-secret"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["openai-api-key"]
+  id = "projects/workflow-scanner/secrets/openai-api-key"
+}
