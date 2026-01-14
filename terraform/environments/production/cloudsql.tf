@@ -100,3 +100,14 @@ resource "google_secret_manager_secret_version" "database_url" {
   secret      = google_secret_manager_secret.database_url.id
   secret_data = local.database_url
 }
+
+# Import blocks for existing database resources
+import {
+  to = google_sql_database.workflow_scanner
+  id = "projects/workflow-scanner/instances/workflow-scanner-db/databases/workflow_scanner"
+}
+
+import {
+  to = google_sql_user.workflow_user
+  id = "workflow_user/workflow-scanner-db"
+}
