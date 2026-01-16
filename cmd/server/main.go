@@ -67,6 +67,8 @@ const (
 	ScannerTimeoutSecs = 3600 // 1 hour timeout
 	ScannerDiskSizeGB  = 20   // 20GB boot disk
 
+	EmailClientTimeoutSecs = 10 // Timeout for feedback email API calls
+
 	DummyNum = 12345 //this is only for testing purposes
 )
 
@@ -1215,6 +1217,56 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
+func sendFeedbackEmail(apiKey string, feedback FeedbackRequest) error {
+	fromEmail := "info@notifications.scalabit.dev"
+	toEmail := getEnv("FEEDBACK_TO_EMAIL", "info@notifications.scalabit.dev")
+
+	emailBody := fmt.Sprintf(`
+New Feedback from remediator.ai Received
+
+From: %s (%s)
+
+Message:
+%s
+`, feedback.Name, feedback.Email, feedback.Message)
+
+	emailPayload := map[string]interface{}{
+		"from":     fromEmail,
+		"to":       []string{toEmail},
+		"reply_to": feedback.Email,
+		"subject":  fmt.Sprintf("Feedback from %s", feedback.Name),
+		"text":     emailBody,
+	}
+
+	payloadBytes, err := json.Marshal(emailPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal email payload: %w", err)
+	}
+
+	emailReq, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", strings.NewReader(string(payloadBytes)))
+	if err != nil {
+		return fmt.Errorf("failed to create email request: %w", err)
+	}
+
+	emailReq.Header.Set("Authorization", "Bearer "+apiKey)
+	emailReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: EmailClientTimeoutSecs * time.Second}
+	resp, err := client.Do(emailReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+
+		return fmt.Errorf("resend API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 func feedbackHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1245,58 +1297,8 @@ func feedbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fromEmail := "info@notifications.scalabit.dev"
-	toEmail := getEnv("FEEDBACK_TO_EMAIL", "info@notifications.scalabit.dev")
-
-	emailBody := fmt.Sprintf(`
-New Feedback from remediator.ai Received
-
-From: %s (%s)
-
-Message:
-%s
-`, req.Name, req.Email, req.Message)
-
-	emailPayload := map[string]interface{}{
-		"from":     fromEmail,
-		"to":       []string{toEmail},
-		"reply_to": req.Email,
-		"subject":  fmt.Sprintf("Feedback from %s", req.Name),
-		"text":     emailBody,
-	}
-
-	payloadBytes, err := json.Marshal(emailPayload)
-	if err != nil {
-		log.Printf("Failed to marshal email payload: %v", err)
-		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
-
-		return
-	}
-
-	emailReq, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", strings.NewReader(string(payloadBytes)))
-	if err != nil {
-		log.Printf("Failed to create email request: %v", err)
-		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
-
-		return
-	}
-
-	emailReq.Header.Set("Authorization", "Bearer "+resendAPIKey)
-	emailReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(emailReq)
-	if err != nil {
-		log.Printf("Failed to send email: %v", err)
-		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
-
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		log.Printf("Resend API error: %d - %s", resp.StatusCode, string(body))
+	if err := sendFeedbackEmail(resendAPIKey, req); err != nil {
+		log.Printf("Failed to send feedback email: %v", err)
 		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
 
 		return
