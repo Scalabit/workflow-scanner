@@ -1219,7 +1219,7 @@ func main() {
 
 func sendFeedbackEmail(apiKey string, feedback FeedbackRequest) error {
 	fromEmail := "info@notifications.scalabit.dev"
-	toEmail := getEnv("FEEDBACK_TO_EMAIL", "info@notifications.scalabit.dev")
+	toEmail := os.Getenv("FEEDBACK_TO_EMAIL")
 
 	emailBody := fmt.Sprintf(`
 New Feedback from remediator.ai Received

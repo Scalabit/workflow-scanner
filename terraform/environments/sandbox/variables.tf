@@ -63,7 +63,6 @@ variable "resend_api_key" {
 variable "feedback_to_email" {
   description = "Email address to receive feedback"
   type        = string
-  default     = "info@notifications.scalabit.dev"
 }
 
 
