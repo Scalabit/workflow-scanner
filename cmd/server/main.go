@@ -135,6 +135,12 @@ type WorkflowScanResponse struct {
 	Error          string `json:"error,omitempty"`
 }
 
+type FeedbackRequest struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Message string `json:"message"`
+}
+
 var (
 	// key is "provider:id" (e.g. "github:1234").
 	premiumUsers = make(map[string]*PremiumUser)
@@ -1182,6 +1188,9 @@ func main() {
 	mux.HandleFunc("/api/increment-usage", func(w http.ResponseWriter, r *http.Request) {
 		incrementUsageHandler(w, r)
 	})
+	mux.HandleFunc("/api/feedback", func(w http.ResponseWriter, r *http.Request) {
+		feedbackHandler(w, r)
+	})
 	// Scan endpoints removed - scanning is now handled by binary via GitHub Actions
 	mux.HandleFunc("/webhook/stripe", func(w http.ResponseWriter, r *http.Request) {
 		handleStripeWebhook(config, w, r)
@@ -1204,6 +1213,106 @@ func main() {
 	log.Printf("Server starting on port %s", config.Port)
 	log.Printf("OAuth callback URLs: /auth/github and /auth/gitlab")
 	log.Fatal(server.ListenAndServe())
+}
+
+func feedbackHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	var req FeedbackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+
+		return
+	}
+
+	if req.Name == "" || req.Email == "" || req.Message == "" {
+		http.Error(w, "Name, email, and message are required", http.StatusBadRequest)
+
+		return
+	}
+
+	resendAPIKey := os.Getenv("RESEND_API_KEY")
+	if resendAPIKey == "" {
+		log.Printf("RESEND_API_KEY not configured")
+		http.Error(w, "Email service not configured", http.StatusInternalServerError)
+
+		return
+	}
+
+	fromEmail := "info@notifications.scalabit.dev"
+	toEmail := getEnv("FEEDBACK_TO_EMAIL", "info@notifications.scalabit.dev")
+
+	emailBody := fmt.Sprintf(`
+New Feedback from remediator.ai Received
+
+From: %s (%s)
+
+Message:
+%s
+`, req.Name, req.Email, req.Message)
+
+	emailPayload := map[string]interface{}{
+		"from":     fromEmail,
+		"to":       []string{toEmail},
+		"reply_to": req.Email,
+		"subject":  fmt.Sprintf("Feedback from %s", req.Name),
+		"text":     emailBody,
+	}
+
+	payloadBytes, err := json.Marshal(emailPayload)
+	if err != nil {
+		log.Printf("Failed to marshal email payload: %v", err)
+		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
+
+		return
+	}
+
+	emailReq, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", strings.NewReader(string(payloadBytes)))
+	if err != nil {
+		log.Printf("Failed to create email request: %v", err)
+		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
+
+		return
+	}
+
+	emailReq.Header.Set("Authorization", "Bearer "+resendAPIKey)
+	emailReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(emailReq)
+	if err != nil {
+		log.Printf("Failed to send email: %v", err)
+		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
+
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Resend API error: %d - %s", resp.StatusCode, string(body))
+		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
+
+		return
+	}
+
+	log.Printf("Feedback received from %s (%s)", req.Name, req.Email)
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Feedback sent successfully",
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
 }
 
 // updateTokenInDatabase handles the database operations for token revocation.
