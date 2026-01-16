@@ -115,6 +115,8 @@ locals {
     "sandbox-stripe-publishable-key" = var.stripe_publishable_key
     "sandbox-stripe-webhook-secret"  = var.stripe_webhook_secret
     "sandbox-openai-api-key"         = var.openai_api_key
+    "sandbox-resend-api-key"         = var.resend_api_key
+    "sandbox-feedback-to-email"      = var.feedback_to_email
     "sandbox-allowed-users"          = var.sandbox_allowed_users
   }
 }
@@ -279,6 +281,27 @@ resource "google_cloud_run_v2_service" "workflow_scanner" {
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.secrets["sandbox-openai-api-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      # Feedback/Email configuration
+      env {
+        name = "RESEND_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["sandbox-resend-api-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "FEEDBACK_TO_EMAIL"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["sandbox-feedback-to-email"].secret_id
             version = "latest"
           }
         }
