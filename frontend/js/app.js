@@ -4,6 +4,7 @@ class remediatorApp {
     constructor() {
         this.auth = new GitHubAuth();
         this.gitlabAuth = new GitLabAuth();
+        this.feedback = new FeedbackManager();
         this.loginBtn = null;
     }
 
@@ -17,6 +18,9 @@ class remediatorApp {
         // Load configuration
         await this.auth.loadConfig();
         await this.gitlabAuth.loadConfig();
+        
+        // Initialize feedback manager
+        this.feedback.init();
         
         // Get DOM elements
         this.githubBtn = document.getElementById('github-login-btn');

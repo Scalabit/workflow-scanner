@@ -67,6 +67,8 @@ const (
 	ScannerTimeoutSecs = 3600 // 1 hour timeout
 	ScannerDiskSizeGB  = 20   // 20GB boot disk
 
+	EmailClientTimeoutSecs = 10 // Timeout for feedback email API calls
+
 	DummyNum = 12345 //this is only for testing purposes
 )
 
@@ -133,6 +135,12 @@ type WorkflowScanResponse struct {
 	Message        string `json:"message,omitempty"`
 	PullRequestURL string `json:"pull_request_url,omitempty"`
 	Error          string `json:"error,omitempty"`
+}
+
+type FeedbackRequest struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Message string `json:"message"`
 }
 
 var (
@@ -1182,6 +1190,9 @@ func main() {
 	mux.HandleFunc("/api/increment-usage", func(w http.ResponseWriter, r *http.Request) {
 		incrementUsageHandler(w, r)
 	})
+	mux.HandleFunc("/api/feedback", func(w http.ResponseWriter, r *http.Request) {
+		feedbackHandler(w, r)
+	})
 	// Scan endpoints removed - scanning is now handled by binary via GitHub Actions
 	mux.HandleFunc("/webhook/stripe", func(w http.ResponseWriter, r *http.Request) {
 		handleStripeWebhook(config, w, r)
@@ -1204,6 +1215,106 @@ func main() {
 	log.Printf("Server starting on port %s", config.Port)
 	log.Printf("OAuth callback URLs: /auth/github and /auth/gitlab")
 	log.Fatal(server.ListenAndServe())
+}
+
+func sendFeedbackEmail(apiKey string, feedback FeedbackRequest) error {
+	fromEmail := "info@notifications.scalabit.dev"
+	toEmail := getEnv("FEEDBACK_TO_EMAIL", "info@notifications.scalabit.dev")
+
+	emailBody := fmt.Sprintf(`
+New Feedback from remediator.ai Received
+
+From: %s (%s)
+
+Message:
+%s
+`, feedback.Name, feedback.Email, feedback.Message)
+
+	emailPayload := map[string]interface{}{
+		"from":     fromEmail,
+		"to":       []string{toEmail},
+		"reply_to": feedback.Email,
+		"subject":  fmt.Sprintf("Feedback from %s", feedback.Name),
+		"text":     emailBody,
+	}
+
+	payloadBytes, err := json.Marshal(emailPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal email payload: %w", err)
+	}
+
+	emailReq, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", strings.NewReader(string(payloadBytes)))
+	if err != nil {
+		return fmt.Errorf("failed to create email request: %w", err)
+	}
+
+	emailReq.Header.Set("Authorization", "Bearer "+apiKey)
+	emailReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: EmailClientTimeoutSecs * time.Second}
+	resp, err := client.Do(emailReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+
+		return fmt.Errorf("resend API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func feedbackHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	var req FeedbackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+
+		return
+	}
+
+	if req.Name == "" || req.Email == "" || req.Message == "" {
+		http.Error(w, "Name, email, and message are required", http.StatusBadRequest)
+
+		return
+	}
+
+	resendAPIKey := os.Getenv("RESEND_API_KEY")
+	if resendAPIKey == "" {
+		log.Printf("RESEND_API_KEY not configured")
+		http.Error(w, "Email service not configured", http.StatusInternalServerError)
+
+		return
+	}
+
+	if err := sendFeedbackEmail(resendAPIKey, req); err != nil {
+		log.Printf("Failed to send feedback email: %v", err)
+		http.Error(w, "Failed to send feedback", http.StatusInternalServerError)
+
+		return
+	}
+
+	log.Printf("Feedback received from %s (%s)", req.Name, req.Email)
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Feedback sent successfully",
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
 }
 
 // updateTokenInDatabase handles the database operations for token revocation.

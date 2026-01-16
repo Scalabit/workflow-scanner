@@ -54,6 +54,18 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "resend_api_key" {
+  description = "Resend API Key for sending emails"
+  type        = string
+  sensitive   = true
+}
+
+variable "feedback_to_email" {
+  description = "Email address to receive feedback"
+  type        = string
+  default     = "info@notifications.scalabit.dev"
+}
+
 
 variable "sandbox_allowed_users" {
   description = "Comma-separated list of email addresses allowed to access sandbox environment"

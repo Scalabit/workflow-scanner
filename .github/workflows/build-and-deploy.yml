@@ -105,6 +105,8 @@ jobs:
           -var="stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE }}" \
           -var="stripe_webhook_secret=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="resend_api_key=${{ secrets.RESEND_API_KEY }}" \
+          -var="feedback_to_email=${{ vars.FEEDBACK_TO_EMAIL || 'info@notifications.scalabit.dev' }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
           
     - name: Terraform Apply (Production)
@@ -123,6 +125,8 @@ jobs:
           -var="stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE }}" \
           -var="stripe_webhook_secret=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="resend_api_key=${{ secrets.RESEND_API_KEY }}" \
+          -var="feedback_to_email=${{ vars.FEEDBACK_TO_EMAIL || 'info@notifications.scalabit.dev' }}" \
           -var="container_image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/workflow-scanner/workflow-scanner:${{ github.sha }}"
           
     - name: Cleanup Terraform lock on failure
