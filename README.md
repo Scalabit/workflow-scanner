@@ -124,3 +124,4 @@ This project is licensed under the terms included in the LICENSE file.
 - See if Docker image + entrypoint script, instead of composite, can be better.
 - Don't make this repo public until we remove the LLM KEY and PAT from secrets.
 - See what are the possibilities of using GITHUB_TOKEN instead PAT_TOKEN.
+---
