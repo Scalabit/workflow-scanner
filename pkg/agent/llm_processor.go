@@ -37,7 +37,6 @@ func main() {
 	log.Printf("DEBUG: ANTHROPIC_API_KEY length: %d", len(os.Getenv("ANTHROPIC_API_KEY")))
 	log.Printf("DEBUG: GEMINI_API_KEY length: %d", len(os.Getenv("GEMINI_API_KEY")))
 	log.Printf("DEBUG: MODEL: %s", os.Getenv("MODEL"))
-	log.Printf("DEBUG: ZIZMOR_ISSUES length: %d", len(os.Getenv("ZIZMOR_ISSUES")))
 	
 	if err := processWorkflows(); err != nil {
 		log.Fatalf("ERROR: %v", err)
