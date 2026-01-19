@@ -36,7 +36,7 @@ When security issues are found, the action automatically creates a pull request 
 **Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
 
 *Model Selection:* You can optionally specify which model to use by setting additional environment variables:
-- `OPENAI_MODEL` - Default: `gpt-5` ([available models](https://platform.openai.com/docs/models))
+- `OPENAI_MODEL` - Default: `gpt-4.1` ([available models](https://platform.openai.com/docs/models))
 - `ANTHROPIC_MODEL` - Default: `claude-sonnet-4-5` ([available models](https://docs.anthropic.com/en/docs/about-claude/models/all-models))
 - `GEMINI_MODEL` - Default: `gemini-2.5-pro` ([available models](https://ai.google.dev/gemini-api/docs/models/gemini))
 
@@ -102,7 +102,7 @@ jobs:
       - name: Scan and fix workflows
         uses: Scalabit/workflow-scanner@a2150268df243daa99fec1e73fb4c0bbf5973fa1 #v1
         env:
-          OPENAI_MODEL: gpt-4o  # Optional: specify a model (default: gpt-5)
+          OPENAI_MODEL: gpt-4o  # Optional: specify a model (default: gpt-4.1)
         with:
           github-token: ${{ secrets.GH_PAT }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}

@@ -134,10 +134,10 @@ func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt strin
 		lowTemperature = 0.1
 	)
 	
-	// Get model from environment or default to gpt-5
+	// Get model from environment or default to gpt-4.1
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gpt-5"
+		model = "gpt-4.1"
 	}
 	
 	req := openai.ChatCompletionRequest{
