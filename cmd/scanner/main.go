@@ -137,13 +137,13 @@ func validateAPIKeyFormats(openaiKey, anthropicKey, geminiKey string) {
 
 func getDefaultModel(openaiKey, anthropicKey, geminiKey string) string {
 	if openaiKey != "" {
-		return "gpt-4o"
+		return "gpt-5-mini"
 	}
 	if anthropicKey != "" {
-		return "claude-3-5-sonnet"
+		return "claude-sonnet-4-5"
 	}
 	if geminiKey != "" {
-		return "gemini-2.5-flash"
+		return "gemini-2.5-pro"
 	}
 
 	return ""

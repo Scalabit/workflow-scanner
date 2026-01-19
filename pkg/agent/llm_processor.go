@@ -134,10 +134,10 @@ func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt strin
 		lowTemperature = 0.1
 	)
 	
-	// Get model from environment or default to gpt-4o
+	// Get model from environment or default to gpt-5-mini
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gpt-4o"
+		model = "gpt-5-mini"
 	}
 	
 	req := openai.ChatCompletionRequest{
@@ -252,7 +252,7 @@ func callGemini(enhancedPrompt string) error {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gemini-2.5-flash"
+		model = "gemini-2.5-pro"
 	}
 	
 	log.Printf("DEBUG: Calling Gemini API with model: %s", model)
@@ -334,7 +334,7 @@ func callAnthropic(enhancedPrompt string) error {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "claude-3-5-sonnet-20241022"
+		model = "claude-sonnet-4-5"
 	}
 	
 	log.Printf("DEBUG: Calling Anthropic API with model: %s", model)
