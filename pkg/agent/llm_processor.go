@@ -139,7 +139,7 @@ func readWorkflowFiles(workflowFiles []string) string {
 			log.Printf("Warning: Could not read %s: %v", filepath, err)
 			continue
 		}
-		result.WriteString(fmt.Sprintf("FILE: %s\n```yaml\n%s\n```\n\n", filepath, string(content)))
+		result.WriteString(fmt.Sprintf("FILE: %s\n---\n%s\n---\n\n", filepath, string(content)))
 	}
 	
 	result.WriteString("=== END OF WORKFLOW FILES ===")
