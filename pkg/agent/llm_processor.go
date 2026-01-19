@@ -56,7 +56,9 @@ func processWorkflows() error {
 	}
 	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
 
-	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowFiles)
+	workflowContents := readWorkflowFiles(workflowFiles)
+
+	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowContents)
 
 	// Determine which provider to use based on available API keys
 	if os.Getenv("OPENAI_API_KEY") != "" {
@@ -122,9 +124,26 @@ func createOpenAIClient() (*openai.Client, context.Context, context.CancelFunc, 
 	return client, ctx, cancel, nil
 }
 
-func buildEnhancedPrompt(promptContent []byte, issues string, workflowFiles []string) string {
-	return fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
-		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
+func buildEnhancedPrompt(promptContent []byte, issues string, workflowContents string) string {
+	return fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
+		string(promptContent), issues, workflowContents)
+}
+
+func readWorkflowFiles(workflowFiles []string) string {
+	var result strings.Builder
+	result.WriteString("=== WORKFLOW FILES (CURRENT CONTENT) ===\n\n")
+	
+	for _, filepath := range workflowFiles {
+		content, err := ioutil.ReadFile(filepath)
+		if err != nil {
+			log.Printf("Warning: Could not read %s: %v", filepath, err)
+			continue
+		}
+		result.WriteString(fmt.Sprintf("FILE: %s\n```yaml\n%s\n```\n\n", filepath, string(content)))
+	}
+	
+	result.WriteString("=== END OF WORKFLOW FILES ===")
+	return result.String()
 }
 
 func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt string) (*openai.ChatCompletionResponse, error) {
