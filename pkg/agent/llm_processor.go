@@ -148,7 +148,7 @@ func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt strin
 				Content: enhancedPrompt,
 			},
 		},
-		MaxTokens:   maxTokens,
+		MaxCompletionTokens: maxTokens,
 		Temperature: lowTemperature,
 	}
 	
