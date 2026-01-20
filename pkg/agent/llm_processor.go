@@ -56,7 +56,14 @@ func processWorkflows() error {
 	}
 	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
 
-	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowFiles)
+	// Read actual workflow file contents
+	workflowContents, err := readWorkflowContents(workflowFiles)
+	if err != nil {
+		return fmt.Errorf("failed to read workflow contents: %w", err)
+	}
+	log.Printf("DEBUG: Read content for %d workflow files", len(workflowContents))
+
+	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowContents)
 
 	// Determine which provider to use based on available API keys
 	if os.Getenv("OPENAI_API_KEY") != "" {
@@ -122,9 +129,29 @@ func createOpenAIClient() (*openai.Client, context.Context, context.CancelFunc, 
 	return client, ctx, cancel, nil
 }
 
-func buildEnhancedPrompt(promptContent []byte, issues string, workflowFiles []string) string {
-	return fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
-		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
+func buildEnhancedPrompt(promptContent []byte, issues string, workflowContents map[string]string) string {
+	// Build workflow files section with actual content
+	var workflowSection strings.Builder
+	for path, content := range workflowContents {
+		workflowSection.WriteString(fmt.Sprintf("\n--- FILE: %s ---\n%s\n", path, content))
+	}
+
+	promptStr := string(promptContent)
+	workflowStr := workflowSection.String()
+
+	return fmt.Sprintf("%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nCURRENT WORKFLOW FILES:\n%s\n\n"+
+		"Please provide your response in the following JSON format:\n"+
+		"{\n"+
+		"  \"explanation\": \"Brief explanation of what fixes were applied\",\n"+
+		"  \"file_changes\": [\n"+
+		"    {\n"+
+		"      \"path\": \"relative/path/to/file.yml\",\n"+
+		"      \"content\": \"complete fixed file content with ONLY security fixes applied\"\n"+
+		"    }\n"+
+		"  ]\n"+
+		"}\n\n"+
+		"Only include files that need changes in the file_changes array.",
+		promptStr, issues, workflowStr)
 }
 
 func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt string) (*openai.ChatCompletionResponse, error) {
@@ -205,6 +232,18 @@ func findWorkflowFiles() ([]string, error) {
 	})
 
 	return files, err
+}
+
+func readWorkflowContents(files []string) (map[string]string, error) {
+	contents := make(map[string]string)
+	for _, file := range files {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", file, err)
+		}
+		contents[file] = string(content)
+	}
+	return contents, nil
 }
 
 func parseJSONResponse(responseText string, llmResponse *LLMResponse) error {
