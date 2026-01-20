@@ -81,25 +81,48 @@
       <p class="text-lg opacity-80">60-second setup • No credit card • Unlimited repos in beta</p>
     </div>
   </header>
-  <!-- Auto-Fix Highlight -->
+  <!-- How It Works -->
   <section class="py-20 bg-white border-b">
-    <div class="container mx-auto px-6 text-center">
+    <div class="container mx-auto px-6">
       <div class="max-w-6xl mx-auto">
-        <span class="inline-block bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-semibold mb-6">
-          Automatic Remediation
-        </span>
-        <h2 class="text-4xl md:text-5xl font-bold mb-8">
-          Finds a problem → Opens a clean PR to fix it.<br/>
-          <span class="text-primary">You just review & merge.</span>
-        </h2>
-        <div class="bg-gray-900 rounded-2xl overflow-hidden shadow-2xl max-w-3xl mx-auto">
-          <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&h=800&fit=crop"
-               alt="remediator auto-fixing a secret leak with a PR"
-               class="w-full">
-          <div class="p-8 text-left text-gray-300">
-            <p class="text-emerald-400 font-mono mb-2">remediator opened pull request #42</p>
-            <p class="text-xl font-semibold text-white mb-2">Fix: Rotate exposed key → GitHub Secrets</p>
-            <p class="text-sm"><mark class="bg-transparent text-green-500">+3</mark> <mark class="bg-transparent text-red-500">-3</mark> • 2 files changed • Ready for review</p>
+        <h2 class="text-4xl md:text-5xl font-bold text-center mb-16">How It Works</h2>
+        <div class="flex flex-col lg:flex-row items-center justify-center gap-8">
+          <!-- Step 1 -->
+          <div class="card-hover bg-white rounded-2xl shadow-xl overflow-hidden w-80 h-80 flex-shrink-0">
+            <div class="bg-primary text-white text-center py-2 font-bold text-base">
+              1. Scan Workflows
+            </div>
+            <img src="images/hero1.png" alt="Scan GitHub workflows" class="w-full h-full object-cover">
+          </div>
+          
+          <!-- Arrow -->
+          <div class="hidden lg:block flex-shrink-0">
+            <svg class="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </div>
+          
+          <!-- Step 2 -->
+          <div class="card-hover bg-white rounded-2xl shadow-xl overflow-hidden w-80 h-80 flex-shrink-0">
+            <div class="bg-primary text-white text-center py-2 font-bold text-base">
+              2. Auto Fix
+            </div>
+            <img src="images/hero2.png" alt="Automatic fixes" class="w-full h-full object-cover">
+          </div>
+          
+          <!-- Arrow -->
+          <div class="hidden lg:block flex-shrink-0">
+            <svg class="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </div>
+          
+          <!-- Step 3 -->
+          <div class="card-hover bg-white rounded-2xl shadow-xl overflow-hidden w-80 h-80 flex-shrink-0">
+            <div class="bg-primary text-white text-center py-2 font-bold text-base">
+              3. Merge PR
+            </div>
+            <img src="images/hero3.png" alt="Merge pull request" class="w-full h-full object-cover">
           </div>
         </div>
       </div>
