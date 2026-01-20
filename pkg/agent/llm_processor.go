@@ -140,13 +140,17 @@ func buildEnhancedPrompt(promptContent []byte, issues string, workflowContents m
 	workflowStr := workflowSection.String()
 
 	return fmt.Sprintf("%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nCURRENT WORKFLOW FILES:\n%s\n\n"+
+		"CRITICAL: You must return the ENTIRE file with ALL original content preserved.\n"+
+		"Do NOT rewrite, simplify, or remove ANY existing lines.\n"+
+		"ONLY add the specific security fix lines (like permissions:, persist-credentials: false, etc.).\n"+
+		"Think of it as: COPY the entire original file, then INSERT the security fix lines where needed.\n\n"+
 		"Please provide your response in the following JSON format:\n"+
 		"{\n"+
 		"  \"explanation\": \"Brief explanation of what fixes were applied\",\n"+
 		"  \"file_changes\": [\n"+
 		"    {\n"+
 		"      \"path\": \"relative/path/to/file.yml\",\n"+
-		"      \"content\": \"complete fixed file content with ONLY security fixes applied\"\n"+
+		"      \"content\": \"THE ENTIRE ORIGINAL FILE with ONLY the security fix lines added - preserve ALL original content including name, on, if conditions, with parameters, etc.\"\n"+
 		"    }\n"+
 		"  ]\n"+
 		"}\n\n"+
