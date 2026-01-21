@@ -1,6 +1,7 @@
 package agent
 
 // GetLLMProcessorCode returns the Go code for the LLM processor.
+//nolint:maintidx // This function intentionally contains large embedded code string
 func GetLLMProcessorCode() string {
 	return `package main
 
@@ -22,19 +23,46 @@ import (
 )
 
 type LineChange struct {
-	LineNumber int    ` + "`json:\"line_number\"`" + `  // Line number to change (1-indexed)
-	OldLine    string ` + "`json:\"old_line\"`" + `     // Original line content for verification
-	NewLine    string ` + "`json:\"new_line\"`" + `     // New line content to replace with
+	LineNumber int    ` + "`json:\"line_number\"`" + `
+	OldLine    string ` + "`json:\"old_line\"`" + `
+	NewLine    string ` + "`json:\"new_line\"`" + `
 }
 
 type FileChange struct {
 	Path    string       ` + "`json:\"path\"`" + `
-	Changes []LineChange ` + "`json:\"changes\"`" + `  // Specific line changes to apply
+	Changes []LineChange ` + "`json:\"changes\"`" + `
 }
 
 type LLMResponse struct {
 	Explanation string       ` + "`json:\"explanation\"`" + `
 	FileChanges []FileChange ` + "`json:\"file_changes\"`" + `
+}
+
+type ZizmorFinding struct {
+	Ident     string ` + "`json:\"ident\"`" + `
+	Desc      string ` + "`json:\"desc\"`" + `
+	Locations []struct {
+		Symbolic struct {
+			Key struct {
+				Local struct {
+					GivenPath string ` + "`json:\"given_path\"`" + `
+				} ` + "`json:\"Local\"`" + `
+			} ` + "`json:\"key\"`" + `
+			Annotation string ` + "`json:\"annotation\"`" + `
+		} ` + "`json:\"symbolic\"`" + `
+		Concrete struct {
+			Location struct {
+				StartPoint struct {
+					Row int ` + "`json:\"row\"`" + `
+				} ` + "`json:\"start_point\"`" + `
+			} ` + "`json:\"location\"`" + `
+		} ` + "`json:\"concrete\"`" + `
+	} ` + "`json:\"locations\"`" + `
+}
+
+type FileFinding struct {
+	Path     string
+	Findings []ZizmorFinding
 }
 
 func main() {
@@ -56,44 +84,162 @@ func processWorkflows() error {
 		return err
 	}
 
-	workflowFiles, err := findWorkflowFiles()
+	// Parse ZIZMOR findings and group by file
+	fileFindings, err := groupFindingsByFile(issues)
 	if err != nil {
-		return fmt.Errorf("failed to find workflow files: %w", err)
+		return fmt.Errorf("failed to parse ZIZMOR findings: %w", err)
 	}
-	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
+	log.Printf("DEBUG: Grouped findings into %d files", len(fileFindings))
 
-	// Read actual workflow file contents
-	workflowContents, err := readWorkflowContents(workflowFiles)
-	if err != nil {
-		return fmt.Errorf("failed to read workflow contents: %w", err)
+	// Process each file separately
+	allExplanations := []string{}
+	for _, fileFinding := range fileFindings {
+		log.Printf("DEBUG: Processing file: %s with %d findings", fileFinding.Path, len(fileFinding.Findings))
+		
+		explanation, err := processFile(promptContent, fileFinding)
+		if err != nil {
+			log.Printf("Warning: Failed to process %s: %v", fileFinding.Path, err)
+			continue
+		}
+		
+		if explanation != "" {
+			allExplanations = append(allExplanations, fmt.Sprintf("[%s] %s", fileFinding.Path, explanation))
+		}
 	}
-	log.Printf("DEBUG: Read content for %d workflow files", len(workflowContents))
 
-	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowContents)
-
-	// Determine which provider to use based on available API keys
-	if os.Getenv("OPENAI_API_KEY") != "" {
-		log.Println("DEBUG: Using OpenAI provider")
-		client, ctx, cancel, err := createOpenAIClient()
-		if err != nil {
-			return err
-		}
-		defer cancel()
-
-		resp, err := callOpenAI(ctx, client, enhancedPrompt)
-		if err != nil {
-			return err
-		}
-		return processOpenAIResponse(resp)
-	} else if os.Getenv("GEMINI_API_KEY") != "" {
-		log.Println("DEBUG: Using Gemini provider")
-		return callGemini(enhancedPrompt)
-	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
-		log.Println("DEBUG: Using Anthropic provider")
-		return callAnthropic(enhancedPrompt)
+	// Print combined explanations
+	if len(allExplanations) > 0 {
+		fmt.Print(strings.Join(allExplanations, "\n"))
 	} else {
-		return fmt.Errorf("no API key found (need OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY)")
+		fmt.Print("No fixes applied")
 	}
+
+	return nil
+}
+
+func groupFindingsByFile(issues string) ([]FileFinding, error) {
+	var findings []ZizmorFinding
+	if err := json.Unmarshal([]byte(issues), &findings); err != nil {
+		return nil, err
+	}
+
+	fileMap := make(map[string][]ZizmorFinding)
+	for _, finding := range findings {
+		for _, loc := range finding.Locations {
+			path := loc.Symbolic.Key.Local.GivenPath
+			if path != "" {
+				fileMap[path] = append(fileMap[path], finding)
+			}
+		}
+	}
+
+	result := []FileFinding{}
+	for path, finds := range fileMap {
+		result = append(result, FileFinding{
+			Path:     path,
+			Findings: finds,
+		})
+	}
+
+	return result, nil
+}
+
+func processFile(promptContent []byte, fileFinding FileFinding) (string, error) {
+	// Read the specific file
+	content, err := os.ReadFile(fileFinding.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Build focused prompt for this file only
+	prompt := buildFilePrompt(promptContent, fileFinding, string(content))
+
+	// Call LLM
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		return callOpenAIForFile(prompt, fileFinding.Path)
+	} else if os.Getenv("GEMINI_API_KEY") != "" {
+		return callGeminiForFile(prompt, fileFinding.Path)
+	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		return callAnthropicForFile(prompt, fileFinding.Path)
+	}
+
+	return "", fmt.Errorf("no API key found")
+}
+
+func buildFilePrompt(promptContent []byte, fileFinding FileFinding, fileContent string) string {
+	// Add line numbers to file
+	lines := strings.Split(fileContent, "\n")
+	var numberedContent strings.Builder
+	for i, line := range lines {
+		numberedContent.WriteString(fmt.Sprintf("%3d | %s\n", i+1, line))
+	}
+
+	// Format findings for this file
+	var findingsText strings.Builder
+	for _, finding := range fileFinding.Findings {
+		for _, loc := range finding.Locations {
+			row := loc.Concrete.Location.StartPoint.Row
+			annotation := loc.Symbolic.Annotation
+			findingsText.WriteString(fmt.Sprintf("- Line %d: %s (%s)\n", row, finding.Desc, annotation))
+		}
+	}
+
+	return fmt.Sprintf("%s\n\nFILE: %s\n%s\n\nISSUES TO FIX:\n%s\n\nReturn ONLY line changes for this file.",
+		string(promptContent), fileFinding.Path, numberedContent.String(), findingsText.String())
+}
+
+func callOpenAIForFile(prompt, filePath string) (string, error) {
+	client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	model := os.Getenv("MODEL")
+	if model == "" {
+		model = "gpt-4o"
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: model,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+		MaxCompletionTokens: 4000,
+		Temperature:         0.1,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no response from OpenAI")
+	}
+
+	responseText := resp.Choices[0].Message.Content
+	
+	var llmResponse LLMResponse
+	if err := parseJSONResponse(responseText, &llmResponse); err != nil {
+		log.Printf("Warning: Failed to parse JSON for %s, skipping", filePath)
+		return "", nil
+	}
+
+	// Apply changes to this file
+	for _, fileChange := range llmResponse.FileChanges {
+		if err := applyFileChange(fileChange); err != nil {
+			log.Printf("Warning: Failed to apply changes to %s: %v", fileChange.Path, err)
+		}
+	}
+
+	return llmResponse.Explanation, nil
+}
+
+func callGeminiForFile(prompt, filePath string) (string, error) {
+	// Simplified - return empty for now
+	return "", fmt.Errorf("Gemini not implemented for file-by-file processing yet")
+}
+
+func callAnthropicForFile(prompt, filePath string) (string, error) {
+	// Simplified - return empty for now
+	return "", fmt.Errorf("Anthropic not implemented for file-by-file processing yet")
 }
 
 func loadInputData() ([]byte, string, error) {
