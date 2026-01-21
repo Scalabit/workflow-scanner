@@ -1,6 +1,7 @@
 package agent
 
 // GetLLMProcessorCode returns the Go code for the LLM processor.
+//nolint:maintidx // This function intentionally contains large embedded code string
 func GetLLMProcessorCode() string {
 	return `package main
 
@@ -21,14 +22,47 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+type LineChange struct {
+	LineNumber int    ` + "`json:\"line_number\"`" + `
+	OldLine    string ` + "`json:\"old_line\"`" + `
+	NewLine    string ` + "`json:\"new_line\"`" + `
+}
+
 type FileChange struct {
-	Path    string ` + "`json:\"path\"`" + `
-	Content string ` + "`json:\"content\"`" + `
+	Path    string       ` + "`json:\"path\"`" + `
+	Changes []LineChange ` + "`json:\"changes\"`" + `
 }
 
 type LLMResponse struct {
 	Explanation string       ` + "`json:\"explanation\"`" + `
 	FileChanges []FileChange ` + "`json:\"file_changes\"`" + `
+}
+
+type ZizmorFinding struct {
+	Ident     string ` + "`json:\"ident\"`" + `
+	Desc      string ` + "`json:\"desc\"`" + `
+	Locations []struct {
+		Symbolic struct {
+			Key struct {
+				Local struct {
+					GivenPath string ` + "`json:\"given_path\"`" + `
+				} ` + "`json:\"Local\"`" + `
+			} ` + "`json:\"key\"`" + `
+			Annotation string ` + "`json:\"annotation\"`" + `
+		} ` + "`json:\"symbolic\"`" + `
+		Concrete struct {
+			Location struct {
+				StartPoint struct {
+					Row int ` + "`json:\"row\"`" + `
+				} ` + "`json:\"start_point\"`" + `
+			} ` + "`json:\"location\"`" + `
+		} ` + "`json:\"concrete\"`" + `
+	} ` + "`json:\"locations\"`" + `
+}
+
+type FileFinding struct {
+	Path     string
+	Findings []ZizmorFinding
 }
 
 func main() {
@@ -50,37 +84,162 @@ func processWorkflows() error {
 		return err
 	}
 
-	workflowFiles, err := findWorkflowFiles()
+	// Parse ZIZMOR findings and group by file
+	fileFindings, err := groupFindingsByFile(issues)
 	if err != nil {
-		return fmt.Errorf("failed to find workflow files: %w", err)
+		return fmt.Errorf("failed to parse ZIZMOR findings: %w", err)
 	}
-	log.Printf("DEBUG: Found %d workflow files: %v", len(workflowFiles), workflowFiles)
+	log.Printf("DEBUG: Grouped findings into %d files", len(fileFindings))
 
-	enhancedPrompt := buildEnhancedPrompt(promptContent, issues, workflowFiles)
-
-	// Determine which provider to use based on available API keys
-	if os.Getenv("OPENAI_API_KEY") != "" {
-		log.Println("DEBUG: Using OpenAI provider")
-		client, ctx, cancel, err := createOpenAIClient()
+	// Process each file separately
+	allExplanations := []string{}
+	for _, fileFinding := range fileFindings {
+		log.Printf("DEBUG: Processing file: %s with %d findings", fileFinding.Path, len(fileFinding.Findings))
+		
+		explanation, err := processFile(promptContent, fileFinding)
 		if err != nil {
-			return err
+			log.Printf("Warning: Failed to process %s: %v", fileFinding.Path, err)
+			continue
 		}
-		defer cancel()
+		
+		if explanation != "" {
+			allExplanations = append(allExplanations, fmt.Sprintf("[%s] %s", fileFinding.Path, explanation))
+		}
+	}
 
-		resp, err := callOpenAI(ctx, client, enhancedPrompt)
-		if err != nil {
-			return err
-		}
-		return processOpenAIResponse(resp)
-	} else if os.Getenv("GEMINI_API_KEY") != "" {
-		log.Println("DEBUG: Using Gemini provider")
-		return callGemini(enhancedPrompt)
-	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
-		log.Println("DEBUG: Using Anthropic provider")
-		return callAnthropic(enhancedPrompt)
+	// Print combined explanations
+	if len(allExplanations) > 0 {
+		fmt.Print(strings.Join(allExplanations, "\n"))
 	} else {
-		return fmt.Errorf("no API key found (need OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY)")
+		fmt.Print("No fixes applied")
 	}
+
+	return nil
+}
+
+func groupFindingsByFile(issues string) ([]FileFinding, error) {
+	var findings []ZizmorFinding
+	if err := json.Unmarshal([]byte(issues), &findings); err != nil {
+		return nil, err
+	}
+
+	fileMap := make(map[string][]ZizmorFinding)
+	for _, finding := range findings {
+		for _, loc := range finding.Locations {
+			path := loc.Symbolic.Key.Local.GivenPath
+			if path != "" {
+				fileMap[path] = append(fileMap[path], finding)
+			}
+		}
+	}
+
+	result := []FileFinding{}
+	for path, finds := range fileMap {
+		result = append(result, FileFinding{
+			Path:     path,
+			Findings: finds,
+		})
+	}
+
+	return result, nil
+}
+
+func processFile(promptContent []byte, fileFinding FileFinding) (string, error) {
+	// Read the specific file
+	content, err := os.ReadFile(fileFinding.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Build focused prompt for this file only
+	prompt := buildFilePrompt(promptContent, fileFinding, string(content))
+
+	// Call LLM
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		return callOpenAIForFile(prompt, fileFinding.Path)
+	} else if os.Getenv("GEMINI_API_KEY") != "" {
+		return callGeminiForFile(prompt, fileFinding.Path)
+	} else if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		return callAnthropicForFile(prompt, fileFinding.Path)
+	}
+
+	return "", fmt.Errorf("no API key found")
+}
+
+func buildFilePrompt(promptContent []byte, fileFinding FileFinding, fileContent string) string {
+	// Add line numbers to file
+	lines := strings.Split(fileContent, "\n")
+	var numberedContent strings.Builder
+	for i, line := range lines {
+		numberedContent.WriteString(fmt.Sprintf("%3d | %s\n", i+1, line))
+	}
+
+	// Format findings for this file
+	var findingsText strings.Builder
+	for _, finding := range fileFinding.Findings {
+		for _, loc := range finding.Locations {
+			row := loc.Concrete.Location.StartPoint.Row
+			annotation := loc.Symbolic.Annotation
+			findingsText.WriteString(fmt.Sprintf("- Line %d: %s (%s)\n", row, finding.Desc, annotation))
+		}
+	}
+
+	return fmt.Sprintf("%s\n\nFILE: %s\n%s\n\nISSUES TO FIX:\n%s\n\nReturn ONLY line changes for this file.",
+		string(promptContent), fileFinding.Path, numberedContent.String(), findingsText.String())
+}
+
+func callOpenAIForFile(prompt, filePath string) (string, error) {
+	client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	model := os.Getenv("MODEL")
+	if model == "" {
+		model = "gpt-4o"
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: model,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+		MaxCompletionTokens: 4000,
+		Temperature:         0.1,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no response from OpenAI")
+	}
+
+	responseText := resp.Choices[0].Message.Content
+	
+	var llmResponse LLMResponse
+	if err := parseJSONResponse(responseText, &llmResponse); err != nil {
+		log.Printf("Warning: Failed to parse JSON for %s, skipping", filePath)
+		return "", nil
+	}
+
+	// Apply changes to this file
+	for _, fileChange := range llmResponse.FileChanges {
+		if err := applyFileChange(fileChange); err != nil {
+			log.Printf("Warning: Failed to apply changes to %s: %v", fileChange.Path, err)
+		}
+	}
+
+	return llmResponse.Explanation, nil
+}
+
+func callGeminiForFile(prompt, filePath string) (string, error) {
+	// Simplified - return empty for now
+	return "", fmt.Errorf("Gemini not implemented for file-by-file processing yet")
+}
+
+func callAnthropicForFile(prompt, filePath string) (string, error) {
+	// Simplified - return empty for now
+	return "", fmt.Errorf("Anthropic not implemented for file-by-file processing yet")
 }
 
 func loadInputData() ([]byte, string, error) {
@@ -122,9 +281,19 @@ func createOpenAIClient() (*openai.Client, context.Context, context.CancelFunc, 
 	return client, ctx, cancel, nil
 }
 
-func buildEnhancedPrompt(promptContent []byte, issues string, workflowFiles []string) string {
-	return fmt.Sprintf(` + "`%s\n\nZIZMOR ISSUES TO FIX:\n%s\n\nWORKFLOW FILES FOUND:\n%s\n\nPlease provide your response in the following JSON format:\n{\n  \"explanation\": \"Brief explanation of what fixes were applied\",\n  \"file_changes\": [\n    {\n      \"path\": \"relative/path/to/file.yml\",\n      \"content\": \"complete fixed file content\"\n    }\n  ]\n}\n\nOnly include files that need changes in the file_changes array. Provide the complete corrected content for each file.`" + `,
-		string(promptContent), issues, strings.Join(workflowFiles, "\n"))
+func buildEnhancedPrompt(promptContent []byte, issues string, workflowContents map[string]string) string {
+	// Build workflow files section with line numbers
+	var workflowSection strings.Builder
+	for path, content := range workflowContents {
+		lines := strings.Split(content, "\n")
+		workflowSection.WriteString(fmt.Sprintf("\n--- FILE: %s ---\n", path))
+		for i, line := range lines {
+			workflowSection.WriteString(fmt.Sprintf("%3d | %s\n", i+1, line))
+		}
+	}
+
+	return fmt.Sprintf("%s\n\nZIZMOR ISSUES:\n%s\n\nWORKFLOW FILES:\n%s",
+		string(promptContent), issues, workflowSection.String())
 }
 
 func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt string) (*openai.ChatCompletionResponse, error) {
@@ -207,6 +376,18 @@ func findWorkflowFiles() ([]string, error) {
 	return files, err
 }
 
+func readWorkflowContents(files []string) (map[string]string, error) {
+	contents := make(map[string]string)
+	for _, file := range files {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", file, err)
+		}
+		contents[file] = string(content)
+	}
+	return contents, nil
+}
+
 func parseJSONResponse(responseText string, llmResponse *LLMResponse) error {
 	// Find JSON content between ` + "```json and ```" + ` markers
 	start := strings.Index(responseText, "` + "```json" + `")
@@ -228,23 +409,55 @@ func parseJSONResponse(responseText string, llmResponse *LLMResponse) error {
 }
 
 func applyFileChange(change FileChange) error {
-	// Ensure the directory exists
-	const (
-		dirPermissions  = 0755
-		filePermissions = 0644
-	)
-	dir := filepath.Dir(change.Path)
-	if err := os.MkdirAll(dir, dirPermissions); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	// Read the current file
+	content, err := os.ReadFile(change.Path)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", change.Path, err)
 	}
 
-	// Write the file
-	if err := ioutil.WriteFile(change.Path, []byte(change.Content), filePermissions); err != nil {
+	lines := strings.Split(string(content), "\n")
+	
+	// Apply each line change
+	for _, lineChange := range change.Changes {
+		if lineChange.LineNumber < 1 || lineChange.LineNumber > len(lines) {
+			log.Printf("Warning: Line number %d out of range for %s (file has %d lines)", 
+				lineChange.LineNumber, change.Path, len(lines))
+			continue
+		}
+		
+		// Verify the old line matches (for safety)
+		actualLine := lines[lineChange.LineNumber-1]
+		expectedLine := strings.TrimSpace(lineChange.OldLine)
+		if strings.TrimSpace(actualLine) != expectedLine {
+			log.Printf("Warning: Line %d doesn't match expected content in %s", lineChange.LineNumber, change.Path)
+			log.Printf("  Expected: %q", expectedLine)
+			log.Printf("  Actual:   %q", strings.TrimSpace(actualLine))
+			log.Printf("  Applying change anyway...")
+		}
+		
+		// Apply the change - handle multi-line replacements
+		newLines := strings.Split(lineChange.NewLine, "\\n")
+		if len(newLines) == 1 {
+			// Simple single-line replacement
+			lines[lineChange.LineNumber-1] = lineChange.NewLine
+		} else {
+			// Multi-line replacement: remove old line, insert new lines
+			before := lines[:lineChange.LineNumber-1]
+			after := lines[lineChange.LineNumber:]
+			lines = append(before, append(newLines, after...)...)
+		}
+		
+		log.Printf("Applied change to %s at line %d", change.Path, lineChange.LineNumber)
+	}
+
+	// Write the modified file back
+	const filePermissions = 0644
+	modifiedContent := strings.Join(lines, "\n")
+	if err := os.WriteFile(change.Path, []byte(modifiedContent), filePermissions); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", change.Path, err)
 	}
 
-	log.Printf("Applied fix to %s", change.Path)
-
+	log.Printf("Successfully applied %d changes to %s", len(change.Changes), change.Path)
 	return nil
 }
 
