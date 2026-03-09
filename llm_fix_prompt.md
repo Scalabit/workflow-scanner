@@ -52,9 +52,20 @@ You have been provided with ZIZMOR scan results in the `zizmor_issues` input tha
    - Advanced permission configurations
    - Workflow logic that requires human judgment
    - Complex secret handling patterns
-4. Fix ONLY the security issues mentioned in the ZIZMOR results
+4. Fix ONLY the security issues mentioned in the ZIZMOR results - DO NOT change anything else
 5. Do NOT make changes beyond what's needed to address the identified vulnerabilities
 6. You NEED to change the code to meet the fixes you are suggesting for the issues found in zizmor
+
+## CRITICAL: WHAT NOT TO CHANGE OR REMOVE
+Unless ZIZMOR specifically reports an issue with these elements, DO NOT modify or remove:
+- **Workflow names** (`name:` field at the top of the file)
+- **Trigger types** (`on:` field - workflow_dispatch, push, pull_request, etc.)
+- **Branch names** in triggers
+- **Job names or structure**
+- **Step names**
+- **Any working code that doesn't have a security issue**
+
+**ONLY change or refactor the specific lines that ZIZMOR identified as security vulnerabilities.**
 
 ## Special Guidance for Specific Findings
 

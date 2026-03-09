@@ -70,6 +70,8 @@ jobs:
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="resend_api_key=${{ secrets.RESEND_API_KEY }}" \
+          -var="feedback_to_email=${{ vars.FEEDBACK_TO_EMAIL }}" \
           -var="sandbox_allowed_users=${{ secrets.SANDBOX_ALLOWED_USERS }}"
           
     - name: Configure Docker to use gcloud as credential helper
@@ -99,6 +101,8 @@ jobs:
           -var="stripe_publishable_key=${{ secrets.TEST_STRIPE_PK }}" \
           -var="stripe_webhook_secret=${{ secrets.TEST_STRIPE_WEBHOOK_SECRET }}" \
           -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="resend_api_key=${{ secrets.RESEND_API_KEY }}" \
+          -var="feedback_to_email=${{ vars.FEEDBACK_TO_EMAIL }}" \
           -var="sandbox_allowed_users=${{ secrets.SANDBOX_ALLOWED_USERS }}"
     
     - name: Get Service URL

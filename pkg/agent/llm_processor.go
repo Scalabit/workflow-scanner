@@ -37,7 +37,6 @@ func main() {
 	log.Printf("DEBUG: ANTHROPIC_API_KEY length: %d", len(os.Getenv("ANTHROPIC_API_KEY")))
 	log.Printf("DEBUG: GEMINI_API_KEY length: %d", len(os.Getenv("GEMINI_API_KEY")))
 	log.Printf("DEBUG: MODEL: %s", os.Getenv("MODEL"))
-	log.Printf("DEBUG: ZIZMOR_ISSUES length: %d", len(os.Getenv("ZIZMOR_ISSUES")))
 	
 	if err := processWorkflows(); err != nil {
 		log.Fatalf("ERROR: %v", err)
@@ -135,10 +134,10 @@ func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt strin
 		lowTemperature = 0.1
 	)
 	
-	// Get model from environment or default to gpt-4o
+	// Get model from environment or default to gpt-4.1
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gpt-4o"
+		model = "gpt-4.1"
 	}
 	
 	req := openai.ChatCompletionRequest{
@@ -149,7 +148,7 @@ func callOpenAI(ctx context.Context, client *openai.Client, enhancedPrompt strin
 				Content: enhancedPrompt,
 			},
 		},
-		MaxTokens:   maxTokens,
+		MaxCompletionTokens: maxTokens,
 		Temperature: lowTemperature,
 	}
 	
@@ -253,7 +252,7 @@ func callGemini(enhancedPrompt string) error {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "gemini-2.5-flash"
+		model = "gemini-2.5-pro"
 	}
 	
 	log.Printf("DEBUG: Calling Gemini API with model: %s", model)
@@ -335,7 +334,7 @@ func callAnthropic(enhancedPrompt string) error {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	model := os.Getenv("MODEL")
 	if model == "" {
-		model = "claude-3-5-sonnet-20241022"
+		model = "claude-sonnet-4-5"
 	}
 	
 	log.Printf("DEBUG: Calling Anthropic API with model: %s", model)

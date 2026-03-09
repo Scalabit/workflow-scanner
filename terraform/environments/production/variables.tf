@@ -65,6 +65,17 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "resend_api_key" {
+  description = "Resend API Key for sending emails"
+  type        = string
+  sensitive   = true
+}
+
+variable "feedback_to_email" {
+  description = "Email address to receive feedback"
+  type        = string
+}
+
 
 variable "service_name" {
   description = "Name of the Cloud Run service"

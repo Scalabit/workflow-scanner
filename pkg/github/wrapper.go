@@ -61,7 +61,13 @@ func (w *WrapperIssueClientImpl) prepareRepository(repo, targetBranch string, so
 	workingDir := mainBranch.Tree().WithoutDirectory(".git")
 
 	finalDir := workingDir.WithDirectory(".", source, dagger.DirectoryWithDirectoryOpts{
-		Exclude: []string{".git"},
+		Exclude: []string{
+			".git",
+			"main.go",
+			"go.mod",
+			"go.sum",
+			"llm_fix_prompt.md",
+		},
 	})
 
 	return finalDir, nil

@@ -36,9 +36,9 @@ When security issues are found, the action automatically creates a pull request 
 **Example:** `${{ secrets.OPENAI_API_KEY }}` or `${{ secrets.ANTHROPIC_API_KEY }}` or `${{ secrets.GEMINI_API_KEY }}`
 
 *Model Selection:* You can optionally specify which model to use by setting additional environment variables:
-- `OPENAI_MODEL` - Default: `gpt-4o` ([available models](https://platform.openai.com/docs/models))
+- `OPENAI_MODEL` - Default: `gpt-4.1` ([available models](https://platform.openai.com/docs/models))
 - `ANTHROPIC_MODEL` - Default: `claude-sonnet-4-5` ([available models](https://docs.anthropic.com/en/docs/about-claude/models/all-models))
-- `GEMINI_MODEL` - Default: `gemini-2.0-flash` ([available models](https://ai.google.dev/gemini-api/docs/models/gemini))
+- `GEMINI_MODEL` - Default: `gemini-2.5-pro` ([available models](https://ai.google.dev/gemini-api/docs/models/gemini))
 
 See [Dagger LLM Configuration](https://docs.dagger.io/reference/configuration/llm) for more details and advanced options.
 
@@ -102,7 +102,7 @@ jobs:
       - name: Scan and fix workflows
         uses: Scalabit/workflow-scanner@a2150268df243daa99fec1e73fb4c0bbf5973fa1 #v1
         env:
-          OPENAI_MODEL: gpt-4o-mini  # Optional: specify a model (default: gpt-4o)
+          OPENAI_MODEL: gpt-4o  # Optional: specify a model (default: gpt-4.1)
         with:
           github-token: ${{ secrets.GH_PAT }}
           llm-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -124,3 +124,4 @@ This project is licensed under the terms included in the LICENSE file.
 - See if Docker image + entrypoint script, instead of composite, can be better.
 - Don't make this repo public until we remove the LLM KEY and PAT from secrets.
 - See what are the possibilities of using GITHUB_TOKEN instead PAT_TOKEN.
+---
