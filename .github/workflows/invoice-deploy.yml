@@ -1,0 +1,57 @@
+name: Deploy Invoice Service
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'invoice/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-invoice:
+    runs-on: ubuntu-latest  
+    
+    defaults:
+      run:
+        working-directory: invoice/terraform
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.0"
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Plan
+      run: |
+        terraform plan \
+          -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+          -var="email_username=${{ secrets.EMAIL_USERNAME }}" \
+          -var="email_password=${{ secrets.EMAIL_PASSWORD }}" \
+          -var="imap_server=${{ secrets.IMAP_SERVER }}" \
+          -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
+          -out=tfplan
+
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: terraform apply -auto-approve tfplan
+
+    - name: Get Instance IP
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        INSTANCE_IP=$(gcloud compute instances describe phi35-invoice-processor --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        echo "Invoice service deployed at: http://$INSTANCE_IP:8000"
+        echo "Health check: http://$INSTANCE_IP:8000/health"

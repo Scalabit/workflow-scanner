@@ -1,8 +1,8 @@
 name: Deploy Sandbox Environment
 
 on:
-  push:
-    branches: [ main, 'sandbox-*' ]
+  # push:
+  #   branches: [ main, 'sandbox-*' ]
   workflow_dispatch:
     inputs:
       environment:

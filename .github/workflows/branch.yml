@@ -1,9 +1,10 @@
 name: Run qualification on branch
 
 on:
-  push:
-    branches-ignore:
-      - main
+  workflow_dispatch:
+  # push:
+  #   branches-ignore:
+  #     - main
 
 jobs:
   lint-fmt:
