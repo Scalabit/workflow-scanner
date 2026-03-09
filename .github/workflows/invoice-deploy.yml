@@ -49,7 +49,7 @@ jobs:
           -var="email_password=${{ secrets.EMAIL_PASSWORD }}" \
           -var="imap_server=${{ secrets.IMAP_SERVER }}" \
           -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
-          google_compute_instance.phi_instance projects/${{ secrets.GCP_PROJECT_ID }}/zones/europe-north1-a/instances/phi35-invoice-processor || true
+          google_compute_instance.phi_instance projects/${{ secrets.GCP_PROJECT_ID }}/zones/us-central1-a/instances/phi35-invoice-processor || true
 
     - name: Terraform Plan
       run: |
@@ -68,6 +68,6 @@ jobs:
     - name: Get Instance IP
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       run: |
-        INSTANCE_IP=$(gcloud compute instances describe phi35-invoice-processor --zone=europe-north1 --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        INSTANCE_IP=$(gcloud compute instances describe phi35-invoice-processor --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
         echo "Invoice service deployed at: http://$INSTANCE_IP:8000"
         echo "Health check: http://$INSTANCE_IP:8000/health"
