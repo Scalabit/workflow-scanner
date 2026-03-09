@@ -37,7 +37,13 @@ jobs:
 
     - name: Import existing firewall rule if exists
       run: |
-        terraform import google_compute_firewall.phi_firewall allow-phi-api || true
+        terraform import \
+          -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+          -var="email_username=${{ secrets.EMAIL_USERNAME }}" \
+          -var="email_password=${{ secrets.EMAIL_PASSWORD }}" \
+          -var="imap_server=${{ secrets.IMAP_SERVER }}" \
+          -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
+          google_compute_firewall.phi_firewall allow-phi-api || true
 
     - name: Terraform Plan
       run: |
