@@ -44,6 +44,7 @@ resource "google_compute_instance" "phi_instance" {
     smtp-server    = var.smtp_server
     # Force recreation when startup script changes
     script-hash    = filesha256("${path.module}/../scripts/startup-script.sh")
+    force-recreate = timestamp()
   }
 
   tags = ["phi-instance"]
