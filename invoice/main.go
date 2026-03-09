@@ -29,15 +29,12 @@ func processWithPhi(text string) (string, error) {
 	defer cancel()
 	
 	cmd := exec.CommandContext(ctx, "python3", "-c", fmt.Sprintf(`
-import os
-os.environ['TRANSFORMERS_CACHE'] = '/opt/phi-invoice/model_cache'
-os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
-
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
-model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3.5-mini-instruct", torch_dtype=torch.float32)
+# Use default cache directory - no custom path
+tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
+model = AutoModelForCausalLM.from_pretrained("microsoft/phi-2", torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
 
 inputs = tokenizer("%s", return_tensors="pt")
 with torch.no_grad():

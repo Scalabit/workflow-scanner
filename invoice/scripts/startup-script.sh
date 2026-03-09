@@ -32,6 +32,7 @@ python3 -c "import torch, transformers; print('Python packages installed success
 echo "Pre-downloading Phi model..."
 export TRANSFORMERS_CACHE=/opt/phi-invoice/model_cache
 mkdir -p $TRANSFORMERS_CACHE
+chmod -R 777 $TRANSFORMERS_CACHE
 export HF_HOME=$TRANSFORMERS_CACHE
 
 python3 -c "
@@ -42,9 +43,9 @@ os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 print('Downloading tokenizer...')
-tokenizer = AutoTokenizer.from_pretrained('microsoft/Phi-3.5-mini-instruct')
+tokenizer = AutoTokenizer.from_pretrained('microsoft/phi-2')
 print('Downloading model...')
-model = AutoModelForCausalLM.from_pretrained('microsoft/Phi-3.5-mini-instruct', torch_dtype=torch.float32)
+model = AutoModelForCausalLM.from_pretrained('microsoft/phi-2', torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map='cpu')
 print('Model download complete - cached at /opt/phi-invoice/model_cache')
 "
 
