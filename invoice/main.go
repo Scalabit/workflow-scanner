@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -83,10 +85,24 @@ func health(c *gin.Context) {
 }
 
 func main() {
-	r := gin.Default()
+	// Start email monitoring in background
+	go func() {
+		log.Println("Starting email monitor...")
+		processor := NewEmailProcessor()
+		for {
+			log.Println("Checking for new emails...")
+			if err := processor.ProcessEmails(); err != nil {
+				log.Printf("Error processing emails: %v", err)
+			}
+			time.Sleep(30 * time.Second) // Check every 30 seconds
+		}
+	}()
 
+	// Start HTTP server
+	r := gin.Default()
 	r.POST("/process-invoice", processInvoice)
 	r.GET("/health", health)
 
+	log.Println("Starting HTTP server on :8000")
 	r.Run(":8000")
 }

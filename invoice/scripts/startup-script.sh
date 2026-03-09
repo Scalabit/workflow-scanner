@@ -52,14 +52,14 @@ export SMTP_SERVER=$(curl -s "http://metadata.google.internal/computeMetadata/v1
 
 # Start the service
 echo "Starting invoice processor..."
-nohup ./invoice-processor > invoice.log 2>&1 &
-sleep 2
+nohup ./invoice-processor </dev/null >/dev/null 2>&1 &
+sleep 3
 
 # Verify service is running
 if pgrep invoice-processor; then
     echo "Invoice processor started successfully"
+    echo "Service should be available at http://$(curl -s ifconfig.me):8000"
 else
     echo "Failed to start invoice processor"
-    cat invoice.log
     exit 1
 fi
