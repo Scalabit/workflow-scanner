@@ -61,6 +61,17 @@ jobs:
           -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
           -out=tfplan
 
+    - name: Destroy existing instance
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        terraform destroy -auto-approve \
+          -target=google_compute_instance.phi_instance \
+          -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+          -var="email_username=${{ secrets.EMAIL_USERNAME }}" \
+          -var="email_password=${{ secrets.EMAIL_PASSWORD }}" \
+          -var="imap_server=${{ secrets.IMAP_SERVER }}" \
+          -var="smtp_server=${{ secrets.SMTP_SERVER }}" || true
+
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       run: terraform apply -auto-approve tfplan
