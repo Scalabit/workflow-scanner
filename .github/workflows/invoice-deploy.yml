@@ -35,6 +35,10 @@ jobs:
     - name: Terraform Init
       run: terraform init
 
+    - name: Import existing firewall rule if exists
+      run: |
+        terraform import google_compute_firewall.phi_firewall allow-phi-api || true
+
     - name: Terraform Plan
       run: |
         terraform plan \
