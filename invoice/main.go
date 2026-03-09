@@ -28,7 +28,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
-model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3.5-mini-instruct", torch_dtype=torch.float16, device_map="auto")
+model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3.5-mini-instruct", torch_dtype=torch.float32)
 
 inputs = tokenizer("%s", return_tensors="pt")
 with torch.no_grad():

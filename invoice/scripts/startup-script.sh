@@ -28,6 +28,18 @@ pip3 install --break-system-packages transformers accelerate huggingface_hub
 # Verify Python packages
 python3 -c "import torch, transformers; print('Python packages installed successfully')"
 
+# Pre-download Phi model to avoid timeouts during processing
+echo "Pre-downloading Phi model..."
+python3 -c "
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+print('Downloading tokenizer...')
+tokenizer = AutoTokenizer.from_pretrained('microsoft/Phi-3.5-mini-instruct')
+print('Downloading model...')
+model = AutoModelForCausalLM.from_pretrained('microsoft/Phi-3.5-mini-instruct', torch_dtype=torch.float32)
+print('Model download complete')
+"
+
 # Clone and build application
 echo "Setting up application..."
 rm -rf /opt/phi-invoice
