@@ -19,14 +19,14 @@ resource "google_compute_instance" "phi_instance" {
   
   lifecycle {
     replace_triggered_by = [
-      null_resource.script_change.id
+      terraform_data.force_recreate.output
     ]
   }
 
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
-      size  = 20
+      size  = 50
       type  = "pd-standard"
     }
   }
@@ -62,8 +62,6 @@ resource "google_compute_firewall" "phi_firewall" {
   target_tags   = ["phi-instance"]
 }
 
-resource "null_resource" "script_change" {
-  triggers = {
-    script_hash = filesha256("${path.module}/../scripts/startup-script.sh")
-  }
+resource "terraform_data" "force_recreate" {
+  input = timestamp()
 }

@@ -1,65 +1,112 @@
 #!/bin/bash
-set -e
+exec > /var/log/startup-script.log 2>&1
+set -x
 
-# Update package lists
+echo "=== Starting Invoice Processor Setup ==="
+
+# Update and install packages
 apt-get update
-
-# Install basic packages and newer Go
-apt-get install -y --no-install-recommends python3-pip git wget
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip git wget curl
 
 # Install Go 1.21+
-wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz
+echo "Installing Go..."
+cd /tmp
+wget -q https://go.dev/dl/go1.21.6.linux-amd64.tar.gz
 tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz
-export PATH=/usr/local/go/bin:$PATH
-echo 'export PATH=/usr/local/go/bin:$PATH' >> /etc/profile
-which go && go version
+export PATH="/usr/local/go/bin:$PATH"
+echo 'export PATH="/usr/local/go/bin:$PATH"' >> /etc/profile
 
-# Install Python packages (with retry and system packages flag)
-for i in {1..3}; do
-    pip3 install --break-system-packages torch transformers accelerate huggingface_hub && break
-    echo "Retry $i/3 for pip install"
-    sleep 5
-done
+# Verify Go installation
+/usr/local/go/bin/go version
 
-# Create working directory
+# Install Python packages with proper flags (CPU-only to save space)
+echo "Installing Python packages..."
+pip3 install --break-system-packages --upgrade pip
+pip3 install --break-system-packages torch --index-url https://download.pytorch.org/whl/cpu
+pip3 install --break-system-packages transformers accelerate huggingface_hub
+
+# Verify Python packages
+python3 -c "import torch, transformers; print('Python packages installed successfully')"
+
+# Clone and build application
+echo "Setting up application..."
+rm -rf /opt/phi-invoice
 mkdir -p /opt/phi-invoice
 cd /opt/phi-invoice
 
-# Clone repo
-git clone https://github.com/Scalabit/workflow-scanner.git . || exit 1
-cd invoice || exit 1
+# Clone with retries
+for i in {1..3}; do
+    git clone https://github.com/Scalabit/workflow-scanner.git . && break
+    echo "Retry $i/3 for git clone"
+    sleep 5
+done
 
-# Verify files exist
-ls -la main.go email.go || exit 1
+cd invoice
+ls -la main.go email.go
 
-# Set Go environment
+# Build application
 export GOMODCACHE=/tmp/gomodcache
 export GOCACHE=/tmp/gocache
-mkdir -p $GOMODCACHE $GOCACHE
+export PATH="/usr/local/go/bin:$PATH"
 
-# Build the Go app
-go mod download || exit 1
-go build -o invoice-processor main.go email.go || exit 1
+/usr/local/go/bin/go mod download
+/usr/local/go/bin/go build -o invoice-processor main.go email.go
 
-# Verify binary was created
-ls -la invoice-processor || exit 1
+# Verify binary
+ls -la invoice-processor
+chmod +x invoice-processor
 
-# Get environment variables from metadata
+# Get environment variables
+echo "Getting environment variables..."
 export EMAIL_USERNAME=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/email-username" -H "Metadata-Flavor: Google")
-export EMAIL_PASSWORD=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/email-password" -H "Metadata-Flavor: Google")
+export EMAIL_PASSWORD=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/email-password" -H "Metadata-Flavor: Google") 
 export IMAP_SERVER=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/imap-server" -H "Metadata-Flavor: Google")
 export SMTP_SERVER=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/smtp-server" -H "Metadata-Flavor: Google")
 
-# Start the service
-echo "Starting invoice processor..."
-nohup ./invoice-processor </dev/null >/dev/null 2>&1 &
-sleep 3
+echo "EMAIL_USERNAME: $EMAIL_USERNAME"
+echo "IMAP_SERVER: $IMAP_SERVER"
+
+# Create systemd service for proper daemon management
+cat > /etc/systemd/system/invoice-processor.service << 'EOF'
+[Unit]
+Description=Invoice Processor Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/phi-invoice/invoice
+ExecStart=/opt/phi-invoice/invoice/invoice-processor
+Restart=always
+Environment=EMAIL_USERNAME=%EMAIL_USERNAME%
+Environment=EMAIL_PASSWORD=%EMAIL_PASSWORD%
+Environment=IMAP_SERVER=%IMAP_SERVER%
+Environment=SMTP_SERVER=%SMTP_SERVER%
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Replace environment variables in service file
+sed -i "s/%EMAIL_USERNAME%/$EMAIL_USERNAME/g" /etc/systemd/system/invoice-processor.service
+sed -i "s/%EMAIL_PASSWORD%/$EMAIL_PASSWORD/g" /etc/systemd/system/invoice-processor.service  
+sed -i "s/%IMAP_SERVER%/$IMAP_SERVER/g" /etc/systemd/system/invoice-processor.service
+sed -i "s/%SMTP_SERVER%/$SMTP_SERVER/g" /etc/systemd/system/invoice-processor.service
+
+# Enable and start service
+systemctl daemon-reload
+systemctl enable invoice-processor
+systemctl start invoice-processor
 
 # Verify service is running
-if pgrep invoice-processor; then
-    echo "Invoice processor started successfully"
-    echo "Service should be available at http://$(curl -s ifconfig.me):8000"
+sleep 5
+if systemctl is-active --quiet invoice-processor; then
+    echo "Invoice processor service started successfully"
+    systemctl status invoice-processor
 else
-    echo "Failed to start invoice processor"
+    echo "Failed to start invoice processor service"
+    systemctl status invoice-processor
     exit 1
 fi
+
+echo "=== Setup Complete ==="

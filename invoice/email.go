@@ -12,6 +12,7 @@ import (
 	"net/smtp"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
@@ -122,11 +123,28 @@ func (e *EmailProcessor) ProcessInvoiceAttachment(attachment map[string]interfac
 	return string(responseBody), nil
 }
 
-func (e *EmailProcessor) SendReply(toEmail, subject, extractedData string) error {
+func (e *EmailProcessor) SendInvoiceReport(fromEmail, originalSubject, extractedData, attachmentName string) error {
 	auth := smtp.PlainAuth("", e.Username, e.Password, strings.Split(e.SMTPServer, ":")[0])
 
-	to := []string{toEmail}
-	msg := fmt.Sprintf("To: %s\r\nSubject: Re: %s - Invoice Data Extracted\r\n\r\nInvoice data extracted:\n\n%s", toEmail, subject, extractedData)
+	// Send to our own inbox (not sender's)
+	to := []string{e.Username}
+	
+	body := fmt.Sprintf(`Invoice Processing Report
+
+EXTRACTED DATA:
+%s
+
+ORIGINAL EMAIL DETAILS:
+- From: %s
+- Subject: %s
+- Attachment: %s
+- Processed: %s
+
+---
+Automated Invoice Processing System`, 
+		extractedData, fromEmail, originalSubject, attachmentName, time.Now().Format("2006-01-02 15:04:05"))
+
+	msg := fmt.Sprintf("To: %s\r\nSubject: Invoice Processed: %s\r\n\r\n%s", e.Username, originalSubject, body)
 
 	return smtp.SendMail(e.SMTPServer, auth, e.Username, to, []byte(msg))
 }
@@ -193,8 +211,9 @@ func (e *EmailProcessor) ProcessEmails() error {
 				fromAddr = msg.Envelope.From[0].Address()
 			}
 
-			if err := e.SendReply(fromAddr, msg.Envelope.Subject, extractedData); err != nil {
-				log.Printf("Error sending reply: %v", err)
+			attachmentName := attachment["filename"].(string)
+			if err := e.SendInvoiceReport(fromAddr, msg.Envelope.Subject, extractedData, attachmentName); err != nil {
+				log.Printf("Error sending invoice report: %v", err)
 			}
 		}
 	}
