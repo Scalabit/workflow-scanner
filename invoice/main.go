@@ -24,7 +24,11 @@ type InvoiceResponse struct {
 func processWithPhi(text string) (string, error) {
 	prompt := fmt.Sprintf("Extract invoice data from this text: %s\nReturn as JSON with fields: invoice_number, date, amount, vendor, items", text)
 
-	cmd := exec.Command("python3", "-c", fmt.Sprintf(`
+	// Set timeout to 5 minutes for model loading and inference
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, "python3", "-c", fmt.Sprintf(`
 import os
 os.environ['TRANSFORMERS_CACHE'] = '/opt/phi-invoice/model_cache'
 os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
@@ -42,11 +46,6 @@ with torch.no_grad():
 result = tokenizer.decode(outputs[0], skip_special_tokens=True)
 print(result)
 `, strings.ReplaceAll(prompt, `"`, `\"`)))
-
-	// Set timeout to 5 minutes for model loading and inference
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	cmd = exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
 
 	output, err := cmd.Output()
 	if err != nil {
