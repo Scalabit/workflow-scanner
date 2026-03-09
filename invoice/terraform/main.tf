@@ -16,6 +16,12 @@ resource "google_compute_instance" "phi_instance" {
   name         = "phi35-invoice-processor"
   machine_type = "e2-standard-2"
   zone         = "${var.region}-a"
+  
+  lifecycle {
+    replace_triggered_by = [
+      null_resource.script_change.id
+    ]
+  }
 
   boot_disk {
     initialize_params {
@@ -54,4 +60,10 @@ resource "google_compute_firewall" "phi_firewall" {
 
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["phi-instance"]
+}
+
+resource "null_resource" "script_change" {
+  triggers = {
+    script_hash = filesha256("${path.module}/../scripts/startup-script.sh")
+  }
 }
