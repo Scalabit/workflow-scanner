@@ -4,12 +4,15 @@ set -e
 # Update package lists
 apt-get update
 
-# Install packages without specific versions to avoid 404s
-apt-get install -y --no-install-recommends python3-pip git golang-go
+# Install basic packages and newer Go
+apt-get install -y --no-install-recommends python3-pip git wget
 
-# Ensure go is in PATH
-export PATH=$PATH:/usr/lib/go-1.18/bin:/usr/bin
-which go || exit 1
+# Install Go 1.21+
+wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz
+export PATH=/usr/local/go/bin:$PATH
+echo 'export PATH=/usr/local/go/bin:$PATH' >> /etc/profile
+which go && go version
 
 # Install Python packages (with retry)
 for i in {1..3}; do

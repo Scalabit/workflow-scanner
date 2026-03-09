@@ -19,7 +19,7 @@ resource "google_compute_instance" "phi_instance" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      image = "ubuntu-os-cloud/ubuntu-2404-lts"
       size  = 20
       type  = "pd-standard"
     }
