@@ -3,8 +3,6 @@ name: Deploy Invoice Service
 on:
   push:
     branches: [ main, master ]
-    paths:
-      - 'invoice/**'
   workflow_dispatch:
 
 jobs:
@@ -35,7 +33,7 @@ jobs:
     - name: Terraform Init
       run: terraform init
 
-    - name: Import existing firewall rule if exists
+    - name: Import existing resources if they exist
       run: |
         terraform import \
           -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
@@ -44,6 +42,14 @@ jobs:
           -var="imap_server=${{ secrets.IMAP_SERVER }}" \
           -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
           google_compute_firewall.phi_firewall allow-phi-api || true
+        
+        terraform import \
+          -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+          -var="email_username=${{ secrets.EMAIL_USERNAME }}" \
+          -var="email_password=${{ secrets.EMAIL_PASSWORD }}" \
+          -var="imap_server=${{ secrets.IMAP_SERVER }}" \
+          -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
+          google_compute_instance.phi_instance projects/${{ secrets.GCP_PROJECT_ID }}/zones/europe-north1-a/instances/phi35-invoice-processor || true
 
     - name: Terraform Plan
       run: |
