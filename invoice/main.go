@@ -28,6 +28,13 @@ func processWithPhi(text string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	
+	// Properly escape the prompt for Python string literal
+	escapedPrompt := strings.ReplaceAll(prompt, `\`, `\\`)
+	escapedPrompt = strings.ReplaceAll(escapedPrompt, `"`, `\"`)
+	escapedPrompt = strings.ReplaceAll(escapedPrompt, "\n", "\\n")
+	escapedPrompt = strings.ReplaceAll(escapedPrompt, "\r", "\\r")
+	escapedPrompt = strings.ReplaceAll(escapedPrompt, "\t", "\\t")
+	
 	cmd := exec.CommandContext(ctx, "python3", "-c", fmt.Sprintf(`
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
@@ -36,13 +43,13 @@ import torch
 tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
 model = AutoModelForCausalLM.from_pretrained("microsoft/phi-2", torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
 
-inputs = tokenizer("""%s""", return_tensors="pt")
+inputs = tokenizer("%s", return_tensors="pt")
 with torch.no_grad():
     outputs = model.generate(**inputs, max_length=512)
 
 result = tokenizer.decode(outputs[0], skip_special_tokens=True)
 print(result)
-`, strings.ReplaceAll(prompt, `"`, `\"`)))
+`, escapedPrompt))
 
 	output, err := cmd.Output()
 	if err != nil {
