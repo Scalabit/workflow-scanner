@@ -63,5 +63,5 @@ resource "google_compute_firewall" "phi_firewall" {
 }
 
 resource "terraform_data" "force_recreate" {
-  input = timestamp()
+  input = "${timestamp()}-${filesha256("${path.module}/../scripts/startup-script.sh")}"
 }
