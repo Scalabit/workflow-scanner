@@ -28,28 +28,7 @@ pip3 install --break-system-packages transformers accelerate huggingface_hub
 # Verify Python packages
 python3 -c "import torch, transformers; print('Python packages installed successfully')"
 
-# Pre-download Phi model to avoid timeouts during processing
-echo "Pre-downloading Phi model..."
-export TRANSFORMERS_CACHE=/opt/phi-invoice/model_cache
-mkdir -p $TRANSFORMERS_CACHE
-chmod -R 777 $TRANSFORMERS_CACHE
-export HF_HOME=$TRANSFORMERS_CACHE
-
-python3 -c "
-import os
-os.environ['TRANSFORMERS_CACHE'] = '/opt/phi-invoice/model_cache'
-os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
-
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-print('Downloading tokenizer...')
-tokenizer = AutoTokenizer.from_pretrained('microsoft/phi-2')
-print('Downloading model...')
-model = AutoModelForCausalLM.from_pretrained('microsoft/phi-2', torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map='cpu')
-print('Model download complete - cached at /opt/phi-invoice/model_cache')
-"
-
-# Clone and build application
+# Clone and build application FIRST
 echo "Setting up application..."
 rm -rf /opt/phi-invoice
 mkdir -p /opt/phi-invoice
@@ -77,6 +56,27 @@ export PATH="/usr/local/go/bin:$PATH"
 # Verify binary
 ls -la invoice-processor
 chmod +x invoice-processor
+
+# Pre-download Phi model AFTER app setup to avoid cache deletion
+echo "Pre-downloading Phi model..."
+export TRANSFORMERS_CACHE=/opt/phi-invoice/model_cache
+mkdir -p $TRANSFORMERS_CACHE
+chmod -R 777 $TRANSFORMERS_CACHE
+export HF_HOME=$TRANSFORMERS_CACHE
+
+python3 -c "
+import os
+os.environ['TRANSFORMERS_CACHE'] = '/opt/phi-invoice/model_cache'
+os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+print('Downloading tokenizer...')
+tokenizer = AutoTokenizer.from_pretrained('microsoft/phi-2')
+print('Downloading model...')
+model = AutoModelForCausalLM.from_pretrained('microsoft/phi-2', torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map='cpu')
+print('Model download complete - cached at /opt/phi-invoice/model_cache')
+"
 
 # Get environment variables
 echo "Getting environment variables..."
