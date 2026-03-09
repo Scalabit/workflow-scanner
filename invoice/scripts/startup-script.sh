@@ -30,14 +30,22 @@ python3 -c "import torch, transformers; print('Python packages installed success
 
 # Pre-download Phi model to avoid timeouts during processing
 echo "Pre-downloading Phi model..."
+export TRANSFORMERS_CACHE=/opt/phi-invoice/model_cache
+mkdir -p $TRANSFORMERS_CACHE
+export HF_HOME=$TRANSFORMERS_CACHE
+
 python3 -c "
+import os
+os.environ['TRANSFORMERS_CACHE'] = '/opt/phi-invoice/model_cache'
+os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
+
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 print('Downloading tokenizer...')
 tokenizer = AutoTokenizer.from_pretrained('microsoft/Phi-3.5-mini-instruct')
 print('Downloading model...')
 model = AutoModelForCausalLM.from_pretrained('microsoft/Phi-3.5-mini-instruct', torch_dtype=torch.float32)
-print('Model download complete')
+print('Model download complete - cached at /opt/phi-invoice/model_cache')
 "
 
 # Clone and build application
