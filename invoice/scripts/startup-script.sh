@@ -45,6 +45,7 @@ cd invoice
 ls -la main.go email.go
 
 # Build application
+export HOME=/root
 export GOMODCACHE=/tmp/gomodcache
 export GOCACHE=/tmp/gocache
 export PATH="/usr/local/go/bin:$PATH"
@@ -87,11 +88,11 @@ Environment=SMTP_SERVER=%SMTP_SERVER%
 WantedBy=multi-user.target
 EOF
 
-# Replace environment variables in service file
-sed -i "s/%EMAIL_USERNAME%/$EMAIL_USERNAME/g" /etc/systemd/system/invoice-processor.service
-sed -i "s/%EMAIL_PASSWORD%/$EMAIL_PASSWORD/g" /etc/systemd/system/invoice-processor.service  
-sed -i "s/%IMAP_SERVER%/$IMAP_SERVER/g" /etc/systemd/system/invoice-processor.service
-sed -i "s/%SMTP_SERVER%/$SMTP_SERVER/g" /etc/systemd/system/invoice-processor.service
+# Replace environment variables in service file with proper escaping
+sed -i "s|%EMAIL_USERNAME%|$EMAIL_USERNAME|g" /etc/systemd/system/invoice-processor.service
+sed -i "s|%EMAIL_PASSWORD%|\"$EMAIL_PASSWORD\"|g" /etc/systemd/system/invoice-processor.service  
+sed -i "s|%IMAP_SERVER%|$IMAP_SERVER|g" /etc/systemd/system/invoice-processor.service
+sed -i "s|%SMTP_SERVER%|$SMTP_SERVER|g" /etc/systemd/system/invoice-processor.service
 
 # Enable and start service
 systemctl daemon-reload
