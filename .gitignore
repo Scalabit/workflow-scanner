@@ -19,3 +19,6 @@ terraform/**/*.tfstate.backup
 build/
 out
 script.sh
+invoice/terraform/.terraform.lock.hcl
+invoice/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/7.6.0/linux_amd64/terraform-provider-google_v7.6.0_x5
+invoice/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/7.6.0/linux_amd64/LICENSE.txt

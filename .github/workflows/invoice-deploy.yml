@@ -52,6 +52,6 @@ jobs:
     - name: Get Instance IP
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       run: |
-        INSTANCE_IP=$(gcloud compute instances describe phi35-invoice-processor --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        INSTANCE_IP=$(gcloud compute instances describe phi35-invoice-processor --zone=europe-north1 --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
         echo "Invoice service deployed at: http://$INSTANCE_IP:8000"
         echo "Health check: http://$INSTANCE_IP:8000/health"
