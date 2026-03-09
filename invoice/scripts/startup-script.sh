@@ -14,9 +14,9 @@ export PATH=/usr/local/go/bin:$PATH
 echo 'export PATH=/usr/local/go/bin:$PATH' >> /etc/profile
 which go && go version
 
-# Install Python packages (with retry)
+# Install Python packages (with retry and system packages flag)
 for i in {1..3}; do
-    pip3 install torch transformers accelerate huggingface_hub && break
+    pip3 install --break-system-packages torch transformers accelerate huggingface_hub && break
     echo "Retry $i/3 for pip install"
     sleep 5
 done
@@ -31,6 +31,11 @@ cd invoice || exit 1
 
 # Verify files exist
 ls -la main.go email.go || exit 1
+
+# Set Go environment
+export GOMODCACHE=/tmp/gomodcache
+export GOCACHE=/tmp/gocache
+mkdir -p $GOMODCACHE $GOCACHE
 
 # Build the Go app
 go mod download || exit 1
