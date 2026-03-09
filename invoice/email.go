@@ -108,7 +108,9 @@ func (e *EmailProcessor) ProcessInvoiceAttachment(attachment map[string]interfac
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 6 * time.Minute, // Allow 6 minutes for AI processing
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
