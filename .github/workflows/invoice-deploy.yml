@@ -72,9 +72,20 @@ jobs:
           -var="imap_server=${{ secrets.IMAP_SERVER }}" \
           -var="smtp_server=${{ secrets.SMTP_SERVER }}" || true
 
+    - name: Terraform Plan (after destroy)
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        terraform plan \
+          -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+          -var="email_username=${{ secrets.EMAIL_USERNAME }}" \
+          -var="email_password=${{ secrets.EMAIL_PASSWORD }}" \
+          -var="imap_server=${{ secrets.IMAP_SERVER }}" \
+          -var="smtp_server=${{ secrets.SMTP_SERVER }}" \
+          -out=tfplan-new
+
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      run: terraform apply -auto-approve tfplan
+      run: terraform apply -auto-approve tfplan-new
 
     - name: Get Instance IP
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
