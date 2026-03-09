@@ -36,7 +36,7 @@ import torch
 tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
 model = AutoModelForCausalLM.from_pretrained("microsoft/phi-2", torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
 
-inputs = tokenizer("%s", return_tensors="pt")
+inputs = tokenizer("""%s""", return_tensors="pt")
 with torch.no_grad():
     outputs = model.generate(**inputs, max_length=512)
 
