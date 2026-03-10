@@ -38,7 +38,7 @@ func extractTextFromPDF(pdfContent []byte) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "pdftotext", tmpFile.Name(), "-")
+	cmd := exec.CommandContext(ctx, "/usr/bin/pdftotext", tmpFile.Name(), "-")
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("pdftotext failed: %v, trying Python fallback", err)
@@ -84,7 +84,7 @@ except Exception as e:
     sys.exit(2)
 `, tmpFile.Name())
 
-	cmd := exec.CommandContext(ctx, "python3", "-c", pythonScript)
+	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-c", pythonScript)
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("Python PDF extraction failed: %v, trying OCR fallback", err)
@@ -121,14 +121,14 @@ func extractTextWithOCR(pdfContent []byte) (string, error) {
 	pngFile := strings.TrimSuffix(tmpFile.Name(), ".pdf") + ".png"
 	defer os.Remove(pngFile)
 	
-	cmd := exec.CommandContext(ctx, "pdftoppm", "-png", "-singlefile", tmpFile.Name(), strings.TrimSuffix(pngFile, ".png"))
+	cmd := exec.CommandContext(ctx, "/usr/bin/pdftoppm", "-png", "-singlefile", tmpFile.Name(), strings.TrimSuffix(pngFile, ".png"))
 	if err := cmd.Run(); err != nil {
 		log.Printf("pdftoppm conversion failed: %v", err)
 		return "Unable to extract text from PDF. This appears to be a corrupted, password-protected, or image-only PDF file.", nil
 	}
 
 	// OCR with tesseract
-	cmd = exec.CommandContext(ctx, "tesseract", pngFile, "stdout", "-l", "eng")
+	cmd = exec.CommandContext(ctx, "/usr/bin/tesseract", pngFile, "stdout", "-l", "eng")
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("OCR extraction failed: %v", err)
@@ -207,7 +207,7 @@ except Exception as e:
     sys.exit(1)
 `
 
-	cmd := exec.CommandContext(ctx, "python3", "-c", pythonScript)
+	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-c", pythonScript)
 	cmd.Stdin = strings.NewReader(text)
 	
 	output, err := cmd.Output()
