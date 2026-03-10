@@ -119,7 +119,7 @@ try:
     # Read invoice text from stdin
     invoice_text = sys.stdin.read()
     
-    prompt = f"Extract invoice data from this text: {invoice_text}\nReturn as JSON with fields: invoice_number, date, amount, vendor, items"
+    prompt = f"Extract invoice data from the following text and return ONLY a JSON object with these fields: invoice_number, date, amount, vendor, items.\n\nText: {invoice_text}\n\nJSON:"
     
     tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
     model = AutoModelForCausalLM.from_pretrained(
@@ -136,7 +136,18 @@ try:
         outputs = model.generate(**inputs, max_length=128, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    print(result)
+
+    import re
+    json_match = re.search(r'JSON:\s*(\{.*?\})', result, re.DOTALL)
+    if json_match:
+        json_output = json_match.group(1)
+        print(json_output)
+    else:
+        json_match = re.search(r'\{.*?\}', result, re.DOTALL)
+        if json_match:
+            print(json_match.group(0))
+        else:
+            print(json.dumps({"error": "No valid JSON found in model output", "raw_output": result[:200]}))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
     sys.exit(1)
