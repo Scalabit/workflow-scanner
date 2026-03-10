@@ -6,7 +6,7 @@ echo "=== Starting Invoice Processor Setup ==="
 
 # Update and install packages
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip git wget curl
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip git wget curl poppler-utils
 
 # Install Go 1.21+
 echo "Installing Go..."
@@ -23,7 +23,7 @@ echo 'export PATH="/usr/local/go/bin:$PATH"' >> /etc/profile
 echo "Installing Python packages..."
 pip3 install --break-system-packages --upgrade pip
 pip3 install --break-system-packages torch --index-url https://download.pytorch.org/whl/cpu
-pip3 install --break-system-packages transformers accelerate huggingface_hub
+pip3 install --break-system-packages transformers accelerate huggingface_hub pypdf
 
 # Verify Python packages
 python3 -c "import torch, transformers; print('Python packages installed successfully')"
