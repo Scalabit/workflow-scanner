@@ -4,15 +4,9 @@ set -x
 
 echo "=== Starting Invoice Processor Setup ==="
 
-# Update and install packages including CUDA drivers
+# Update and install packages
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip git wget curl poppler-utils tesseract-ocr tesseract-ocr-eng
-
-# Install CUDA drivers for T4 GPU
-curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/3bf863cc.pub | apt-key add -
-echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64 /" > /etc/apt/sources.list.d/cuda.list
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y cuda-drivers nvidia-driver-535
 
 # Install Go 1.21+
 echo "Installing Go..."
@@ -25,10 +19,10 @@ echo 'export PATH="/usr/local/go/bin:$PATH"' >> /etc/profile
 # Verify Go installation
 /usr/local/go/bin/go version
 
-# Install Python packages with GPU support
+# Install Python packages (CPU optimized)
 echo "Installing Python packages..."
 pip3 install --break-system-packages --upgrade pip
-pip3 install --break-system-packages torch --index-url https://download.pytorch.org/whl/cu121
+pip3 install --break-system-packages torch --index-url https://download.pytorch.org/whl/cpu
 pip3 install --break-system-packages transformers accelerate huggingface_hub pypdf
 
 # Verify Python packages

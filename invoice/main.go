@@ -178,9 +178,9 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
     model = AutoModelForCausalLM.from_pretrained(
         "microsoft/phi-2", 
-        torch_dtype=torch.float16,  # Use half precision
+        torch_dtype=torch.float32,  # Use float32 for CPU
         low_cpu_mem_usage=True, 
-        device_map="cuda",
+        device_map="cpu",
         trust_remote_code=True,
         use_cache=False  # Disable KV cache to save memory
     )
