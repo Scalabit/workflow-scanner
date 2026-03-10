@@ -23,7 +23,6 @@ type InvoiceResponse struct {
 }
 
 func extractTextFromPDF(pdfContent []byte) (string, error) {
-	// Write PDF to temporary file
 	tmpFile, err := os.CreateTemp("", "invoice-*.pdf")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
@@ -36,14 +35,18 @@ func extractTextFromPDF(pdfContent []byte) (string, error) {
 	}
 	tmpFile.Close()
 
-	// Use pdftotext to extract text
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "pdftotext", tmpFile.Name(), "-")
 	output, err := cmd.Output()
 	if err != nil {
-		// Fallback: try with python pypdf
+		log.Printf("pdftotext failed: %v, trying Python fallback", err)
+		return extractTextWithPythonFallback(pdfContent)
+	}
+
+	if len(strings.TrimSpace(string(output))) == 0 {
+		log.Printf("pdftotext returned empty text, trying Python fallback")
 		return extractTextWithPythonFallback(pdfContent)
 	}
 
@@ -51,22 +54,27 @@ func extractTextFromPDF(pdfContent []byte) (string, error) {
 }
 
 func extractTextWithPythonFallback(pdfContent []byte) (string, error) {
-	// Fallback to Python PDF extraction if pdftotext unavailable
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	pythonScript := `
+	tmpFile, err := os.CreateTemp("", "invoice-fallback-*.pdf")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(pdfContent); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write PDF to temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	pythonScript := fmt.Sprintf(`
 import sys
+from pypdf import PdfReader
+
 try:
-    from pypdf import PdfReader
-    from io import BytesIO
-    import binascii
-    
-    # Read hex data from stdin and convert to bytes
-    hex_data = sys.stdin.read().strip()
-    pdf_data = binascii.unhexlify(hex_data)
-    
-    reader = PdfReader(BytesIO(pdf_data))
+    reader = PdfReader("%s")
     text = ""
     for page in reader.pages:
         text += page.extract_text()
@@ -74,16 +82,22 @@ try:
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(2)
-`
+`, tmpFile.Name())
 
 	cmd := exec.CommandContext(ctx, "python3", "-c", pythonScript)
-	cmd.Stdin = strings.NewReader(fmt.Sprintf("%x", pdfContent))
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("PDF extraction failed: %w", err)
+		log.Printf("Python PDF extraction also failed: %v", err)
+		return "Unable to extract text from PDF. This appears to be a corrupted, password-protected, or image-only PDF file.", nil
 	}
 
-	return string(output), nil
+	extractedText := strings.TrimSpace(string(output))
+	if len(extractedText) == 0 {
+		log.Printf("Python PDF extraction returned empty text")
+		return "PDF appears to contain no extractable text. This may be an image-only PDF.", nil
+	}
+
+	return extractedText, nil
 }
 
 func processWithPhi(text string) (string, error) {
@@ -91,11 +105,9 @@ func processWithPhi(text string) (string, error) {
 		return `{"error":"empty text for processing"}`, nil
 	}
 
-	// Set timeout to 5 minutes for model loading and inference
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	// Use stdin to pass data - avoids escaping issues entirely
 	pythonScript := `
 import sys
 import json
@@ -181,7 +193,6 @@ func health(c *gin.Context) {
 }
 
 func main() {
-	// Start email monitoring in background
 	go func() {
 		log.Println("Starting email monitor...")
 		processor := NewEmailProcessor()
@@ -190,11 +201,10 @@ func main() {
 			if err := processor.ProcessEmails(); err != nil {
 				log.Printf("Error processing emails: %v", err)
 			}
-			time.Sleep(30 * time.Second) // Check every 30 seconds
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
-	// Start HTTP server
 	r := gin.Default()
 	r.POST("/process-invoice", processInvoice)
 	r.GET("/health", health)
