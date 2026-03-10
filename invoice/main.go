@@ -87,22 +87,76 @@ except Exception as e:
 	cmd := exec.CommandContext(ctx, "python3", "-c", pythonScript)
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("Python PDF extraction also failed: %v", err)
-		return "Unable to extract text from PDF. This appears to be a corrupted, password-protected, or image-only PDF file.", nil
+		log.Printf("Python PDF extraction failed: %v, trying OCR fallback", err)
+		return extractTextWithOCR(pdfContent)
 	}
 
 	extractedText := strings.TrimSpace(string(output))
 	if len(extractedText) == 0 {
-		log.Printf("Python PDF extraction returned empty text")
-		return "PDF appears to contain no extractable text. This may be an image-only PDF.", nil
+		log.Printf("Python PDF extraction returned empty text, trying OCR fallback")
+		return extractTextWithOCR(pdfContent)
 	}
 
+	return extractedText, nil
+}
+
+func extractTextWithOCR(pdfContent []byte) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Convert PDF to PNG using pdftoppm, then OCR with tesseract
+	tmpFile, err := os.CreateTemp("", "invoice-ocr-*.pdf")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(pdfContent); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write PDF to temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	// Convert PDF to image
+	pngFile := strings.TrimSuffix(tmpFile.Name(), ".pdf") + ".png"
+	defer os.Remove(pngFile)
+	
+	cmd := exec.CommandContext(ctx, "pdftoppm", "-png", "-singlefile", tmpFile.Name(), strings.TrimSuffix(pngFile, ".png"))
+	if err := cmd.Run(); err != nil {
+		log.Printf("pdftoppm conversion failed: %v", err)
+		return "Unable to extract text from PDF. This appears to be a corrupted, password-protected, or image-only PDF file.", nil
+	}
+
+	// OCR with tesseract
+	cmd = exec.CommandContext(ctx, "tesseract", pngFile, "stdout", "-l", "eng")
+	output, err := cmd.Output()
+	if err != nil {
+		log.Printf("OCR extraction failed: %v", err)
+		return "Unable to extract text from PDF using OCR. This may be a low-quality image or corrupted file.", nil
+	}
+
+	extractedText := strings.TrimSpace(string(output))
+	if len(extractedText) == 0 {
+		log.Printf("OCR returned empty text")
+		return "PDF appears to contain no readable text. This may be a blank document or very low quality scan.", nil
+	}
+
+	log.Printf("Successfully extracted text using OCR: %d characters", len(extractedText))
 	return extractedText, nil
 }
 
 func processWithPhi(text string) (string, error) {
 	if len(strings.TrimSpace(text)) == 0 {
 		return `{"error":"empty text for processing"}`, nil
+	}
+	
+	// Handle PDF extraction error messages
+	if strings.Contains(text, "Unable to extract text from PDF") {
+		return `{"error":"corrupted_pdf","message":"Unable to extract invoice data from corrupted, password-protected, or image-only PDF file"}`, nil
+	}
+	
+	if strings.Contains(text, "PDF appears to contain no extractable text") {
+		return `{"error":"image_only_pdf","message":"PDF appears to contain no extractable text - likely an image-only document"}`, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)

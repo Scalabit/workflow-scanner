@@ -6,7 +6,7 @@ echo "=== Starting Invoice Processor Setup ==="
 
 # Update and install packages
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip git wget curl poppler-utils
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip git wget curl poppler-utils tesseract-ocr tesseract-ocr-eng
 
 # Install Go 1.21+
 echo "Installing Go..."
