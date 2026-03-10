@@ -14,7 +14,7 @@ provider "google" {
 
 resource "google_compute_instance" "phi_instance" {
   name         = "phi35-invoice-processor"
-  machine_type = "e2-standard-4"
+  machine_type = "n1-standard-2"
   zone         = "${var.region}-a"
   
   lifecycle {
@@ -29,6 +29,15 @@ resource "google_compute_instance" "phi_instance" {
       size  = 50
       type  = "pd-standard"
     }
+  }
+
+  guest_accelerator {
+    type  = "nvidia-tesla-t4"
+    count = 1
+  }
+
+  scheduling {
+    on_host_maintenance = "TERMINATE"
   }
 
   network_interface {

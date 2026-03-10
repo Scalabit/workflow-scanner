@@ -180,7 +180,7 @@ try:
         "microsoft/phi-2", 
         torch_dtype=torch.float16,  # Use half precision
         low_cpu_mem_usage=True, 
-        device_map="cpu",
+        device_map="cuda",
         trust_remote_code=True,
         use_cache=False  # Disable KV cache to save memory
     )
