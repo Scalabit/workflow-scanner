@@ -104,6 +104,7 @@ Environment=EMAIL_USERNAME=%EMAIL_USERNAME%
 Environment=EMAIL_PASSWORD=%EMAIL_PASSWORD%
 Environment=IMAP_SERVER=%IMAP_SERVER%
 Environment=SMTP_SERVER=%SMTP_SERVER%
+Environment=PATH=%PATH%
 
 [Install]
 WantedBy=multi-user.target
@@ -114,6 +115,7 @@ sed -i "s|%EMAIL_USERNAME%|$EMAIL_USERNAME|g" /etc/systemd/system/invoice-proces
 sed -i "s|%EMAIL_PASSWORD%|\"$EMAIL_PASSWORD\"|g" /etc/systemd/system/invoice-processor.service  
 sed -i "s|%IMAP_SERVER%|$IMAP_SERVER|g" /etc/systemd/system/invoice-processor.service
 sed -i "s|%SMTP_SERVER%|$SMTP_SERVER|g" /etc/systemd/system/invoice-processor.service
+sed -i "s|%PATH%|/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin|g" /etc/systemd/system/invoice-processor.service
 
 # Enable and start service
 systemctl daemon-reload
