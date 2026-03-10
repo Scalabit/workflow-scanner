@@ -105,7 +105,7 @@ func processWithPhi(text string) (string, error) {
 		return `{"error":"empty text for processing"}`, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	pythonScript := `
@@ -122,11 +122,18 @@ try:
     prompt = f"Extract invoice data from this text: {invoice_text}\nReturn as JSON with fields: invoice_number, date, amount, vendor, items"
     
     tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
-    model = AutoModelForCausalLM.from_pretrained("microsoft/phi-2", torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
+    model = AutoModelForCausalLM.from_pretrained(
+        "microsoft/phi-2", 
+        torch_dtype=torch.float16,  # Use half precision
+        low_cpu_mem_usage=True, 
+        device_map="cpu",
+        trust_remote_code=True,
+        use_cache=False  # Disable KV cache to save memory
+    )
     
     inputs = tokenizer(prompt, return_tensors="pt")
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_length=512)
+        outputs = model.generate(**inputs, max_length=128, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
     print(result)
