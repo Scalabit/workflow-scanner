@@ -185,16 +185,16 @@ try:
     # Read invoice text from stdin
     invoice_text = sys.stdin.read()
     
-    prompt = f"Extract invoice data from the following text and return ONLY a JSON object with these fields: invoice_number, date, amount, vendor, items.\n\nText: {invoice_text}\n\nJSON:"
-    
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+    
+    messages = [
+        {"role": "user", "content": f"Extract invoice data from the following text and return ONLY a JSON object with these fields: invoice_number, date, amount, vendor, items.\n\nText: {invoice_text}\n\nJSON:"}
+    ]
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
         "microsoft/Phi-3-mini-4k-instruct", 
-        torch_dtype=torch.float32,  # Use float32 for CPU
-        low_cpu_mem_usage=True, 
-        device_map="cpu",
-        trust_remote_code=True,
-        use_cache=False  # Disable KV cache to save memory
+        torch_dtype=torch.float32,
+        device_map="cpu"
     )
     
     inputs = tokenizer(prompt, return_tensors="pt")
