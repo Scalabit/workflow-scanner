@@ -187,9 +187,9 @@ try:
     
     prompt = f"Extract invoice data from the following text and return ONLY a JSON object with these fields: invoice_number, date, amount, vendor, items.\n\nText: {invoice_text}\n\nJSON:"
     
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini")
     model = AutoModelForCausalLM.from_pretrained(
-        "microsoft/phi-2", 
+        "microsoft/Phi-3.5-mini", 
         torch_dtype=torch.float32,  # Use float32 for CPU
         low_cpu_mem_usage=True, 
         device_map="cpu",
@@ -202,18 +202,30 @@ try:
         outputs = model.generate(**inputs, max_new_tokens=256, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    # Debug: always print the full output to see what we're getting
+    import sys
+    print(f"DEBUG - Full model output: {repr(result)}", file=sys.stderr)
 
     import re
-    json_match = re.search(r'JSON:\s*(\{.*?\})', result, re.DOTALL)
-    if json_match:
-        json_output = json_match.group(1)
+    # Try multiple JSON patterns
+    patterns = [
+        r'JSON:\s*(\{.*?\})',           # JSON: {...}
+        r'\{[^{}]*"invoice_number"[^{}]*\}',  # Look for invoice_number field
+        r'\{.*?\}',                     # Any JSON object
+    ]
+    
+    json_output = None
+    for pattern in patterns:
+        json_match = re.search(pattern, result, re.DOTALL)
+        if json_match:
+            json_output = json_match.group(1) if json_match.lastindex else json_match.group(0)
+            break
+    
+    if json_output:
         print(json_output)
     else:
-        json_match = re.search(r'\{.*?\}', result, re.DOTALL)
-        if json_match:
-            print(json_match.group(0))
-        else:
-            print(json.dumps({"error": "No valid JSON found in model output", "raw_output": result[:200]}))
+        print(json.dumps({"error": "No valid JSON found in model output", "raw_output": result[:1000]}))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
     sys.exit(1)
