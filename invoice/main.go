@@ -188,7 +188,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     
     messages = [
-        {"role": "user", "content": f"You are an expert invoice data extractor. Extract ALL data from this invoice text and return ONLY a valid JSON object.\n\nRequired format:\n{{\n  \"invoice_number\": \"string\",\n  \"date\": \"string\", \n  \"total_amount\": \"number as string\",\n  \"vendor\": \"string\",\n  \"items\": [\n    {{\n      \"make_model\": \"string\",\n      \"product_code\": \"string\", \n      \"unit_price\": \"number as string\",\n      \"quantity\": \"1\"\n    }}\n  ]\n}}\n\nIMPORTANT: Extract EVERY row from any product/item tables. Each table row should be a separate item in the array.\n\nInvoice text:\n{invoice_text}\n\nJSON:"}
+        {"role": "user", "content": f"Extract all key fields from this invoice or receipt document.\nReturn ONLY valid JSON matching this exact schema (use null for any missing field):\n{{\n  \"invoice_number\": \"string | null\",\n  \"invoice_date\": \"YYYY-MM-DD | null\",\n  \"due_date\": \"YYYY-MM-DD | null\",\n  \"supplier_name\": \"string | null\",\n  \"supplier_vat\": \"string | null\",\n  \"customer_name\": \"string | null\",\n  \"total_amount\": \"number | null\",\n  \"currency\": \"EUR | USD | GBP | ... | null\",\n  \"tax_amount\": \"number | null\",\n  \"line_items\": [\n    {{\"description\": \"string\", \"quantity\": \"number\", \"unit_price\": \"number\", \"total\": \"number\"}}\n  ]\n}}\nDo not include any explanation or markdown — only the JSON object.\n\n{invoice_text}"}
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
