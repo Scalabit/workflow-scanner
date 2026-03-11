@@ -188,7 +188,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     
     messages = [
-        {"role": "user", "content": f"Extract all key fields from this invoice or receipt document.\nReturn ONLY valid JSON matching this exact schema (use null for any missing field):\n{{\n  \"invoice_number\": \"string | null\",\n  \"invoice_date\": \"YYYY-MM-DD | null\",\n  \"due_date\": \"YYYY-MM-DD | null\",\n  \"supplier_name\": \"string | null\",\n  \"supplier_vat\": \"string | null\",\n  \"customer_name\": \"string | null\",\n  \"total_amount\": \"number | null\",\n  \"currency\": \"EUR | USD | GBP | ... | null\",\n  \"tax_amount\": \"number | null\",\n  \"line_items\": [\n    {{\"description\": \"string\", \"quantity\": \"number\", \"unit_price\": \"number\", \"total\": \"number\"}}\n  ]\n}}\nDo not include any explanation or markdown — only the JSON object.\n\n{invoice_text}"}
+        {"role": "user", "content": f"Extract all key fields from this invoice document and return ONLY a JSON object note that there may be more than on item in a single document.\n\nUse this format (use null for missing fields):\n{{\n  \"invoice_number\": \"actual number or null\",\n  \"invoice_date\": \"YYYY-MM-DD or null\", \n  \"supplier_name\": \"actual name or null\",\n  \"total_amount\": 123.45,\n  \"currency\": \"EUR\",\n  \"line_items\": [\n    {{\"description\": \"item name\", \"quantity\": 1, \"unit_price\": 50.00, \"total\": 50.00}}\n  ]\n}}\n\nDocument text:\n{invoice_text}\n\nJSON:"}
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
