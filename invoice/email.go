@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -75,6 +76,17 @@ func (e *EmailProcessor) GetAttachments(msg *mail.Message) []map[string]interfac
 					content, err := io.ReadAll(p)
 					if err != nil {
 						continue
+					}
+
+					// Check if content is base64 encoded
+					encoding := strings.ToLower(p.Header.Get("Content-Transfer-Encoding"))
+					if encoding == "base64" {
+						decoded, err := base64.StdEncoding.DecodeString(string(content))
+						if err != nil {
+							log.Printf("Failed to decode base64 attachment %s: %v", filename, err)
+							continue
+						}
+						content = decoded
 					}
 
 					attachments = append(attachments, map[string]interface{}{
