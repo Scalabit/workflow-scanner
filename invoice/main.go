@@ -187,9 +187,9 @@ try:
     
     prompt = f"Extract invoice data from the following text and return ONLY a JSON object with these fields: invoice_number, date, amount, vendor, items.\n\nText: {invoice_text}\n\nJSON:"
     
-    tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
     model = AutoModelForCausalLM.from_pretrained(
-        "TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
+        "microsoft/phi-2", 
         torch_dtype=torch.float32,  # Use float32 for CPU
         low_cpu_mem_usage=True, 
         device_map="cpu",

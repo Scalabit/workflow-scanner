@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -143,6 +144,15 @@ func (e *EmailProcessor) SendInvoiceReport(fromEmail, originalSubject, extracted
 	// Send to our own inbox (not sender's)
 	to := []string{e.Username}
 	
+	// Parse the API response to extract clean JSON
+	var apiResponse map[string]interface{}
+	cleanData := extractedData
+	if err := json.Unmarshal([]byte(extractedData), &apiResponse); err == nil {
+		if extractedDataValue, ok := apiResponse["extracted_data"].(string); ok {
+			cleanData = extractedDataValue
+		}
+	}
+	
 	body := fmt.Sprintf(`Invoice Processing Report
 
 EXTRACTED DATA:
@@ -156,7 +166,7 @@ ORIGINAL EMAIL DETAILS:
 
 ---
 Automated Invoice Processing System`, 
-		extractedData, fromEmail, originalSubject, attachmentName, time.Now().Format("2006-01-02 15:04:05"))
+		cleanData, fromEmail, originalSubject, attachmentName, time.Now().Format("2006-01-02 15:04:05"))
 
 	msg := fmt.Sprintf("To: %s\r\nSubject: Invoice Processed: %s\r\n\r\n%s", e.Username, originalSubject, body)
 
