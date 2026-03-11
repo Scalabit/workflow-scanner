@@ -71,11 +71,11 @@ os.environ['HF_HOME'] = '/opt/phi-invoice/model_cache'
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-print('Downloading Phi-3-mini-4k-instruct tokenizer...')
-tokenizer = AutoTokenizer.from_pretrained('microsoft/Phi-3-mini-4k-instruct')
-print('Downloading Phi-3-mini-4k-instruct model...')
-model = AutoModelForCausalLM.from_pretrained('microsoft/Phi-3-mini-4k-instruct', torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map='cpu')
-print('Phi-3-mini-4k-instruct download complete - cached at /opt/phi-invoice/model_cache')
+print('Downloading Phi-3.5-mini-instruct tokenizer...')
+tokenizer = AutoTokenizer.from_pretrained('microsoft/Phi-3.5-mini-instruct')
+print('Downloading Phi-3.5-mini-instruct model...')
+model = AutoModelForCausalLM.from_pretrained('microsoft/Phi-3.5-mini-instruct', torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map='cpu')
+print('Phi-3.5-mini-instruct download complete - cached at /opt/phi-invoice/model_cache')
 "
 
 # Get environment variables

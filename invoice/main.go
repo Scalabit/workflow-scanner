@@ -185,21 +185,21 @@ try:
     # Read invoice text from stdin
     invoice_text = sys.stdin.read()
     
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
     
     messages = [
-        {"role": "user", "content": f"Read this invoice and extract the data as JSON. Find the invoice number, date, company name, total amount, and all items listed.\n\nInvoice text:\n{invoice_text}\n\nReturn only valid JSON with the extracted data:"}
+        {"role": "user", "content": f"Read this invoice and extract ALL data as JSON. Find the invoice number, date, company name, total amount, and extract EVERY item from any product tables or lists - there may be multiple items.\n\nInvoice text:\n{invoice_text}\n\nReturn only valid JSON with ALL the extracted data including every single item:"}
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
-        "microsoft/Phi-3-mini-4k-instruct", 
+        "microsoft/Phi-3.5-mini-instruct", 
         torch_dtype=torch.float32,
         device_map="cpu"
     )
     
     inputs = tokenizer(prompt, return_tensors="pt")
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=256, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+        outputs = model.generate(**inputs, max_new_tokens=512, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
     
