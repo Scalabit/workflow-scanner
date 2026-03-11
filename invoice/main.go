@@ -33,6 +33,10 @@ func extractTextFromPDF(pdfContent []byte) (string, error) {
 		tmpFile.Close()
 		return "", fmt.Errorf("failed to write PDF to temp file: %w", err)
 	}
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to sync temp file: %w", err)
+	}
 	tmpFile.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -66,6 +70,10 @@ func extractTextWithPythonFallback(pdfContent []byte) (string, error) {
 	if _, err := tmpFile.Write(pdfContent); err != nil {
 		tmpFile.Close()
 		return "", fmt.Errorf("failed to write PDF to temp file: %w", err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to sync temp file: %w", err)
 	}
 	tmpFile.Close()
 
@@ -114,6 +122,10 @@ func extractTextWithOCR(pdfContent []byte) (string, error) {
 	if _, err := tmpFile.Write(pdfContent); err != nil {
 		tmpFile.Close()
 		return "", fmt.Errorf("failed to write PDF to temp file: %w", err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to sync temp file: %w", err)
 	}
 	tmpFile.Close()
 
