@@ -188,7 +188,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     
     messages = [
-        {"role": "user", "content": f"Extract all key fields from this invoice document and return ONLY a JSON object note that there may be more than on item in a single document.\n\nUse this format (use null for missing fields):\n{{\n  \"invoice_number\": \"actual number or null\",\n  \"invoice_date\": \"YYYY-MM-DD or null\", \n  \"supplier_name\": \"actual name or null\",\n  \"total_amount\": 123.45,\n  \"currency\": \"EUR\",\n  \"line_items\": [\n    {{\"description\": \"item name\", \"quantity\": 1, \"unit_price\": 50.00, \"total\": 50.00}}\n  ]\n}}\n\nDocument text:\n{invoice_text}\n\nJSON:"}
+        {"role": "user", "content": f"Read this invoice and extract the data as JSON. Find the invoice number, date, company name, total amount, and all items listed.\n\nInvoice text:\n{invoice_text}\n\nReturn only valid JSON with the extracted data:"}
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
