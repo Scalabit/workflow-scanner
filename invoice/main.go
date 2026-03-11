@@ -188,7 +188,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     
     messages = [
-        {"role": "user", "content": f"Extract invoice data from the following text and return ONLY a JSON object with these fields: invoice_number, date, amount, vendor, items.\n\nText: {invoice_text}\n\nJSON:"}
+        {"role": "user", "content": f"Extract ALL invoice data from the following text and return ONLY a JSON object with these exact fields: invoice_number, date, total_amount, vendor, items (array of objects with make_model, product_code, unit_price, quantity).\n\nExtract ALL items from any tables or lists. Look for product codes, prices, quantities, and descriptions.\n\nText: {invoice_text}\n\nJSON:"}
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
