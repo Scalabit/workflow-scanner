@@ -14,7 +14,7 @@ provider "google" {
 
 resource "google_compute_instance" "phi_instance" {
   name         = "phi35-invoice-processor"
-  machine_type = "e2-standard-4"
+  machine_type = "e2-standard-8"
   zone         = "${var.region}-a"
   
   lifecycle {
