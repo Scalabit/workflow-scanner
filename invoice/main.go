@@ -169,8 +169,7 @@ func processWithPhi(text string) (string, error) {
 	if len(strings.TrimSpace(text)) == 0 {
 		return `{"error":"empty text for processing"}`, nil
 	}
-	
-	// Handle PDF extraction error messages
+
 	if strings.Contains(text, "Unable to extract text from PDF") {
 		return `{"error":"corrupted_pdf","message":"Unable to extract invoice data from corrupted, password-protected, or image-only PDF file"}`, nil
 	}
@@ -219,19 +218,12 @@ try:
     import gc
     gc.collect()
     
-    # Debug: always print the full output to see what we're getting
-    import sys
-    print(f"DEBUG - Full model output: {repr(result)}", file=sys.stderr)
-
     import re
-    
-    # Extract JSON from markdown code blocks first
     json_output = None
     markdown_match = re.search(r'` + "`" + `json\s*(.*?)\s*` + "`" + `', result, re.DOTALL)
     if markdown_match:
         json_output = markdown_match.group(1).strip()
     else:
-        # Try other JSON patterns
         patterns = [
             r'JSON:\s*(\{.*?\})',           # JSON: {...}
             r'\{[^{}]*"invoice_number"[^{}]*\}',  # Look for invoice_number field

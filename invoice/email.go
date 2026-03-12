@@ -79,7 +79,6 @@ func (e *EmailProcessor) GetAttachments(msg *mail.Message) []map[string]interfac
 						continue
 					}
 
-					// Check if content is base64 encoded
 					encoding := strings.ToLower(p.Header.Get("Content-Transfer-Encoding"))
 					if encoding == "base64" {
 						decoded, err := base64.StdEncoding.DecodeString(string(content))
@@ -141,10 +140,8 @@ func (e *EmailProcessor) ProcessInvoiceAttachment(attachment map[string]interfac
 func (e *EmailProcessor) SendInvoiceReport(fromEmail, originalSubject, extractedData, attachmentName string) error {
 	auth := smtp.PlainAuth("", e.Username, e.Password, strings.Split(e.SMTPServer, ":")[0])
 
-	// Send to our own inbox (not sender's)
 	to := []string{e.Username}
-	
-	// Parse the API response to extract clean JSON
+
 	var apiResponse map[string]interface{}
 	cleanData := extractedData
 	if err := json.Unmarshal([]byte(extractedData), &apiResponse); err == nil {
