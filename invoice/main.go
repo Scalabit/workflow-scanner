@@ -216,19 +216,25 @@ try:
     print(f"DEBUG - Full model output: {repr(result)}", file=sys.stderr)
 
     import re
-    # Try multiple JSON patterns
-    patterns = [
-        r'JSON:\s*(\{.*?\})',           # JSON: {...}
-        r'\{[^{}]*"invoice_number"[^{}]*\}',  # Look for invoice_number field
-        r'\{.*?\}',                     # Any JSON object
-    ]
     
+    # Extract JSON from markdown code blocks first
     json_output = None
-    for pattern in patterns:
-        json_match = re.search(pattern, result, re.DOTALL)
-        if json_match:
-            json_output = json_match.group(1) if json_match.lastindex else json_match.group(0)
-            break
+    markdown_match = re.search(r'` + "`" + `json\s*(.*?)\s*` + "`" + `', result, re.DOTALL)
+    if markdown_match:
+        json_output = markdown_match.group(1).strip()
+    else:
+        # Try other JSON patterns
+        patterns = [
+            r'JSON:\s*(\{.*?\})',           # JSON: {...}
+            r'\{[^{}]*"invoice_number"[^{}]*\}',  # Look for invoice_number field
+            r'\{.*?\}',                     # Any JSON object
+        ]
+        
+        for pattern in patterns:
+            json_match = re.search(pattern, result, re.DOTALL)
+            if json_match:
+                json_output = json_match.group(1) if json_match.lastindex else json_match.group(0)
+                break
     
     if json_output:
         print(json_output)
