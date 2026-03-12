@@ -42,7 +42,7 @@ func extractTextFromPDF(pdfContent []byte) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/pdftotext", tmpFile.Name(), "-")
+	cmd := exec.CommandContext(ctx, "/usr/bin/pdftotext", "-layout", "-nopgbrk", tmpFile.Name(), "-")
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("pdftotext failed: %v, trying Python fallback", err)
@@ -84,9 +84,17 @@ from pypdf import PdfReader
 try:
     reader = PdfReader("%s")
     text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    print(text)
+    for page_num, page in enumerate(reader.pages):
+        page_text = page.extract_text()
+        if page_text:
+            text += f"\n--- Page {page_num + 1} ---\n"
+            text += page_text + "\n"
+    
+    if not text.strip():
+        print("No extractable text found in PDF", file=sys.stderr)
+        sys.exit(1)
+    
+    print(text.strip())
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(2)
@@ -199,7 +207,7 @@ try:
     
     inputs = tokenizer(prompt, return_tensors="pt")
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=512, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+        outputs = model.generate(**inputs, max_new_tokens=2048, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
     
