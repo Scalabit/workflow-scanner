@@ -196,7 +196,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
     
     messages = [
-        {"role": "user", "content": f"Read this invoice and extract ALL data as JSON. Find the invoice number, date, company name, total amount, and extract EVERY item from any product tables or lists - there may be multiple items.\n\nInvoice text:\n{invoice_text}\n\nReturn only valid JSON with ALL the extracted data including every single item:"}
+        {"role": "user", "content": f"Read this invoice and extract ALL data as JSON. Find the invoice number, date, due date, company name, total amount, and extract EVERY item from any product tables or lists - there may be multiple items.\n\nInvoice text:\n{invoice_text}\n\nReturn only valid JSON with ALL the extracted data including every single item. Make sure to include 'due_date' field if present:"}
     ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     model = AutoModelForCausalLM.from_pretrained(
@@ -210,6 +210,14 @@ try:
         outputs = model.generate(**inputs, max_new_tokens=2048, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     
     result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    # Clean up to free memory
+    del model
+    del tokenizer
+    del inputs
+    del outputs
+    import gc
+    gc.collect()
     
     # Debug: always print the full output to see what we're getting
     import sys
