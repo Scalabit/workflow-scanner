@@ -25,7 +25,7 @@ variable "vm_name" {
 variable "machine_type" {
   description = "Machine type for the VM - meets minimum Wazuh requirements"
   type        = string
-  default     = "e2-small"  # 2vCPU, 2GB RAM - meets minimum requirements
+  default     = "e2-medium"  # 2vCPU, 4GB RAM - meets Wazuh requirements
 }
 
 variable "disk_size_gb" {
