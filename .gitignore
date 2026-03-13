@@ -14,6 +14,7 @@ terraform/**/*.tfvars
 terraform/**/.terraform/
 terraform/**/*.tfstate
 terraform/**/*.tfstate.backup
+wazuh-windows-vm/terraform.tfvars
 
 
 build/
@@ -22,3 +23,6 @@ script.sh
 invoice/terraform/.terraform.lock.hcl
 invoice/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/7.6.0/linux_amd64/terraform-provider-google_v7.6.0_x5
 invoice/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/7.6.0/linux_amd64/LICENSE.txt
+
+wazuh-windows-vm/README.md
+wazuh-manager/README.md

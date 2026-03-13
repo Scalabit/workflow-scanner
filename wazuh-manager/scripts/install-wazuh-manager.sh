@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# Wazuh Manager Installation Script for Ubuntu 22.04
+# This script installs Wazuh manager, indexer, and dashboard using the all-in-one installer
+
+set -e
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/wazuh-install.log
+}
+
+log "Starting Wazuh all-in-one installation..."
+
+# Update system packages
+log "Updating system packages..."
+apt-get update -y
+apt-get upgrade -y
+
+# Install required dependencies
+log "Installing required dependencies..."
+apt-get install -y curl wget gnupg lsb-release
+
+# Download and install Wazuh all-in-one
+log "Downloading Wazuh installation script..."
+cd /tmp
+curl -sO https://packages.wazuh.com/4.14/wazuh-install.sh
+
+# Make the script executable
+chmod +x wazuh-install.sh
+
+# Run the all-in-one installation
+log "Starting Wazuh all-in-one installation (this may take several minutes)..."
+./wazuh-install.sh -a 2>&1 | tee -a /var/log/wazuh-install.log
+
+# The installation script generates random passwords, let's save them
+log "Saving installation output and credentials..."
+
+# Extract the admin credentials from the installation log
+if grep -q "User: admin" /var/log/wazuh-install.log; then
+    log "Installation completed successfully!"
+    
+    # Extract and save credentials
+    grep -A 2 "User: admin" /var/log/wazuh-install.log > /tmp/wazuh-credentials.txt
+    
+    # Make credentials readable by root only
+    chmod 600 /tmp/wazuh-credentials.txt
+    
+    log "Credentials saved to /tmp/wazuh-credentials.txt"
+else
+    log "Warning: Could not find admin credentials in installation log"
+fi
+
+# Check service status
+log "Checking Wazuh services status..."
+
+# Check if services are running
+if systemctl is-active --quiet wazuh-manager; then
+    log "Wazuh Manager service is running"
+else
+    log "Warning: Wazuh Manager service is not running"
+fi
+
+if systemctl is-active --quiet wazuh-indexer; then
+    log "Wazuh Indexer service is running"
+else
+    log "Warning: Wazuh Indexer service is not running"
+fi
+
+if systemctl is-active --quiet wazuh-dashboard; then
+    log "Wazuh Dashboard service is running"
+else
+    log "Warning: Wazuh Dashboard service is not running"
+fi
+
+# Configure agent enrollment settings
+log "Configuring agent enrollment..."
+
+# Enable agent registration
+if [ -f /var/ossec/etc/ossec.conf ]; then
+    # Backup original configuration
+    cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.backup
+    
+    # Enable auto-enrollment and set registration password
+    sed -i 's/<use_password>no<\/use_password>/<use_password>yes<\/use_password>/' /var/ossec/etc/ossec.conf
+    
+    # Restart wazuh-manager to apply changes
+    systemctl restart wazuh-manager
+    log "Agent registration configured"
+else
+    log "Warning: Wazuh configuration file not found"
+fi
+
+# Set up agent password
+log "Setting up agent registration password..."
+if [ -f /var/ossec/etc/authd.pass ]; then
+    # Use the default password if not specified
+    echo "WazuhPassword123" > /var/ossec/etc/authd.pass
+    chown ossec:ossec /var/ossec/etc/authd.pass
+    chmod 640 /var/ossec/etc/authd.pass
+    log "Agent registration password configured"
+fi
+
+# Display installation summary
+log "=== Wazuh Installation Summary ==="
+log "Wazuh Manager: Installed"
+log "Wazuh Indexer: Installed" 
+log "Wazuh Dashboard: Installed"
+log "External IP: $(curl -s ifconfig.me 2>/dev/null || echo 'Unable to determine')"
+log "Internal IP: $(hostname -I | awk '{print $1}')"
+log ""
+log "Dashboard URL: https://$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+log ""
+log "Agent enrollment command template:"
+log "For internal communication: Use IP $(hostname -I | awk '{print $1}')"
+log ""
+log "Installation logs: /var/log/wazuh-install.log"
+log "Credentials: /tmp/wazuh-credentials.txt"
+log ""
+log "=== Installation Complete ==="
+
+# Create completion marker
+touch /var/log/wazuh-install-complete
+echo "$(date): Wazuh installation completed successfully" > /var/log/wazuh-install-complete
+
+log "Wazuh installation script finished successfully!"
