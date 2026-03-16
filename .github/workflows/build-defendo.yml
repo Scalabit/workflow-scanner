@@ -6,6 +6,7 @@ on:
     paths:
     - 'defendo/**'
     - '.github/workflows/build-defendo.yml'
+  workflow_call:
   workflow_dispatch:
 
 env:
@@ -25,6 +26,12 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+
+    - name: Verify directory structure
+      run: |
+        ls -la
+        ls -la defendo/ || echo "defendo directory not found"
+        ls -la defendo/agent/ || echo "defendo/agent directory not found"
 
     - name: Download external tools
       working-directory: defendo/agent
