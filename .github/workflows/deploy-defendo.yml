@@ -90,7 +90,7 @@ jobs:
         try {
             Write-Log "Starting defendo agent deployment..."
             
-            # Stop any existing agent
+            # Stop any existing agent processes
             Get-Process -Name "guardify-agent" -ErrorAction SilentlyContinue | Stop-Process -Force
             
             # Copy binaries
@@ -104,34 +104,33 @@ jobs:
             
             Write-Log "Binaries deployed successfully"
             
-            # Create service to run agent
+            # Remove any existing service or scheduled task
             $serviceName = "DefendoAgent"
             $serviceExists = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-            
             if ($serviceExists) {
                 Stop-Service -Name $serviceName -Force
                 & sc.exe delete $serviceName
-                Start-Sleep 2
+                Write-Log "Removed existing service"
             }
             
-            # Create new service (excluding WiFi check #8 for Windows Server)
-            $project = "workflow-scanner"
-            $topic = "defendo-windows-alerts"
+            Unregister-ScheduledTask -TaskName "DefendoAgent" -Confirm:$false -ErrorAction SilentlyContinue
+            Write-Log "Removed existing scheduled task"
+            
+            # Create scheduled task to run agent every 10 minutes (excluding WiFi check #8 for Windows Server)
             $exePath = "$defendoPath\guardify-agent.exe"
-            $arguments = '--pubsub-project workflow-scanner --pubsub-topic defendo-windows-alerts --interval 10m --json --only "1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34"'
+            $arguments = "--pubsub-project workflow-scanner --pubsub-topic defendo-windows-alerts --interval 10m --json --only 1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34"
             
-            & sc.exe create $serviceName binPath= "`"$exePath`" $arguments" start= auto DisplayName= "Defendo Security Agent"
-            & sc.exe description $serviceName "Defendo security monitoring agent"
+            $action = New-ScheduledTaskAction -Execute $exePath -Argument $arguments
+            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 10)
+            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+            $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
             
-            # Set service to restart on failure
-            & sc.exe failure $serviceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
+            Register-ScheduledTask -TaskName "DefendoAgent" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
+            Write-Log "Defendo agent scheduled task created"
             
-            Start-Service -Name $serviceName
-            Write-Log "Defendo agent service started successfully"
-            
-            # Verify service is running
-            $serviceStatus = Get-Service -Name $serviceName
-            Write-Log "Service status: $($serviceStatus.Status)"
+            # Start the task immediately for first run
+            Start-ScheduledTask -TaskName "DefendoAgent"
+            Write-Log "Defendo agent task started - will run every 10 minutes"
             
             
         } catch {
