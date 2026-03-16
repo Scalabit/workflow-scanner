@@ -40,6 +40,11 @@ jobs:
         name: guardify-tools
         path: ./artifacts/tools/
 
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ~1.5
+
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
       with:
@@ -47,6 +52,11 @@ jobs:
 
     - name: Setup gcloud CLI
       uses: google-github-actions/setup-gcloud@v2
+
+    - name: Initialize Terraform
+      run: |
+        cd defendo-windows-vm
+        terraform init
 
     - name: Get VM IP
       id: vm_info
