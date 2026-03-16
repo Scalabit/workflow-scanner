@@ -19,7 +19,7 @@ resource "google_compute_disk" "defendo_boot_disk" {
   zone = var.zone
   size = var.disk_size_gb
   
-  image = "windows-server-2022-dc-v20241210"
+  image = "windows-server-2022-dc"
 
   labels = {
     environment = "security"
@@ -67,9 +67,9 @@ resource "google_compute_instance" "defendo_vm" {
 }
 
 resource "google_service_account" "defendo_agent" {
-  account_id   = "defendo-agent-sa"
-  display_name = "Defendo Agent Service Account"
-  description  = "Service account for Defendo security agent"
+  account_id   = "defendo-windows-agent-sa"
+  display_name = "Defendo Windows Agent Service Account"
+  description  = "Service account for Defendo Windows security agent"
 }
 
 resource "google_project_iam_member" "defendo_pubsub_publisher" {
@@ -79,16 +79,16 @@ resource "google_project_iam_member" "defendo_pubsub_publisher" {
 }
 
 resource "google_pubsub_topic" "defendo_alerts" {
-  name = "defendo-security-alerts"
+  name = "defendo-windows-alerts"
 
   labels = {
     environment = "security"
-    purpose     = "defendo-agent"
+    purpose     = "defendo-windows-agent"
   }
 }
 
 resource "google_compute_firewall" "defendo_rdp" {
-  name    = "allow-defendo-rdp"
+  name    = "allow-defendo-windows-rdp"
   network = "default"
 
   allow {
