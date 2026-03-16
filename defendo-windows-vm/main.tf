@@ -13,18 +13,10 @@ provider "google" {
   region  = var.region
 }
 
-resource "google_compute_disk" "defendo_boot_disk" {
-  name = "${var.vm_name}-boot-disk"
-  type = "pd-ssd"
-  zone = var.zone
-  size = var.disk_size_gb
-  
-  image = "windows-server-2022-dc"
-
-  labels = {
-    environment = "security"
-    purpose     = "defendo-agent"
-  }
+# Get the latest Windows Server 2022 image
+data "google_compute_image" "windows_2022" {
+  family  = "windows-2022"
+  project = "windows-cloud"
 }
 
 resource "google_compute_instance" "defendo_vm" {
@@ -35,8 +27,11 @@ resource "google_compute_instance" "defendo_vm" {
   tags = ["defendo-agent", "windows-vm", "security"]
 
   boot_disk {
-    source      = google_compute_disk.defendo_boot_disk.id
-    auto_delete = false
+    initialize_params {
+      image = data.google_compute_image.windows_2022.self_link
+      size  = var.disk_size_gb
+      type  = "pd-ssd"
+    }
   }
 
   network_interface {
