@@ -1,0 +1,146 @@
+name: Terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
+
+# Prevent concurrent runs on the same branch to avoid state conflicts.
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false  # never cancel an in-progress apply
+
+permissions:
+  contents: read
+  id-token: write       # Required for Workload Identity Federation
+  pull-requests: write  # Required to post the plan as a PR comment
+
+env:
+  TF_VERSION:   "~1.9"
+  WORKING_DIR:  terraform
+
+jobs:
+  terraform:
+    name: ${{ github.event_name == 'push' && 'Apply' || 'Plan' }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      # ── 1. Source ────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Auth ──────────────────────────────────────────────────────────────
+      # Uses Workload Identity Federation — no long-lived keys in secrets.
+      # Required secrets:
+      #   WIF_PROVIDER         → value of `terraform output wif_provider`
+      #   WIF_SERVICE_ACCOUNT  → value of `terraform output terraform_ci_service_account`
+      #   TF_STATE_BUCKET      → name of the GCS bucket holding Terraform state
+      #   GCP_PROJECT_ID       → Google Cloud project ID
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account:            ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      # ── 3. Terraform setup ───────────────────────────────────────────────────
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true  # Captures stdout/stderr for plan comment
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+
+      # ── 4. Validate ──────────────────────────────────────────────────────────
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      # ── 5. Plan ──────────────────────────────────────────────────────────────
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -no-color \
+            -out=tfplan \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="github_repository=${{ github.repository }}"
+        continue-on-error: true  # Let us post the failed plan to the PR
+
+      - name: Post Plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN_STDOUT: ${{ steps.plan.outputs.stdout }}
+          PLAN_STDERR: ${{ steps.plan.outputs.stderr }}
+        with:
+          script: |
+            const outcome  = '${{ steps.plan.outcome }}';
+            const icon     = outcome === 'success' ? '✅' : '❌';
+            const stdout   = process.env.PLAN_STDOUT || '(no output)';
+            const stderr   = process.env.PLAN_STDERR || '';
+            const errBlock = stderr
+              ? `\n<details><summary>Errors</summary>\n\n\`\`\`\n${stderr}\n\`\`\`\n</details>`
+              : '';
+
+            const body = [
+              `### Terraform Plan ${icon}`,
+              '',
+              '<details><summary>Show plan</summary>',
+              '',
+              '```terraform',
+              stdout,
+              '```',
+              '</details>',
+              errBlock,
+              '',
+              `*Triggered by @${{ github.actor }} on \`${{ github.head_ref }}\`*`,
+            ].join('\n');
+
+            // Delete previous plan comments to keep the PR tidy.
+            const comments = await github.rest.issues.listComments({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            for (const c of comments.data) {
+              if (c.user.login === 'github-actions[bot]' && c.body.startsWith('### Terraform Plan')) {
+                await github.rest.issues.deleteComment({
+                  owner:      context.repo.owner,
+                  repo:       context.repo.repo,
+                  comment_id: c.id,
+                });
+              }
+            }
+
+            await github.rest.issues.createComment({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail if Plan Failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      # ── 6. Apply (main branch only) ──────────────────────────────────────────
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan

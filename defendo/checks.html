@@ -1,0 +1,2251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Security Checks — Defendo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ============================
+       RESET & BASE
+    ============================ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --primary: #2563EB;
+      --primary-dark: #1D4ED8;
+      --accent: #0EA5E9;
+      --dark: #111827;
+      --gray: #6B7280;
+      --light-bg: #F9FAFB;
+      --white: #FFFFFF;
+      --green: #10B981;
+      --border: #E5E7EB;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05);
+      --shadow-lg: 0 10px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-lg: 20px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--dark);
+      background: var(--white);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    img { max-width: 100%; }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ============================
+       BUTTONS
+    ============================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 24px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--white);
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(37,99,235,0.35);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 1.5px solid var(--primary);
+    }
+    .btn-outline:hover {
+      background: #EFF6FF;
+      transform: translateY(-1px);
+    }
+
+    .btn-white {
+      background: var(--white);
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .btn-white:hover {
+      background: #F0F4FF;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+
+    .btn-lg {
+      padding: 14px 32px;
+      font-size: 1rem;
+      border-radius: 10px;
+    }
+
+    /* ============================
+       NAVBAR
+    ============================ */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .navbar.scrolled {
+      border-bottom-color: var(--border);
+      box-shadow: 0 1px 16px rgba(0,0,0,0.07);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 1.125rem;
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.01em;
+    }
+
+    .nav-logo svg {
+      flex-shrink: 0;
+    }
+
+    .nav-logo span.accent {
+      color: var(--primary);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--gray);
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .nav-links a:hover {
+      color: var(--dark);
+      background: var(--light-bg);
+    }
+
+    .nav-links a.active {
+      color: var(--primary);
+      background: #EFF6FF;
+      font-weight: 600;
+    }
+
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .hamburger:hover { background: var(--light-bg); }
+    .hamburger span {
+      display: block;
+      height: 2px;
+      background: var(--dark);
+      border-radius: 2px;
+      transition: all 0.25s ease;
+    }
+    .hamburger.open span:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .hamburger.open span:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    .hamburger.open span:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .mobile-menu {
+      display: none;
+      flex-direction: column;
+      background: var(--white);
+      border-top: 1px solid var(--border);
+      padding: 16px 24px 24px;
+      gap: 4px;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      color: var(--dark);
+      transition: background 0.15s;
+    }
+    .mobile-menu a:hover { background: var(--light-bg); }
+    .mobile-menu a.active {
+      color: var(--primary);
+      background: #EFF6FF;
+      font-weight: 600;
+    }
+    .mobile-menu .btn {
+      margin-top: 8px;
+      justify-content: center;
+    }
+
+    /* ============================
+       SECTION COMMON
+    ============================ */
+    .section {
+      padding: 96px 0;
+    }
+
+    .section-alt {
+      background: var(--light-bg);
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(1.75rem, 2.8vw, 2.375rem);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      color: var(--dark);
+    }
+
+    .section-sub {
+      font-size: 1.0625rem;
+      color: var(--gray);
+      max-width: 560px;
+      line-height: 1.7;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .section-header .section-sub {
+      margin: 0 auto;
+    }
+
+    /* ============================
+       FEATURE CARD (base — same as index.html)
+    ============================ */
+    .feature-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+    }
+
+    .feature-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+      border-color: #BFDBFE;
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: #EFF6FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    /* ============================
+       CTA BANNER
+    ============================ */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--primary) 0%, #1E40AF 60%, #0369A1 100%);
+      padding: 80px 0;
+    }
+
+    .cta-banner-inner {
+      text-align: center;
+    }
+
+    .cta-banner h2 {
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+    }
+
+    .cta-banner p {
+      font-size: 1.0625rem;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 36px;
+    }
+
+    /* ============================
+       FOOTER
+    ============================ */
+    .footer {
+      background: var(--dark);
+      padding: 64px 0 40px;
+      color: #9CA3AF;
+    }
+
+    .footer-top {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr 1fr;
+      gap: 48px;
+      margin-bottom: 48px;
+    }
+
+    .footer-brand {}
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.0625rem;
+      font-weight: 800;
+      color: var(--white);
+      margin-bottom: 12px;
+    }
+
+    .footer-tagline {
+      font-size: 0.875rem;
+      line-height: 1.6;
+      max-width: 220px;
+    }
+
+    .footer-col-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 16px;
+    }
+
+    .footer-links {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-links a {
+      font-size: 0.875rem;
+      color: #9CA3AF;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover { color: var(--white); }
+
+    .footer-bottom {
+      border-top: 1px solid #1F2937;
+      padding-top: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-copy {
+      font-size: 0.8125rem;
+    }
+
+    .footer-legal {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-legal a {
+      font-size: 0.8125rem;
+      color: #9CA3AF;
+      transition: color 0.15s;
+    }
+    .footer-legal a:hover { color: var(--white); }
+
+    /* ============================
+       HERO — CHECKS PAGE
+    ============================ */
+    .checks-hero {
+      padding: 140px 0 80px;
+      background: linear-gradient(160deg, #EFF6FF 0%, #F9FAFB 50%, #F0F9FF 100%);
+      text-align: center;
+    }
+
+    .checks-hero .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #EFF6FF;
+      color: var(--primary);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #BFDBFE;
+    }
+
+    .checks-hero h1 {
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.18;
+      letter-spacing: -0.03em;
+      color: var(--dark);
+      margin-bottom: 20px;
+    }
+
+    .checks-hero .hero-sub {
+      font-size: 1.0625rem;
+      color: var(--gray);
+      line-height: 1.7;
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Stat pills row */
+    .stat-pills {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 40px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--dark);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stat-pill .pill-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #EFF6FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    /* ============================
+       CHECKS SECTIONS
+    ============================ */
+    .checks-section {
+      padding: 80px 0 0;
+    }
+
+    .checks-section:last-of-type {
+      padding-bottom: 80px;
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .category-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .category-title {
+      font-size: 1.375rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--dark);
+    }
+
+    .category-count {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--gray);
+      margin-top: 2px;
+    }
+
+    /* Category color schemes */
+    .cat-blue   { --cat-color: #2563EB; --cat-bg: #EFF6FF; --cat-border: #BFDBFE; --cat-light: #DBEAFE; }
+    .cat-purple { --cat-color: #7C3AED; --cat-bg: #F5F3FF; --cat-border: #DDD6FE; --cat-light: #EDE9FE; }
+    .cat-green  { --cat-color: #059669; --cat-bg: #ECFDF5; --cat-border: #A7F3D0; --cat-light: #D1FAE5; }
+    .cat-orange { --cat-color: #D97706; --cat-bg: #FFFBEB; --cat-border: #FDE68A; --cat-light: #FEF3C7; }
+    .cat-teal   { --cat-color: #0D9488; --cat-bg: #F0FDFA; --cat-border: #99F6E4; --cat-light: #CCFBF1; }
+    .cat-sky    { --cat-color: #0284C7; --cat-bg: #F0F9FF; --cat-border: #BAE6FD; --cat-light: #E0F2FE; }
+    .cat-red    { --cat-color: #DC2626; --cat-bg: #FEF2F2; --cat-border: #FECACA; --cat-light: #FEE2E2; }
+    .cat-indigo { --cat-color: #4F46E5; --cat-bg: #EEF2FF; --cat-border: #C7D2FE; --cat-light: #E0E7FF; }
+    .cat-rose   { --cat-color: #E11D48; --cat-bg: #FFF1F2; --cat-border: #FECDD3; --cat-light: #FFE4E6; }
+
+    .category-icon {
+      background: var(--cat-bg);
+      color: var(--cat-color);
+    }
+
+    .checks-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    /* Check card */
+    .check-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--cat-color);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .check-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+
+    .check-card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .check-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--cat-bg);
+      color: var(--cat-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .check-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .check-cat-badge {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--cat-color);
+      background: var(--cat-bg);
+      border: 1px solid var(--cat-border);
+      padding: 2px 9px;
+      border-radius: 20px;
+      margin-bottom: 6px;
+    }
+
+    .check-name {
+      font-size: 1.0rem;
+      font-weight: 700;
+      color: var(--dark);
+      line-height: 1.3;
+    }
+
+    .check-desc {
+      font-size: 0.875rem;
+      color: var(--gray);
+      line-height: 1.65;
+    }
+
+    .check-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Status level badges */
+    .status-levels {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .status-levels-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 2px;
+    }
+
+    .sl-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 0.6875rem;
+      font-weight: 700;
+    }
+
+    .sl-ok       { background: #D1FAE5; color: #065F46; }
+    .sl-warning  { background: #FEF3C7; color: #92400E; }
+    .sl-critical { background: #FEE2E2; color: #991B1B; }
+    .sl-error    { background: #F3F4F6; color: #374151; }
+
+    /* Data source tag */
+    .data-source {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--gray);
+      background: var(--light-bg);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    /* ============================
+       CHECKS PAGE CTA
+    ============================ */
+    .checks-cta {
+      background: linear-gradient(135deg, var(--primary) 0%, #1E40AF 60%, #0369A1 100%);
+      padding: 80px 0;
+    }
+
+    .checks-cta-inner {
+      text-align: center;
+    }
+
+    .checks-cta h2 {
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.025em;
+      margin-bottom: 16px;
+    }
+
+    .checks-cta p {
+      font-size: 1.0625rem;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 36px;
+    }
+
+    /* ============================
+       RESPONSIVE
+    ============================ */
+    @media (max-width: 1024px) {
+      .footer-top {
+        grid-template-columns: 1fr 1fr;
+        gap: 36px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links,
+      .nav-cta { display: none; }
+      .hamburger { display: flex; }
+
+      .checks-hero { padding: 110px 0 60px; }
+
+      .section { padding: 64px 0; }
+
+      .checks-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-top {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+
+      .footer-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stat-pills {
+        gap: 8px;
+      }
+      .stat-pill {
+        padding: 8px 14px;
+        font-size: 0.8125rem;
+      }
+      .check-footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================
+       NAVBAR
+  ============================ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <path d="M14 2L4 6.5V13.5C4 19.3 8.4 24.7 14 26C19.6 24.7 24 19.3 24 13.5V6.5L14 2Z" fill="#2563EB"/>
+            <path d="M14 5L6.5 8.75V14.25C6.5 18.85 9.9 23.1 14 24.25C18.1 23.1 21.5 18.85 21.5 14.25V8.75L14 5Z" fill="#DBEAFE"/>
+            <path d="M11 13.5L13 15.5L17.5 11" stroke="#2563EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Defendo
+        </a>
+
+        <ul class="nav-links">
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#how-it-works">How It Works</a></li>
+          <li><a href="index.html#pricing">Pricing</a></li>
+          <li><a href="checks.html" class="active">Checks</a></li>
+        </ul>
+
+        <div class="nav-cta">
+          <a href="index.html#contact" class="btn btn-primary">Get Started</a>
+        </div>
+
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-menu" id="mobile-menu">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#how-it-works">How It Works</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="checks.html" class="active">Checks</a>
+      <a href="index.html#contact" class="btn btn-primary">Get Started</a>
+    </div>
+  </nav>
+
+
+  <!-- ============================
+       HERO
+  ============================ -->
+  <section class="checks-hero">
+    <div class="container">
+      <div class="hero-eyebrow">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Agent Checks
+      </div>
+      <h1>What Defendo Checks</h1>
+      <p class="hero-sub">The Defendo agent runs 16 automated security checks on every managed device, reporting results back to your dashboard in real time.</p>
+      <div class="stat-pills">
+        <div class="stat-pill">
+          <div class="pill-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          </div>
+          16 Checks
+        </div>
+        <div class="stat-pill">
+          <div class="pill-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          4 Severity Levels
+        </div>
+        <div class="stat-pill">
+          <div class="pill-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          Windows Support
+        </div>
+        <div class="stat-pill">
+          <div class="pill-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          Real-Time Results
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 1: Password Security
+  ============================ -->
+  <section class="checks-section cat-blue">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Password Security</div>
+          <div class="category-count">4 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 1: Password Minimum Length -->
+        <div class="check-card cat-blue">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                <line x1="12" y1="15" x2="12" y2="17"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Password Security</div>
+              <div class="check-name">Password Minimum Length</div>
+            </div>
+          </div>
+          <p class="check-desc">Short passwords are easy to guess. This check makes sure your business requires employees to create passwords long enough to be hard to crack — protecting every account from attackers trying common password combinations.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Windows API
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 2: Password Age -->
+        <div class="check-card cat-blue">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Password Security</div>
+              <div class="check-name">Password Age</div>
+            </div>
+          </div>
+          <p class="check-desc">Old passwords are a silent risk — they may have been leaked without anyone knowing. This check ensures employees change their passwords regularly, limiting the damage if a password is ever stolen or exposed in a data breach.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING &gt;72d</span>
+              <span class="sl-badge sl-critical">CRITICAL &gt;90d</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Windows API
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 3: Strong Password Policy -->
+        <div class="check-card cat-blue">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <polyline points="9 12 11 14 15 10"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Password Security</div>
+              <div class="check-name">Strong Password Policy</div>
+            </div>
+          </div>
+          <p class="check-desc">Weak password rules leave the front door wide open. This check verifies that your business requires truly strong passwords — mixing letters, numbers and symbols — and prevents employees from reusing old ones or never changing them.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Windows API
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 4: Password Manager Installed -->
+        <div class="check-card cat-blue">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Password Security</div>
+              <div class="check-name">Password Manager Installed</div>
+            </div>
+          </div>
+          <p class="check-desc">Most people reuse the same password across multiple sites — which means one breach compromises everything. A password manager lets employees use a unique, strong password for every account without having to remember them all.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+              Registry
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 2: Access Control
+  ============================ -->
+  <section class="checks-section cat-purple">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Access Control</div>
+          <div class="category-count">4 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 5: Admin Accounts List -->
+        <div class="check-card cat-purple">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Access Control</div>
+              <div class="check-name">Admin Accounts List</div>
+            </div>
+          </div>
+          <p class="check-desc">Not everyone needs the keys to the whole building. This check identifies how many people have full admin access to each device — the fewer, the better. Too many admin accounts makes it much easier for attackers to cause serious damage if one account is compromised.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING &gt;3</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Windows API
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 6: Logged-In User in Administrators -->
+        <div class="check-card cat-purple">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M6 20v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>
+                <path d="M18 14l2 2 4-4" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Access Control</div>
+              <div class="check-name">Logged-In User in Administrators</div>
+            </div>
+          </div>
+          <p class="check-desc">When someone clicks a malicious link, the damage is far worse if they're logged in as an administrator. This check flags employees doing their everyday work with admin-level access — a simple habit change that dramatically limits what an attacker can do.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Windows API
+            </div>
+          </div>
+        </div>
+
+        <!-- LAPS -->
+        <div class="check-card cat-purple">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <polyline points="23 4 23 10 17 10"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Access Control</div>
+              <div class="check-name">LAPS (Local Admin Password Solution)</div>
+            </div>
+          </div>
+          <p class="check-desc">Many businesses unknowingly use the same local administrator password on every computer — meaning one breach gives attackers the keys to every machine. Microsoft LAPS fixes this by automatically generating and rotating a unique password for each device. This check confirms that protection is configured across your fleet.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- Windows Hello for Business -->
+        <div class="check-card cat-purple">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Access Control</div>
+              <div class="check-name">Windows Hello for Business</div>
+            </div>
+          </div>
+          <p class="check-desc">Passwords get stolen. Windows Hello replaces them with a PIN, fingerprint, or face scan that never leaves the device — so even if an attacker steals your password database, they still can't log in. This check confirms that your organisation enforces this stronger form of authentication via policy, making phishing attacks significantly less effective.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 3: System Security
+  ============================ -->
+  <section class="checks-section cat-green">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+            <path d="M9 9l2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">System Security</div>
+          <div class="category-count">5 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 7: Windows Update Enabled -->
+        <div class="check-card cat-green">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Security</div>
+              <div class="check-name">Windows Update Enabled</div>
+            </div>
+          </div>
+          <p class="check-desc">Most ransomware attacks exploit known security holes that Microsoft has already fixed. This check ensures every device automatically downloads and installs those fixes — closing the gaps before attackers can use them against you.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING (manual)</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+              Registry
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 8: BitLocker Status -->
+        <div class="check-card cat-green">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Security</div>
+              <div class="check-name">BitLocker Status</div>
+            </div>
+          </div>
+          <p class="check-desc">If a laptop is lost or stolen, encryption is the only thing standing between your data and a stranger. This check verifies every drive is fully encrypted — so a missing device never becomes a data breach.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              WMI
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 9: VSS / Backup Snapshots -->
+        <div class="check-card cat-green">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Security</div>
+              <div class="check-name">VSS / Backup Snapshots</div>
+            </div>
+          </div>
+          <p class="check-desc">Ransomware works by destroying your files and demanding payment to get them back. Backups are your escape route. This check confirms that recent snapshots of your data exist so you can recover quickly — without paying a ransom.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING &gt;7d</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              WMI
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 10: Screen Lock Timeout -->
+        <div class="check-card cat-green">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+                <rect x="8" y="7" width="8" height="7" rx="1" fill="none"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Security</div>
+              <div class="check-name">Screen Lock Timeout</div>
+            </div>
+          </div>
+          <p class="check-desc">A computer left unlocked is an open invitation — anyone walking past can access emails, files, and systems. This check makes sure every device locks itself after a few minutes of inactivity and requires a password to get back in.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING &gt;5min</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+              Registry
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 11: Antivirus Installed -->
+        <div class="check-card cat-green">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M8 11l3 3 5-5"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Security</div>
+              <div class="check-name">Antivirus Installed</div>
+            </div>
+          </div>
+          <p class="check-desc">Antivirus is your last line of defence against malware, ransomware, and viruses. This check confirms that protection is switched on and up to date on every device — because an antivirus that's out of date is almost as bad as having none at all.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              WMI
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 4: Network Security
+  ============================ -->
+  <section class="checks-section cat-orange">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1.42 9a16 16 0 0121.16 0"/><path d="M5 12.55a11 11 0 0114.08 0"/>
+            <path d="M10.54 17.1a6 6 0 012.92 0"/>
+            <circle cx="12" cy="20" r="1"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Network Security</div>
+          <div class="category-count">1 check</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 12: Guest Wi-Fi Subnet Separation -->
+        <div class="check-card cat-orange">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1.42 9a16 16 0 0121.16 0"/><path d="M5 12.55a11 11 0 0114.08 0"/>
+                <path d="M10.54 17.1a6 6 0 012.92 0"/>
+                <circle cx="12" cy="20" r="1"/>
+                <line x1="4" y1="4" x2="20" y2="20" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Network Security</div>
+              <div class="check-name">Guest Wi-Fi Subnet Separation</div>
+            </div>
+          </div>
+          <p class="check-desc">Your guest Wi-Fi is meant for visitors — not a back door into your business network. This check ensures the guest network is properly separated so that a visitor (or an attacker on your guest Wi-Fi) cannot access your internal systems, files, or printers.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              WMI + WLAN API
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 5: Data Protection
+  ============================ -->
+  <section class="checks-section cat-teal">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Data Protection</div>
+          <div class="category-count">2 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 13: Cloud Backup Active -->
+        <div class="check-card cat-teal">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+                <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Data Protection</div>
+              <div class="check-name">Cloud Backup Active</div>
+            </div>
+          </div>
+          <p class="check-desc">Hard drives fail. Ransomware strikes. Laptops get stolen. A cloud backup means your files are safe even when disaster hits. This check confirms that your important data — documents, desktop files, pictures — is being automatically backed up offsite.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+              Registry
+            </div>
+          </div>
+        </div>
+
+        <!-- Check 14: Plaintext Credentials -->
+        <div class="check-card cat-teal">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <line x1="10" y1="9" x2="8" y2="9"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Data Protection</div>
+              <div class="check-name">Plaintext Credentials</div>
+            </div>
+          </div>
+          <p class="check-desc">Passwords and secret keys saved in plain text files — like a Word document or a notes file — are a ticking time bomb. This check scans the device for any credentials stored this way, so they can be moved somewhere safe before an attacker finds them first.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING (unverified)</span>
+              <span class="sl-badge sl-critical">CRITICAL (verified)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              TruffleHog
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 6: Browser & Software
+  ============================ -->
+  <section class="checks-section cat-sky">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Browser &amp; Software</div>
+          <div class="category-count">2 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 15: Browser Versions Up To Date -->
+        <div class="check-card cat-sky">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Browser &amp; Software</div>
+              <div class="check-name">Browser Versions Up To Date</div>
+            </div>
+          </div>
+          <p class="check-desc">Your browser is the window to the internet — and an outdated one can be hijacked just by visiting a website. This check makes sure Chrome, Firefox, Edge, and Brave are always running the latest version, which patches known security vulnerabilities automatically.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+              Registry + Vendor API
+            </div>
+          </div>
+        </div>
+
+        <!-- Force-Installed Chrome Extensions -->
+        <div class="check-card cat-sky">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                <line x1="12" y1="8" x2="12" y2="8" stroke-width="3"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Browser &amp; Software</div>
+              <div class="check-name">Force-Installed Chrome Extensions</div>
+            </div>
+          </div>
+          <p class="check-desc">Browser extensions can read everything you type, see every page you visit, and intercept your passwords. IT teams can forcibly install extensions across all devices using Group Policy — a legitimate practice, but one that attackers can also abuse if they compromise your network administration. This check lists any extensions being pushed to devices so you can verify they're all intentional and trustworthy.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK (none)</span>
+              <span class="sl-badge sl-warning">WARNING (verify)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 7: Threat Intelligence
+  ============================ -->
+  <section class="checks-section cat-red">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Threat Intelligence</div>
+          <div class="category-count">1 check</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Check 16: Email Compromised (HIBP) -->
+        <div class="check-card cat-red">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Threat Intelligence</div>
+              <div class="check-name">Email Compromised (HIBP)</div>
+            </div>
+          </div>
+          <p class="check-desc">Every week, millions of email addresses and passwords are stolen from websites and sold online. This check looks up the employee's email against a database of known breaches — if their credentials have been leaked, they need to know immediately and change their passwords before attackers use them.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING (breached)</span>
+              <span class="sl-badge sl-critical">CRITICAL (passwords)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+              HIBP API
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 8: System Hardening
+  ============================ -->
+  <section class="checks-section cat-indigo">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <rect x="9" y="9" width="6" height="6"/>
+            <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+            <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+            <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/>
+            <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">System Hardening</div>
+          <div class="category-count">11 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Secure Boot -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <polyline points="9 12 11 14 15 10"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">Secure Boot Enabled</div>
+            </div>
+          </div>
+          <p class="check-desc">Secure Boot ensures that only trusted, manufacturer-approved software can start when your device powers on. If someone tampers with your device or installs a bootkit — malware that hides below the operating system — Secure Boot stops it from loading. This check confirms that critical protection is in place.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- TPM -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2"/>
+                <rect x="9" y="9" width="6" height="6"/>
+                <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+                <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+                <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/>
+                <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">TPM Security Chip</div>
+            </div>
+          </div>
+          <p class="check-desc">A Trusted Platform Module (TPM) is a dedicated security chip built into modern devices. It securely stores encryption keys and makes it nearly impossible to steal data from a powered-off laptop. A working TPM is required for BitLocker full-disk encryption and Windows Hello passwordless login. This check confirms yours is active.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- RDP Exposure -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+                <line x1="17" y1="8" x2="7" y2="8"/>
+                <polyline points="11 12 7 8 11 4"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">Remote Desktop (RDP) Exposure</div>
+            </div>
+          </div>
+          <p class="check-desc">Remote Desktop lets someone control your computer over the internet — useful for IT support, but dangerous when left on unnecessarily. RDP on port 3389 is the number-one way ransomware groups break into businesses. This check flags when RDP is switched on so you can ensure it's protected by MFA or disabled when not in use.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK (disabled)</span>
+              <span class="sl-badge sl-warning">WARNING (enabled)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- LSA Credential Guard -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+                <path d="M18 8s2 1 2 4"/>
+                <path d="M6 8s-2 1-2 4"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">LSA Credential Guard</div>
+            </div>
+          </div>
+          <p class="check-desc">Windows stores all login credentials — including network passwords — in a protected area called LSA memory. Without extra protection, an attacker who gains admin access can extract every single password stored on the device in seconds. This check verifies LSA is running in a hardened mode that blocks these credential-theft attacks.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- AMSI -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">Windows Script Scanning (AMSI)</div>
+            </div>
+          </div>
+          <p class="check-desc">Attackers increasingly deliver malware through scripts — PowerShell commands, macros, and web-based code — rather than traditional files, precisely because they are harder to detect. Windows Script Scanning (AMSI) lets your antivirus inspect those scripts the moment they run. This check detects if that capability has been deliberately disabled on any account.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- SMBv1 -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+                <line x1="14" y1="18" x2="20" y2="18"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">SMBv1 Protocol Disabled</div>
+            </div>
+          </div>
+          <p class="check-desc">SMBv1 is a 30-year-old file-sharing protocol that Microsoft has long recommended disabling. It was the vulnerability exploited by EternalBlue — the tool behind WannaCry ransomware, which caused over $4 billion in global damages in 2017. It is still found enabled on countless business computers. This check confirms it is switched off on every device.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING (key absent)</span>
+              <span class="sl-badge sl-critical">CRITICAL (enabled)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- WinRM -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">WinRM Secure Configuration</div>
+            </div>
+          </div>
+          <p class="check-desc">WinRM is the built-in Windows tool for remote scripting and IT management. If misconfigured, it can send passwords over the network in plain text or accept weak login methods — making it easy for an attacker on your network to silently take control of devices. This check ensures it's configured safely or not exposing insecure options.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- PowerShell Logging -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"/>
+                <line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">PowerShell Logging Enabled</div>
+            </div>
+          </div>
+          <p class="check-desc">PowerShell is the most powerful tool on a Windows computer — and one of the most abused by attackers. Enabling comprehensive PowerShell logging records every command run on the device, creating a forensic trail that makes it possible to detect attacks in progress and reconstruct exactly what happened during a security incident. This check ensures all three logging layers are active.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK (all 3 enabled)</span>
+              <span class="sl-badge sl-warning">WARNING (partial)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- Command Line Auditing -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">Command Line Auditing Enabled</div>
+            </div>
+          </div>
+          <p class="check-desc">When a new program launches on your device, Windows logs it — but without this setting, the log only shows what program ran, not what instructions it was given. That's like having CCTV that shows someone entering a vault but not what they took. This check ensures the full command is always recorded, so investigations can determine exactly what malicious programs were told to do.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- UAC -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">User Account Control (UAC) Enabled</div>
+            </div>
+          </div>
+          <p class="check-desc">UAC is the Windows security feature that asks "Do you want to allow this app to make changes?" before anything installs or modifies the system. Without it, any program — including malware — can silently make itself an administrator. This check confirms UAC is switched on, which is one of the most effective basic protections against malware installing itself.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL (disabled)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- Computer Account Password Rotation -->
+        <div class="check-card cat-indigo">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">System Hardening</div>
+              <div class="check-name">Computer Account Password Rotation</div>
+            </div>
+          </div>
+          <p class="check-desc">Every Windows computer on a network has its own machine password that automatically rotates every 30 days. Attackers can disable this rotation to extend the shelf-life of stolen credentials — letting them re-enter your network weeks or months after the initial breach without needing to re-compromise anything. This check confirms rotation is still enabled.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CHECKS — Category 9: Active Threat Detection
+  ============================ -->
+  <section class="checks-section cat-rose" style="padding-bottom: 96px;">
+    <div class="container">
+      <div class="category-header">
+        <div class="category-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <div>
+          <div class="category-title">Active Threat Detection</div>
+          <div class="category-count">4 checks</div>
+        </div>
+      </div>
+
+      <div class="checks-grid">
+
+        <!-- Registry Persistence Artifacts -->
+        <div class="check-card cat-rose">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Active Threat Detection</div>
+              <div class="check-name">Registry Persistence Artifacts</div>
+            </div>
+          </div>
+          <p class="check-desc">Sophisticated attackers plant hidden mechanisms in the Windows registry to ensure their malware survives reboots, reinstalls, and even security scans. This check hunts for three known techniques: a hidden startup loader (RunOnceEx) invisible to most tools, a DNS server backdoor used for privilege escalation, and a cryptographic library hijacking trick that silently loads malicious code whenever encryption is used.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- Crash Reporting Integrity -->
+        <div class="check-card cat-rose">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Active Threat Detection</div>
+              <div class="check-name">Crash Reporting Integrity</div>
+            </div>
+          </div>
+          <p class="check-desc">When Windows crashes or a program fails, it captures a snapshot of what was happening — invaluable evidence during a security investigation. WannaCry and other sophisticated malware deliberately disable this capability before executing, so there's nothing left to analyse. If these settings have been silently turned off, it is a strong indicator of a past or active infection.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL (tampered)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- Post-Mortem Debugger Integrity -->
+        <div class="check-card cat-rose">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <line x1="11" y1="8" x2="11" y2="14"/>
+                <line x1="8" y1="11" x2="14" y2="11"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Active Threat Detection</div>
+              <div class="check-name">Post-Mortem Debugger Integrity</div>
+            </div>
+          </div>
+          <p class="check-desc">Windows maintains a small registry entry (AeDebug) that tells the system to create a detailed crash log whenever an application fails — an essential tool for security investigators. Some malware, including WannaCry, deletes this entry specifically to prevent those logs from being created. A missing entry can indicate a past or active compromise on the device.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-warning">WARNING (missing)</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+        <!-- Processes Without Binary on Disk -->
+        <div class="check-card cat-rose">
+          <div class="check-card-top">
+            <div class="check-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </div>
+            <div class="check-meta">
+              <div class="check-cat-badge">Active Threat Detection</div>
+              <div class="check-name">Processes Without Binary on Disk</div>
+            </div>
+          </div>
+          <p class="check-desc">Every legitimate program on your computer has an executable file on disk. Some advanced malware deletes its own file the moment it launches — so it runs entirely in memory, leaving no file trace for antivirus to find. This technique is used by sophisticated attackers to stay hidden. This check detects any running process whose executable has vanished from disk, a powerful indicator of fileless malware.</p>
+          <div class="check-footer">
+            <div class="status-levels">
+              <span class="status-levels-label">Levels:</span>
+              <span class="sl-badge sl-ok">OK</span>
+              <span class="sl-badge sl-critical">CRITICAL</span>
+              <span class="sl-badge sl-error">ERROR</span>
+            </div>
+            <div class="data-source">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              osquery
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       CTA SECTION
+  ============================ -->
+  <section class="checks-cta">
+    <div class="container">
+      <div class="checks-cta-inner">
+        <h2>Ready to protect your business?</h2>
+        <p>All 34 checks run automatically on every managed device, every time the Defendo agent reports in.</p>
+        <a href="index.html#contact" class="btn btn-white btn-lg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Get Started Free
+        </a>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       FOOTER
+  ============================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+
+
+
+      </div>
+
+      <div class="footer-bottom">
+        <span class="footer-copy">&copy; 2026 Defendo Ltd. All rights reserved.</span>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+
+  <!-- ============================
+       JS
+  ============================ -->
+  <script>
+    // ---- Sticky Navbar ----
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 12) {
+        navbar.classList.add('scrolled');
+      } else {
+        navbar.classList.remove('scrolled');
+      }
+    }, { passive: true });
+
+    // ---- Hamburger / Mobile Menu ----
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    function closeMobileMenu() {
+      hamburger.classList.remove('open');
+      mobileMenu.classList.remove('open');
+    }
+
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.contains('open');
+      if (isOpen) {
+        closeMobileMenu();
+      } else {
+        hamburger.classList.add('open');
+        mobileMenu.classList.add('open');
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!navbar.contains(e.target)) {
+        closeMobileMenu();
+      }
+    });
+
+    // ---- Intersection Observer for card entrance animations ----
+    const fadeInStyle = `
+      .fade-in-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      .fade-in-up.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    `;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = fadeInStyle;
+    document.head.appendChild(styleSheet);
+
+    const animatables = document.querySelectorAll('.check-card, .stat-pill');
+
+    animatables.forEach((el, i) => {
+      el.classList.add('fade-in-up');
+      el.style.transitionDelay = `${(i % 2) * 80}ms`;
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    animatables.forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>

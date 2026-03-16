@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Defendo — Enterprise-Grade Security for SMEs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ============================
+       RESET & BASE
+    ============================ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --primary: #2563EB;
+      --primary-dark: #1D4ED8;
+      --accent: #0EA5E9;
+      --dark: #111827;
+      --gray: #6B7280;
+      --light-bg: #F9FAFB;
+      --white: #FFFFFF;
+      --green: #10B981;
+      --border: #E5E7EB;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05);
+      --shadow-lg: 0 10px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-lg: 20px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--dark);
+      background: var(--white);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    img { max-width: 100%; }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ============================
+       BUTTONS
+    ============================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 24px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--white);
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(37,99,235,0.35);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 1.5px solid var(--primary);
+    }
+    .btn-outline:hover {
+      background: #EFF6FF;
+      transform: translateY(-1px);
+    }
+
+    .btn-white {
+      background: var(--white);
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .btn-white:hover {
+      background: #F0F4FF;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+
+    .btn-lg {
+      padding: 14px 32px;
+      font-size: 1rem;
+      border-radius: 10px;
+    }
+
+    /* ============================
+       NAVBAR
+    ============================ */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .navbar.scrolled {
+      border-bottom-color: var(--border);
+      box-shadow: 0 1px 16px rgba(0,0,0,0.07);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 1.125rem;
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.01em;
+    }
+
+    .nav-logo svg {
+      flex-shrink: 0;
+    }
+
+    .nav-logo span.accent {
+      color: var(--primary);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--gray);
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .nav-links a:hover {
+      color: var(--dark);
+      background: var(--light-bg);
+    }
+
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .hamburger:hover { background: var(--light-bg); }
+    .hamburger span {
+      display: block;
+      height: 2px;
+      background: var(--dark);
+      border-radius: 2px;
+      transition: all 0.25s ease;
+    }
+    .hamburger.open span:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+    .hamburger.open span:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    .hamburger.open span:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .mobile-menu {
+      display: none;
+      flex-direction: column;
+      background: var(--white);
+      border-top: 1px solid var(--border);
+      padding: 16px 24px 24px;
+      gap: 4px;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      color: var(--dark);
+      transition: background 0.15s;
+    }
+    .mobile-menu a:hover { background: var(--light-bg); }
+    .mobile-menu .btn {
+      margin-top: 8px;
+      justify-content: center;
+    }
+
+    /* ============================
+       HERO
+    ============================ */
+    .hero {
+      padding: 140px 0 80px;
+      background: linear-gradient(160deg, #EFF6FF 0%, #F9FAFB 50%, #F0F9FF 100%);
+      overflow: hidden;
+    }
+
+    .hero-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #EFF6FF;
+      color: var(--primary);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #BFDBFE;
+    }
+
+    .hero-eyebrow .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.18;
+      letter-spacing: -0.03em;
+      color: var(--dark);
+      margin-bottom: 20px;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--primary);
+    }
+
+    .hero-sub {
+      font-size: 1.0625rem;
+      color: var(--gray);
+      line-height: 1.7;
+      margin-bottom: 36px;
+      max-width: 480px;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .hero-note {
+      margin-top: 18px;
+      font-size: 0.8125rem;
+      color: var(--gray);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hero-note svg { color: var(--green); flex-shrink: 0; }
+
+    /* ---- Dashboard Mockup ---- */
+    .dashboard-mockup {
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,0.05);
+      overflow: hidden;
+      font-size: 0.75rem;
+      position: relative;
+    }
+
+    .dash-topbar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .dash-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--dark);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dash-title svg { color: var(--primary); }
+
+    .dash-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #D1FAE5;
+      color: #065F46;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 20px;
+    }
+    .dash-badge .badge-dot {
+      width: 5px;
+      height: 5px;
+      background: var(--green);
+      border-radius: 50%;
+    }
+
+    .dash-window-controls {
+      display: flex;
+      gap: 5px;
+    }
+    .dash-window-controls span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dash-window-controls span:nth-child(1) { background: #FC5F57; }
+    .dash-window-controls span:nth-child(2) { background: #FDBC2C; }
+    .dash-window-controls span:nth-child(3) { background: #34C749; }
+
+    .dash-body {
+      padding: 16px;
+      background: #F8FAFC;
+    }
+
+    .dash-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .dash-stat {
+      background: var(--white);
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .dash-stat-label {
+      color: var(--gray);
+      font-size: 0.625rem;
+      font-weight: 500;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .dash-stat-value {
+      font-size: 1.125rem;
+      font-weight: 800;
+      color: var(--dark);
+      line-height: 1;
+    }
+
+    .dash-stat-value.green { color: var(--green); }
+    .dash-stat-value.blue { color: var(--primary); }
+
+    .dash-stat-sub {
+      font-size: 0.5625rem;
+      color: var(--gray);
+      margin-top: 3px;
+    }
+
+    .dash-section-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .dash-log-feed {
+      background: var(--white);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .dash-log-header {
+      display: grid;
+      grid-template-columns: 70px 1fr 80px 60px;
+      padding: 7px 12px;
+      background: var(--light-bg);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.5625rem;
+      font-weight: 700;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      gap: 8px;
+    }
+
+    .dash-log-row {
+      display: grid;
+      grid-template-columns: 70px 1fr 80px 60px;
+      padding: 7px 12px;
+      border-bottom: 1px solid #F3F4F6;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.1s;
+    }
+    .dash-log-row:last-child { border-bottom: none; }
+    .dash-log-row:hover { background: #F9FAFB; }
+
+    .dash-log-time {
+      color: var(--gray);
+      font-size: 0.625rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .dash-log-device {
+      font-weight: 600;
+      font-size: 0.6875rem;
+      color: var(--dark);
+    }
+
+    .dash-log-event {
+      font-size: 0.625rem;
+      color: var(--gray);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-size: 0.5625rem;
+      font-weight: 600;
+    }
+    .status-ok {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+    .status-warn {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .status-info {
+      background: #EFF6FF;
+      color: #1E40AF;
+    }
+
+    .dash-threat-meter {
+      background: var(--white);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .dash-threat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .dash-threat-header span:first-child {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      color: var(--dark);
+    }
+
+    .dash-threat-pct {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .threat-bar-track {
+      height: 6px;
+      background: #F3F4F6;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .threat-bar-fill {
+      height: 100%;
+      width: 8%;
+      background: linear-gradient(90deg, var(--green), #34D399);
+      border-radius: 4px;
+      transition: width 1.5s ease;
+    }
+
+    .threat-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      font-size: 0.5625rem;
+      color: var(--gray);
+    }
+
+    /* ============================
+       SECTION COMMON
+    ============================ */
+    .section {
+      padding: 96px 0;
+    }
+
+    .section-alt {
+      background: var(--light-bg);
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(1.75rem, 2.8vw, 2.375rem);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      color: var(--dark);
+    }
+
+    .section-sub {
+      font-size: 1.0625rem;
+      color: var(--gray);
+      max-width: 560px;
+      line-height: 1.7;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .section-header .section-sub {
+      margin: 0 auto;
+    }
+
+    /* ============================
+       FEATURES
+    ============================ */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+    }
+
+    .feature-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+      border-color: #BFDBFE;
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: #EFF6FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .feature-title {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--dark);
+    }
+
+    .feature-desc {
+      font-size: 0.9rem;
+      color: var(--gray);
+      line-height: 1.65;
+    }
+
+    /* ============================
+       HOW IT WORKS
+    ============================ */
+    .steps-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      position: relative;
+    }
+
+    .steps-connector {
+      position: absolute;
+      top: 36px;
+      left: calc(16.666% + 36px);
+      right: calc(16.666% + 36px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+      z-index: 0;
+    }
+
+    .steps-connector::before,
+    .steps-connector::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+    }
+    .steps-connector::before { left: 0; }
+    .steps-connector::after { right: 0; background: var(--accent); }
+
+    .step {
+      padding: 0 28px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-number {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: var(--white);
+      font-size: 1.5rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      box-shadow: 0 6px 20px rgba(37,99,235,0.3);
+      position: relative;
+    }
+
+    .step-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--dark);
+    }
+
+    .step-desc {
+      font-size: 0.9rem;
+      color: var(--gray);
+      line-height: 1.65;
+    }
+
+    /* ============================
+       PRICING
+    ============================ */
+    .pricing-toggle-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 52px;
+    }
+
+    .pricing-toggle-label {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--gray);
+    }
+
+    .pricing-toggle-label.active {
+      color: var(--dark);
+      font-weight: 600;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #D1D5DB;
+      border-radius: 13px;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+      background: var(--primary);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: var(--white);
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch input:checked ~ .toggle-thumb {
+      transform: translateX(22px);
+    }
+
+    .save-badge {
+      background: #D1FAE5;
+      color: #065F46;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 20px;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .pricing-card {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 32px;
+      position: relative;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .pricing-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    .pricing-card.popular {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.08), var(--shadow-md);
+      transform: scale(1.025);
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -13px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--primary);
+      color: var(--white);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 16px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .pricing-tier {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .pricing-price {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .pricing-price sup {
+      font-size: 1.25rem;
+      font-weight: 700;
+      vertical-align: super;
+      line-height: 0;
+    }
+
+    .pricing-price sub {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--gray);
+      vertical-align: baseline;
+    }
+
+    .pricing-desc {
+      font-size: 0.875rem;
+      color: var(--gray);
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      line-height: 1.5;
+    }
+
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .pricing-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: var(--dark);
+      line-height: 1.4;
+    }
+
+    .pricing-features li svg {
+      color: var(--green);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .pricing-cta {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* ============================
+       CTA BANNER
+    ============================ */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--primary) 0%, #1E40AF 60%, #0369A1 100%);
+      padding: 80px 0;
+    }
+
+    .cta-banner-inner {
+      text-align: center;
+    }
+
+    .cta-banner h2 {
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+    }
+
+    .cta-banner p {
+      font-size: 1.0625rem;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 36px;
+    }
+
+    .cta-email-form {
+      display: flex;
+      gap: 12px;
+      max-width: 480px;
+      margin: 0 auto;
+      flex-wrap: wrap;
+    }
+
+    .cta-email-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 13px 18px;
+      border-radius: 10px;
+      border: none;
+      font-size: 0.9375rem;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .cta-email-input::placeholder { color: #9CA3AF; }
+    .cta-email-input:focus {
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    .cta-banner .btn-white {
+      flex-shrink: 0;
+    }
+
+    .cta-privacy {
+      margin-top: 14px;
+      font-size: 0.8125rem;
+      color: rgba(255,255,255,0.6);
+    }
+
+    /* ============================
+       FOOTER
+    ============================ */
+    .footer {
+      background: var(--dark);
+      padding: 64px 0 40px;
+      color: #9CA3AF;
+    }
+
+    .footer-top {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr 1fr;
+      gap: 48px;
+      margin-bottom: 48px;
+    }
+
+    .footer-brand {}
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.0625rem;
+      font-weight: 800;
+      color: var(--white);
+      margin-bottom: 12px;
+    }
+
+    .footer-tagline {
+      font-size: 0.875rem;
+      line-height: 1.6;
+      max-width: 220px;
+    }
+
+    .footer-col-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 16px;
+    }
+
+    .footer-links {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-links a {
+      font-size: 0.875rem;
+      color: #9CA3AF;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover { color: var(--white); }
+
+    .footer-bottom {
+      border-top: 1px solid #1F2937;
+      padding-top: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-copy {
+      font-size: 0.8125rem;
+    }
+
+    .footer-legal {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-legal a {
+      font-size: 0.8125rem;
+      color: #9CA3AF;
+      transition: color 0.15s;
+    }
+    .footer-legal a:hover { color: var(--white); }
+
+    /* ============================
+       RESPONSIVE
+    ============================ */
+    @media (max-width: 1024px) {
+      .hero-inner {
+        grid-template-columns: 1fr;
+        gap: 48px;
+      }
+      .hero-sub { max-width: 100%; }
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .testimonials-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .footer-top {
+        grid-template-columns: 1fr 1fr;
+        gap: 36px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links,
+      .nav-cta { display: none; }
+      .hamburger { display: flex; }
+
+      .hero { padding: 110px 0 60px; }
+
+      .section { padding: 64px 0; }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .steps-container {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+      .steps-connector { display: none; }
+
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        max-width: 440px;
+        margin: 0 auto;
+      }
+
+      .pricing-card.popular {
+        transform: scale(1);
+      }
+
+      .testimonials-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-email-form {
+        flex-direction: column;
+      }
+      .cta-email-input { min-width: unset; }
+
+      .footer-top {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+
+      .footer-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .dash-stats {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .dash-log-header,
+      .dash-log-row {
+        grid-template-columns: 60px 1fr 70px 50px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .dash-stats {
+        grid-template-columns: 1fr;
+      }
+      .dash-log-header { display: none; }
+      .dash-log-row {
+        grid-template-columns: 55px 1fr 65px;
+      }
+      .dash-log-row > *:last-child { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================
+       NAVBAR
+  ============================ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="#" class="nav-logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <path d="M14 2L4 6.5V13.5C4 19.3 8.4 24.7 14 26C19.6 24.7 24 19.3 24 13.5V6.5L14 2Z" fill="#2563EB"/>
+            <path d="M14 5L6.5 8.75V14.25C6.5 18.85 9.9 23.1 14 24.25C18.1 23.1 21.5 18.85 21.5 14.25V8.75L14 5Z" fill="#DBEAFE"/>
+            <path d="M11 13.5L13 15.5L17.5 11" stroke="#2563EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Defendo
+        </a>
+
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="checks.html">Checks</a></li>
+        </ul>
+
+        <div class="nav-cta">
+          <a href="#pricing" class="btn btn-outline">View Pricing</a>
+          <a href="#contact" class="btn btn-primary">Get Started</a>
+        </div>
+
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-menu" id="mobile-menu">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="checks.html">Checks</a>
+      <a href="#contact" class="btn btn-primary">Get Started</a>
+    </div>
+  </nav>
+
+
+  <!-- ============================
+       HERO
+  ============================ -->
+  <section class="hero" id="hero">
+    <div class="container">
+      <div class="hero-inner">
+
+        <!-- Left: Copy -->
+        <div class="hero-content">
+          <div class="hero-eyebrow">
+            <span class="dot"></span>
+            Now in General Availability — v2.4
+          </div>
+          <h1>Enterprise-Grade Security,<br /><em>Built for Safe</em> Businesses</h1>
+          <p class="hero-sub">Defendo monitors every device across your organisation, aggregates logs into a single pane of glass, and deploys AI agents that detect threats — and respond — before you even notice them.</p>
+          <div class="hero-ctas">
+            <a href="#contact" class="btn btn-primary btn-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Start Free Trial
+            </a>
+            <a href="#contact" class="btn btn-outline btn-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82V15.18a1 1 0 01-1.447.894L15 14"/><rect x="1" y="6" width="14" height="12" rx="2"/></svg>
+              Book a Demo
+            </a>
+          </div>
+          <p class="hero-note">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z"/></svg>
+            No credit card required &nbsp;·&nbsp; 14-day free trial &nbsp;·&nbsp; Cancel any time
+          </p>
+        </div>
+
+        <!-- Right: Dashboard Mockup -->
+        <div class="dashboard-mockup">
+          <!-- Window chrome -->
+          <div class="dash-topbar">
+            <div class="dash-window-controls">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="dash-title">
+              <svg width="13" height="13" viewBox="0 0 28 28" fill="currentColor">
+                <path d="M14 2L4 6.5V13.5C4 19.3 8.4 24.7 14 26C19.6 24.7 24 19.3 24 13.5V6.5L14 2Z"/>
+              </svg>
+              Defendo Dashboard
+            </div>
+            <div class="dash-badge">
+              <span class="badge-dot"></span>
+              All Systems Secure
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="dash-body">
+            <!-- Stats row -->
+            <div class="dash-stats">
+              <div class="dash-stat">
+                <div class="dash-stat-label">Devices Online</div>
+                <div class="dash-stat-value blue">24</div>
+                <div class="dash-stat-sub">of 24 total</div>
+              </div>
+              <div class="dash-stat">
+                <div class="dash-stat-label">Active Threats</div>
+                <div class="dash-stat-value green">0</div>
+                <div class="dash-stat-sub">↓ 2 resolved today</div>
+              </div>
+              <div class="dash-stat">
+                <div class="dash-stat-label">Events Today</div>
+                <div class="dash-stat-value">1,247</div>
+                <div class="dash-stat-sub">↑ 12% vs yesterday</div>
+              </div>
+            </div>
+
+            <!-- Log feed -->
+            <div class="dash-section-title">Recent Events</div>
+            <div class="dash-log-feed">
+              <div class="dash-log-header">
+                <span>Time</span>
+                <span>Device</span>
+                <span>Event</span>
+                <span>Status</span>
+              </div>
+              <div class="dash-log-row">
+                <span class="dash-log-time">09:42:11</span>
+                <span class="dash-log-device">WS-MKT-04</span>
+                <span class="dash-log-event">Password min length</span>
+                <span class="status-badge status-ok">OK</span>
+              </div>
+              <div class="dash-log-row">
+                <span class="dash-log-time">09:41:58</span>
+                <span class="dash-log-device">SRV-PROD-01</span>
+                <span class="dash-log-event">Windows Update enabled</span>
+                <span class="status-badge status-ok">OK</span>
+              </div>
+              <div class="dash-log-row">
+                <span class="dash-log-time">09:41:03</span>
+                <span class="dash-log-device">LPT-HR-02</span>
+                <span class="dash-log-event">Defender enabled</span>
+                <span class="status-badge status-ok">OK</span>
+              </div>
+              <div class="dash-log-row">
+                <span class="dash-log-time">09:39:47</span>
+                <span class="dash-log-device">WS-DEV-07</span>
+                <span class="dash-log-event">Screen lock timeout</span>
+                <span class="status-badge status-warn">Warning</span>
+              </div>
+              <div class="dash-log-row">
+                <span class="dash-log-time">09:38:22</span>
+                <span class="dash-log-device">SRV-FILE-02</span>
+                <span class="dash-log-event">Screen lock timeout</span>
+                <span class="status-badge status-ok">OK</span>
+              </div>
+            </div>
+
+            <!-- Threat meter -->
+            <div class="dash-threat-meter">
+              <div class="dash-threat-header">
+                <span>Threat Risk Level</span>
+                <span class="dash-threat-pct">Low — 8%</span>
+              </div>
+              <div class="threat-bar-track">
+                <div class="threat-bar-fill" id="threatBar"></div>
+              </div>
+              <div class="threat-bar-labels">
+                <span>Low</span>
+                <span>Medium</span>
+                <span>High</span>
+                <span>Critical</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+
+
+  <!-- ============================
+       FEATURES
+  ============================ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Features</span>
+        <h2 class="section-title">Everything you need to stay secure</h2>
+        <p class="section-sub">A complete security platform designed for the realities of SME IT — powerful enough for your security team, simple enough for everyone else.</p>
+      </div>
+
+      <div class="features-grid">
+
+        <!-- Card 1 -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <div class="feature-title">Real-Time Device Monitoring</div>
+          <p class="feature-desc">Continuous visibility across every endpoint — laptops, servers, mobiles, and IoT devices — with live health and connectivity status.</p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+          </div>
+          <div class="feature-title">Centralized Log Management</div>
+          <p class="feature-desc">All device events, system logs, and network activity flow into one searchable, tamper-evident repository — with 12-month retention.</p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div class="feature-title">AI-Powered Threat Detection</div>
+          <p class="feature-desc">Machine learning models trained on millions of threat patterns identify anomalies and zero-day behaviours in real time, without signature files.</p>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <polyline points="9 12 11 14 15 10"/>
+            </svg>
+          </div>
+          <div class="feature-title">Automated Policy Enforcement</div>
+          <p class="feature-desc">Define security rules once; let AI agents enforce them automatically — quarantining devices, blocking connections, or alerting your team instantly.</p>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+          </div>
+          <div class="feature-title">Instant Alerts &amp; Reports</div>
+          <p class="feature-desc">Push notifications, email digests, and executive-ready PDF reports delivered on your schedule — so you're always informed, never overwhelmed.</p>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+            </svg>
+          </div>
+          <div class="feature-title">Compliance Ready</div>
+          <p class="feature-desc">Built-in frameworks for GDPR, ISO 27001, and NIS2. Generate audit trails, evidence packs, and compliance dashboards with a single click.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       HOW IT WORKS
+  ============================ -->
+  <section class="section section-alt" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">How It Works</span>
+        <h2 class="section-title">Up and running in under 30 minutes</h2>
+        <p class="section-sub">No complex infrastructure required. Defendo deploys via a lightweight agent and starts protecting your business immediately.</p>
+      </div>
+
+      <div class="steps-container">
+        <div class="steps-connector"></div>
+
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3 class="step-title">Connect Your Devices</h3>
+          <p class="step-desc">Install the Defendo agent on Windows, macOS, or Linux in minutes. Group devices by team, location, or risk level from the dashboard.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3 class="step-title">Monitor &amp; Collect Logs</h3>
+          <p class="step-desc">Every event is captured, normalised, and streamed to your centralised log store — encrypted in transit and at rest. Full audit trail from day one.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3 class="step-title">AI Detects &amp; Responds</h3>
+          <p class="step-desc">Our AI agents analyse behaviour 24/7. When a threat is detected, automated playbooks respond immediately — isolate, alert, remediate.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       PRICING
+  ============================ -->
+  <section class="section" id="pricing">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-label">Pricing</span>
+        <h2 class="section-title">Simple, transparent pricing</h2>
+        <p class="section-sub">No hidden fees, no per-user charges. Pay for what you need and scale as you grow.</p>
+      </div>
+
+      <!-- Billing toggle -->
+      <div class="pricing-toggle-wrap">
+        <span class="pricing-toggle-label active" id="label-monthly">Monthly</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="billing-toggle" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+        <span class="pricing-toggle-label" id="label-annual">Annual</span>
+        <span class="save-badge">Save 20%</span>
+      </div>
+
+      <div class="pricing-grid">
+
+        <!-- Starter -->
+        <div class="pricing-card">
+          <div class="pricing-tier">Starter</div>
+          <div class="pricing-price">
+            <sup>€</sup><span class="price-val" data-monthly="100" data-annual="80">100</span><sub>/mo</sub>
+          </div>
+          <p class="pricing-desc">Perfect for small teams getting started with structured security monitoring.</p>
+          <ul class="pricing-features">
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Up to 10 devices
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Real-time device monitoring
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Centralized log management
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Email alerts &amp; weekly reports
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              30-day log retention
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Community support
+            </li>
+          </ul>
+          <a href="#contact" class="btn btn-outline pricing-cta">Start Free Trial</a>
+        </div>
+
+        <!-- Business (Popular) -->
+        <div class="pricing-card popular">
+          <div class="popular-badge">Most Popular</div>
+          <div class="pricing-tier">Business</div>
+          <div class="pricing-price">
+            <sup>€</sup><span class="price-val" data-monthly="350" data-annual="280">350</span><sub>/mo</sub>
+          </div>
+          <p class="pricing-desc">The complete security suite for growing businesses with complex environments.</p>
+          <ul class="pricing-features">
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Up to 50 devices
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              AI-powered threat detection
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Automated policy enforcement
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Custom alerting rules
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              12-month log retention
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              GDPR &amp; ISO 27001 reports
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Priority support (8h SLA)
+            </li>
+          </ul>
+          <a href="#contact" class="btn btn-primary pricing-cta">Start Free Trial</a>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="pricing-card">
+          <div class="pricing-tier">Enterprise</div>
+          <div class="pricing-price" style="font-size:2rem; letter-spacing:-0.02em;">
+            Custom
+          </div>
+          <p class="pricing-desc">Tailored for organisations with advanced requirements, compliance mandates, or dedicated security teams.</p>
+          <ul class="pricing-features">
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Unlimited devices
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              All Business features
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Custom API integrations
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Dedicated success manager
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Custom log retention
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              On-premise deployment option
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              99.9% uptime SLA
+            </li>
+          </ul>
+          <a href="#contact" class="btn btn-outline pricing-cta">Contact Sales</a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+
+
+  <!-- ============================
+       CTA BANNER
+  ============================ -->
+  <section class="cta-banner" id="contact">
+    <div class="container">
+      <div class="cta-banner-inner">
+        <h2>Start protecting your business today</h2>
+        <form class="cta-email-form" onsubmit="handleDemoRequest(event)">
+          <input
+            type="email"
+            class="cta-email-input"
+            placeholder="Enter your work email"
+            required
+            id="demo-email"
+          />
+          <button type="submit" class="btn btn-white btn-lg">
+            Request Demo
+          </button>
+        </form>
+        <p class="cta-privacy">We respect your privacy. No spam, unsubscribe any time.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================
+       FOOTER
+  ============================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+
+
+
+      </div>
+
+      <div class="footer-bottom">
+        <span class="footer-copy">&copy; 2026 Defendo Ltd. All rights reserved.</span>
+        <div class="footer-legal">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+
+  <!-- ============================
+       JS
+  ============================ -->
+  <script>
+    // ---- Sticky Navbar ----
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 12) {
+        navbar.classList.add('scrolled');
+      } else {
+        navbar.classList.remove('scrolled');
+      }
+    }, { passive: true });
+
+    // ---- Smooth Scroll for anchor links ----
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        const targetId = this.getAttribute('href');
+        if (targetId === '#') return;
+        const target = document.querySelector(targetId);
+        if (!target) return;
+        e.preventDefault();
+        const navHeight = navbar.offsetHeight;
+        const targetTop = target.getBoundingClientRect().top + window.scrollY - navHeight - 12;
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
+
+        // Close mobile menu if open
+        closeMobileMenu();
+      });
+    });
+
+    // ---- Hamburger / Mobile Menu ----
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    function closeMobileMenu() {
+      hamburger.classList.remove('open');
+      mobileMenu.classList.remove('open');
+    }
+
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.contains('open');
+      if (isOpen) {
+        closeMobileMenu();
+      } else {
+        hamburger.classList.add('open');
+        mobileMenu.classList.add('open');
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!navbar.contains(e.target)) {
+        closeMobileMenu();
+      }
+    });
+
+    // ---- Pricing Toggle ----
+    const billingToggle = document.getElementById('billing-toggle');
+    const labelMonthly = document.getElementById('label-monthly');
+    const labelAnnual = document.getElementById('label-annual');
+    const priceEls = document.querySelectorAll('.price-val');
+
+    billingToggle.addEventListener('change', () => {
+      const isAnnual = billingToggle.checked;
+
+      if (isAnnual) {
+        labelMonthly.classList.remove('active');
+        labelAnnual.classList.add('active');
+      } else {
+        labelMonthly.classList.add('active');
+        labelAnnual.classList.remove('active');
+      }
+
+      priceEls.forEach(el => {
+        const val = isAnnual ? el.dataset.annual : el.dataset.monthly;
+        if (val) {
+          el.textContent = val;
+        }
+      });
+    });
+
+    // ---- Demo Request Form ----
+    function handleDemoRequest(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('demo-email');
+      const btn = e.target.querySelector('button[type="submit"]');
+      const originalText = btn.textContent;
+
+      btn.textContent = 'Sending...';
+      btn.disabled = true;
+
+      // Simulate async request
+      setTimeout(() => {
+        btn.textContent = 'Request Sent!';
+        btn.style.background = '#D1FAE5';
+        btn.style.color = '#065F46';
+        emailInput.value = '';
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = '';
+          btn.style.color = '';
+          btn.disabled = false;
+        }, 3000);
+      }, 900);
+    }
+
+    // ---- Animate threat bar on load ----
+    window.addEventListener('load', () => {
+      const bar = document.getElementById('threatBar');
+      if (bar) {
+        // Trigger CSS transition
+        requestAnimationFrame(() => {
+          bar.style.width = '8%';
+        });
+      }
+    });
+
+    // ---- Intersection Observer for subtle entrance animations ----
+    const observerOptions = {
+      threshold: 0.12,
+      rootMargin: '0px 0px -40px 0px'
+    };
+
+    const fadeInStyle = `
+      .fade-in-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      .fade-in-up.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    `;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = fadeInStyle;
+    document.head.appendChild(styleSheet);
+
+    const animatables = document.querySelectorAll(
+      '.feature-card, .step, .pricing-card'
+    );
+
+    animatables.forEach((el, i) => {
+      el.classList.add('fade-in-up');
+      el.style.transitionDelay = `${(i % 3) * 80}ms`;
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+
+    animatables.forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>

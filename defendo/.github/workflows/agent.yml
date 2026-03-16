@@ -1,0 +1,82 @@
+name: Agent CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent.yml"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent.yml"
+
+concurrency:
+  group: agent-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: agent
+
+    steps:
+      # ── 1. Source ────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Go ────────────────────────────────────────────────────────────────
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: agent/go.sum
+
+      # ── 3. Embedded tools (TruffleHog + osqueryi) ────────────────────────────
+      # Cache by Makefile hash so the cache is busted when versions change.
+      - name: Cache embedded tools
+        id: cache-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            agent/checks/tools/trufflehog.exe
+            agent/checks/tools/osqueryi.exe
+          key: embedded-tools-${{ hashFiles('agent/Makefile') }}
+
+      - name: Download embedded tools
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: make download-tools
+
+      # ── 4. Lint ──────────────────────────────────────────────────────────────
+      - name: Install golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin v2.11.3
+
+      - name: Lint
+        working-directory: agent
+        env:
+          GOOS: windows
+          CGO_ENABLED: "0"
+        run: golangci-lint run --timeout=5m
+
+      # ── 5. Test ──────────────────────────────────────────────────────────────
+      # Tests compile as a Windows binary (cross-compile only; cannot execute).
+      # See: agent/Makefile → test target.
+      - name: Test
+        run: make test
+
+      # ── 6. Build ─────────────────────────────────────────────────────────────
+      - name: Build
+        run: make build
+
+      # ── 7. Artifact ──────────────────────────────────────────────────────────
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: defendo-agent-windows-amd64
+          path: agent/guardify-agent.exe
+          retention-days: ${{ github.ref == 'refs/heads/master' && 90 || 7 }}

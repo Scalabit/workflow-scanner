@@ -1,0 +1,72 @@
+version: "2"
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - misspell
+    - unused
+    - bodyclose
+    - nilerr
+    - unconvert
+  disable:
+    - gosec        # too many false positives with unsafe.Pointer in Windows API interop
+    - gochecknoglobals  # Windows API handles must be package-level vars
+    - exhaustruct  # not required for this project
+    - wsl          # too opinionated
+    - nlreturn     # too opinionated
+    - lll          # long lines acceptable in Windows API struct definitions
+
+  exclusions:
+    rules:
+      # Test files: unchecked errors are acceptable.
+      - path: "_test.go"
+        linters:
+          - errcheck
+
+      # Deferred Windows API cleanup — errors not actionable.
+      - linters:
+          - errcheck
+        text: "netApiBufferFree"
+
+      # Registry key Close() — error not actionable.
+      - linters:
+          - errcheck
+        text: "k.Close"
+
+      # Registry sub-key Close() — error not actionable.
+      - linters:
+          - errcheck
+        text: "sk.Close"
+
+      # tmp.Close() before os.Remove on temp files — best-effort cleanup.
+      - linters:
+          - errcheck
+        text: "tmp.Close"
+
+      # HTTP response Body.Close() in defer — standard Go pattern.
+      - linters:
+          - errcheck
+        text: "resp.Body.Close"
+
+      # WLAN API handle cleanup in defer — errors not actionable.
+      - linters:
+          - errcheck
+        text: "wlanCloseHandle.Call"
+
+      # WLAN API memory cleanup in defer — errors not actionable.
+      - linters:
+          - errcheck
+        text: "wlanFreeMemory.Call"
+
+      # os.Remove for temp file cleanup — best-effort, not actionable.
+      - linters:
+          - errcheck
+        text: "os.Remove"
+
+      # json.Encoder.Encode for list output — errors are non-recoverable here.
+      - linters:
+          - errcheck
+        text: "enc.Encode"
