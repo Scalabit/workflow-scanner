@@ -114,7 +114,7 @@ jobs:
             $project = "workflow-scanner"
             $topic = "defendo-windows-alerts"
             $exePath = "$defendoPath\guardify-agent.exe"
-            $arguments = "--pubsub-project $project --pubsub-topic $topic --interval 1h --json"
+            $arguments = "--pubsub-project $project --pubsub-topic $topic --interval 10m --json"
             
             & sc.exe create $serviceName binPath= "`"$exePath`" $arguments" start= auto DisplayName= "Defendo Security Agent"
             & sc.exe description $serviceName "Defendo security monitoring agent"
@@ -183,5 +183,5 @@ jobs:
         echo "### Monitoring" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **Pub/Sub Topic**: defendo-windows-alerts" >> $GITHUB_STEP_SUMMARY
-        echo "- **Check Interval**: 1 hour" >> $GITHUB_STEP_SUMMARY
+        echo "- **Check Interval**: 10 minutes" >> $GITHUB_STEP_SUMMARY
         echo "- **Log Location**: C:\\defendo\\logs\\" >> $GITHUB_STEP_SUMMARY

@@ -46,9 +46,9 @@ try {
         
         # Run the agent with Pub/Sub integration
         $project = "workflow-scanner"
-        $topic = "defendo-security-alerts"
+        $topic = "defendo-windows-alerts"
         
-        & $agentPath --pubsub-project $project --pubsub-topic $topic --interval 1h --json | Tee-Object -FilePath $logFile -Append
+        & $agentPath --pubsub-project $project --pubsub-topic $topic --interval 10m --json | Tee-Object -FilePath $logFile -Append
     } else {
         Write-Log "Defendo agent not found at $agentPath"
     }
