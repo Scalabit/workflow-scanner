@@ -79,12 +79,27 @@ resource "google_project_iam_member" "defendo_pubsub_publisher" {
   member  = "serviceAccount:${google_service_account.defendo_agent.email}"
 }
 
+resource "google_project_iam_member" "defendo_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.defendo_agent.email}"
+}
+
 resource "google_pubsub_topic" "defendo_alerts" {
   name = "defendo-windows-alerts"
 
   labels = {
     environment = "security"
     purpose     = "defendo-windows-agent"
+  }
+}
+
+resource "google_pubsub_topic" "defendo_formatted_reports" {
+  name = "defendo-formatted-reports"
+
+  labels = {
+    environment = "security"
+    purpose     = "defendo-formatted-reports"
   }
 }
 

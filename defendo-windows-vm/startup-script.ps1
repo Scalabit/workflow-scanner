@@ -22,7 +22,7 @@ Register-ScheduledTask -TaskName "DefendoAgentDownload" -Action $taskAction -Tri
 
 # Create the download script
 $downloadScript = @'
-# Download defendo agent from GitHub Actions artifacts
+# Download defendo agent from Cloud Storage
 $defendoPath = "C:\defendo"
 $logFile = "$defendoPath\logs\agent-$(Get-Date -Format 'yyyy-MM-dd').log"
 
@@ -33,24 +33,50 @@ function Write-Log {
 }
 
 try {
-    Write-Log "Starting defendo agent download..."
+    Write-Log "Starting defendo agent download from Cloud Storage..."
     
-    # Note: In production, this would download from GitHub releases or artifacts
-    # For now, create placeholder
-    Write-Log "Waiting for defendo binary deployment..."
+    # Download files from Cloud Storage
+    $bucket = "workflow-scanner-defendo-deployment"
+    $gsutilPath = "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gsutil.cmd"
     
-    # Check if guardify-agent.exe exists
-    $agentPath = "$defendoPath\guardify-agent.exe"
-    if (Test-Path $agentPath) {
-        Write-Log "Defendo agent found, starting security checks..."
+    if (Test-Path $gsutilPath) {
+        Write-Log "Downloading agent files..."
+        & $gsutilPath -m cp "gs://$bucket/*" $defendoPath
         
-        # Run the agent with Pub/Sub integration
-        $project = "workflow-scanner"
-        $topic = "defendo-windows-alerts"
-        
-        & $agentPath --pubsub-project $project --pubsub-topic $topic --interval 10m --json | Tee-Object -FilePath $logFile -Append
+        # Check if download successful
+        $agentPath = "$defendoPath\guardify-agent.exe"
+        if (Test-Path $agentPath) {
+            Write-Log "Agent downloaded successfully, running deployment script..."
+            
+            if (Test-Path "$defendoPath\deploy-agent.ps1") {
+                & "$defendoPath\deploy-agent.ps1"
+            } else {
+                Write-Log "Deployment script not found, installing manually..."
+                
+                # Manual deployment
+                $serviceName = "DefendoAgent"
+                $project = "workflow-scanner"
+                $topic = "defendo-windows-alerts"
+                
+                # Stop existing service
+                Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+                & sc.exe delete $serviceName 2>$null
+                
+                # Create new service (excluding WiFi check #8 for Windows Server)
+                $arguments = '--pubsub-project workflow-scanner --pubsub-topic defendo-windows-alerts --interval 10m --json --only "1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34"'
+                
+                & sc.exe create $serviceName binPath= "`"$agentPath`" $arguments" start= auto DisplayName= "Defendo Security Agent"
+                & sc.exe description $serviceName "Defendo security monitoring agent"
+                
+                # Start service
+                Start-Service -Name $serviceName
+                Write-Log "Defendo agent service started successfully"
+            }
+        } else {
+            Write-Log "Agent download failed"
+        }
     } else {
-        Write-Log "Defendo agent not found at $agentPath"
+        Write-Log "Google Cloud SDK not found"
     }
     
 } catch {
