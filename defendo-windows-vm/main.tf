@@ -94,14 +94,6 @@ resource "google_pubsub_topic" "defendo_alerts" {
   }
 }
 
-resource "google_pubsub_topic" "defendo_formatted_reports" {
-  name = "defendo-formatted-reports"
-
-  labels = {
-    environment = "security"
-    purpose     = "defendo-formatted-reports"
-  }
-}
 
 resource "google_compute_firewall" "defendo_rdp" {
   name    = "allow-defendo-windows-rdp"

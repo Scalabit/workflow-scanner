@@ -74,8 +74,6 @@ jobs:
         cp artifacts/tools/trufflehog.exe deployment-package/
         cp artifacts/tools/osqueryi.exe deployment-package/
         
-        # Create report formatter script
-        cp format-defendo-report.ps1 deployment-package/
         
         # Create deployment script
         cat > deployment-package/deploy-agent.ps1 << 'EOF'
@@ -100,7 +98,6 @@ jobs:
             New-Item -ItemType Directory -Path "$defendoPath\tools" -Force
             Copy-Item "trufflehog.exe" "$defendoPath\tools\" -Force
             Copy-Item "osqueryi.exe" "$defendoPath\tools\" -Force
-            Copy-Item "format-defendo-report.ps1" "$defendoPath\" -Force
             
             # Create reports directory
             New-Item -ItemType Directory -Path "$defendoPath\reports" -Force
@@ -126,17 +123,16 @@ jobs:
             & sc.exe create $serviceName binPath= "`"$exePath`" $arguments" start= auto DisplayName= "Defendo Security Agent"
             & sc.exe description $serviceName "Defendo security monitoring agent"
             
+            # Set service to restart on failure
+            & sc.exe failure $serviceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
+            
             Start-Service -Name $serviceName
             Write-Log "Defendo agent service started successfully"
             
-            # Create scheduled task for formatted reports (every 10 minutes)
-            $reportAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy RemoteSigned -File C:\defendo\format-defendo-report.ps1"
-            $reportTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 10)
-            $reportSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-            $reportPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+            # Verify service is running
+            $serviceStatus = Get-Service -Name $serviceName
+            Write-Log "Service status: $($serviceStatus.Status)"
             
-            Register-ScheduledTask -TaskName "DefendoReportGenerator" -Action $reportAction -Trigger $reportTrigger -Settings $reportSettings -Principal $reportPrincipal -Force
-            Write-Log "Defendo report generator scheduled task created"
             
         } catch {
             Write-Log "Error: $($_.Exception.Message)"
