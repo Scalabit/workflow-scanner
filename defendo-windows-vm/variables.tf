@@ -17,13 +17,13 @@ variable "zone" {
 }
 
 variable "vm_name" {
-  description = "Name of the Wazuh manager VM"
+  description = "Name of the Windows VM for Defendo"
   type        = string
-  default     = "wazuh-manager"
+  default     = "defendo-windows-vm"
 }
 
 variable "machine_type" {
-  description = "Machine type for the VM"
+  description = "Machine type for the VM (16GB RAM for security agent)"
   type        = string
   default     = "e2-standard-4"
 }
@@ -31,11 +31,6 @@ variable "machine_type" {
 variable "disk_size_gb" {
   description = "Size of the boot disk in GB"
   type        = number
-  default     = 50
+  default     = 100
 }
 
-variable "wazuh_admin_password" {
-  description = "Admin password for Wazuh dashboard"
-  type        = string
-  sensitive   = true
-}

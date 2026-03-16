@@ -12,9 +12,6 @@ on:
         - plan
         - apply
         - destroy
-  # push:
-  #   branches:
-  #     - main
 
 env:
   TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}

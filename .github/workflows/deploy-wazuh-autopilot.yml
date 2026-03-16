@@ -1,0 +1,159 @@
+name: Deploy Wazuh OpenClaw Autopilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  GCP_ZONE: ${{ secrets.GCP_ZONE }}
+
+jobs:
+  deploy:
+    name: Deploy Autopilot to GCP VM
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Create deployment script
+      run: |
+        cat > deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "Installing Ollama..."
+        if ! command -v ollama &> /dev/null; then
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo mkdir -p /etc/systemd/system/ollama.service.d/
+          sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null << 'OLLAMA_CONF'
+        [Service]
+        Environment="OLLAMA_NUM_CTX=32768"
+        Environment="OLLAMA_HOST=0.0.0.0"
+        OLLAMA_CONF
+          sudo systemctl daemon-reload
+          sudo systemctl enable ollama
+          sudo systemctl start ollama
+          sleep 10
+          ollama pull llama3.2:3b
+        fi
+
+        echo "Installing MCP Server..."
+        if [ ! -d "/opt/wazuh-mcp-server" ]; then
+          cd /opt
+          sudo git clone https://github.com/gensecaihq/Wazuh-MCP-Server wazuh-mcp-server
+          cd wazuh-mcp-server
+          sudo pip3 install -r requirements.txt
+          
+          sudo tee /etc/systemd/system/wazuh-mcp-server.service > /dev/null << 'MCP_SERVICE'
+        [Unit]
+        Description=Wazuh MCP Server
+        After=network.target wazuh-manager.service ollama.service
+
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/opt/wazuh-mcp-server
+        Environment=WAZUH_HOST=localhost
+        Environment=WAZUH_PORT=55000
+        Environment=WAZUH_USER=wazuh
+        Environment=WAZUH_PASS=WazuhPassword123
+        Environment=WAZUH_VERIFY_SSL=false
+        Environment=MCP_PORT=3000
+        Environment=MCP_HOST=0.0.0.0
+        Environment=AUTH_MODE=bearer
+        Environment=MCP_API_KEY=${MCP_API_KEY}
+        ExecStart=/usr/bin/python3 -m src.main
+        Restart=always
+
+        [Install]
+        WantedBy=multi-user.target
+        MCP_SERVICE
+          
+          sudo systemctl enable wazuh-mcp-server
+          sudo systemctl start wazuh-mcp-server
+        fi
+
+        echo "Installing OpenClaw Autopilot..."
+        if [ ! -d "/opt/openclaw-autopilot" ]; then
+          cd /opt
+          sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot openclaw-autopilot
+          cd openclaw-autopilot
+          
+          export AUTOPILOT_MODE=production
+          export MCP_URL=http://localhost:3000
+          export AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
+          export OPENCLAW_LLM_MODE=local
+          export AUTOPILOT_REQUIRE_TAILSCALE=false
+          
+          sudo -E ./install/install.sh
+        fi
+
+        echo "Verifying installation..."
+        sudo systemctl status ollama --no-pager --lines=0
+        sudo systemctl status wazuh-mcp-server --no-pager --lines=0
+        echo "Deployment complete!"
+        EOF
+        
+        chmod +x deploy.sh
+
+    - name: Deploy to Wazuh Manager VM
+      run: |
+        gcloud compute scp deploy.sh wazuh-manager:~/deploy.sh --zone=${{ env.GCP_ZONE }}
+        
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' bash ~/deploy.sh"
+
+    - name: Output Autopilot Details
+      run: |
+        VM_IP=$(gcloud compute instances describe wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        
+        echo "## Wazuh OpenClaw Autopilot Deployed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### AI Security Operations Dashboard" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**OpenClaw Dashboard:** http://$VM_IP:18789" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- View AI agent sessions and security analysis" >> $GITHUB_STEP_SUMMARY
+        echo "- Manage automated incident response" >> $GITHUB_STEP_SUMMARY
+        echo "- Approve/reject AI recommendations" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### AI Infrastructure" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Ollama API:** http://$VM_IP:11434" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Local AI model (llama3.2:3b)" >> $GITHUB_STEP_SUMMARY
+        echo "- No external API costs" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**MCP Server:** http://$VM_IP:3000" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- AI bridge to Wazuh Manager" >> $GITHUB_STEP_SUMMARY
+        echo "- Security data API for AI agents" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Existing Wazuh Infrastructure" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Wazuh Dashboard:** https://$VM_IP" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Traditional security monitoring" >> $GITHUB_STEP_SUMMARY
+        echo "- Raw alerts and agent management" >> $GITHUB_STEP_SUMMARY

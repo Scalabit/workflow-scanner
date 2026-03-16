@@ -1,0 +1,77 @@
+name: Build Defendo Agent
+
+on:
+  push:
+    branches: [main]
+    paths:
+    - 'defendo/**'
+    - '.github/workflows/build-defendo.yml'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.25'
+  GOTOOLCHAIN: go1.26.0
+
+jobs:
+  build:
+    name: Build Windows Agent Binary
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Download external tools
+      working-directory: defendo/agent
+      run: |
+        echo "Downloading TruffleHog and osquery..."
+        make download-tools
+
+    - name: Build Windows binary
+      working-directory: defendo/agent
+      run: |
+        echo "Building guardify-agent.exe for Windows..."
+        make build
+
+    - name: Test build
+      working-directory: defendo/agent
+      run: |
+        echo "Running tests..."
+        make test
+
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: guardify-agent-windows
+        path: defendo/agent/guardify-agent.exe
+        retention-days: 30
+
+    - name: Upload tools artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: guardify-tools
+        path: |
+          defendo/agent/checks/tools/trufflehog.exe
+          defendo/agent/checks/tools/osqueryi.exe
+        retention-days: 30
+
+    - name: Build Summary
+      run: |
+        echo "## Defendo Agent Build Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts Created" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **guardify-agent.exe** - Main Windows security agent" >> $GITHUB_STEP_SUMMARY
+        echo "- **trufflehog.exe** - Secret scanning tool" >> $GITHUB_STEP_SUMMARY  
+        echo "- **osqueryi.exe** - System query tool" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "1. Deploy Windows VM with 16GB RAM" >> $GITHUB_STEP_SUMMARY
+        echo "2. Install guardify-agent.exe on the VM" >> $GITHUB_STEP_SUMMARY
+        echo "3. Configure GCP Pub/Sub integration" >> $GITHUB_STEP_SUMMARY

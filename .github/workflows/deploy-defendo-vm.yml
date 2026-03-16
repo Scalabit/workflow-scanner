@@ -1,0 +1,65 @@
+name: Deploy Defendo Windows VM
+
+on:
+  workflow_call:
+
+env:
+  TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID || 'workflow-scanner' }}
+
+jobs:
+  terraform:
+    name: Deploy Windows VM
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: defendo-windows-vm
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ~1.5
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Plan
+      run: terraform plan -out=tfplan
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve tfplan
+
+    - name: Get VM Info
+      id: vm_info
+      run: |
+        echo "vm_ip=$(terraform output -raw vm_external_ip)" >> $GITHUB_OUTPUT
+        echo "vm_name=$(terraform output -raw vm_name)" >> $GITHUB_OUTPUT
+        echo "pubsub_topic=$(terraform output -raw pubsub_topic)" >> $GITHUB_OUTPUT
+
+    - name: VM Summary
+      run: |
+        echo "## Defendo Windows VM Deployed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### VM Details" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Name**: ${{ steps.vm_info.outputs.vm_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **External IP**: ${{ steps.vm_info.outputs.vm_ip }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Machine Type**: e2-standard-4 (16GB RAM)" >> $GITHUB_STEP_SUMMARY
+        echo "- **OS**: Windows Server 2022" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Pub/Sub Integration" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Topic**: ${{ steps.vm_info.outputs.pubsub_topic }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Project**: ${{ env.TF_VAR_project_id }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,171 @@
+name: Deploy Defendo Agent
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'defendo/**'
+      - 'defendo-windows-vm/**'
+      - '.github/workflows/deploy-defendo.yml'
+      - '.github/workflows/deploy-defendo-vm.yml'
+      - '.github/workflows/build-defendo.yml'
+  workflow_dispatch:
+
+jobs:
+  build-agent:
+    uses: ./.github/workflows/build-defendo.yml
+  
+  deploy-vm:
+    uses: ./.github/workflows/deploy-defendo-vm.yml
+    secrets: inherit
+    
+  deploy-agent:
+    name: Deploy Agent to VM
+    needs: [build-agent, deploy-vm]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Download agent artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: guardify-agent-windows
+        path: ./artifacts/
+
+    - name: Download tools artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: guardify-tools
+        path: ./artifacts/tools/
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Get VM IP
+      id: vm_info
+      run: |
+        cd defendo-windows-vm
+        echo "vm_ip=$(terraform output -raw vm_external_ip)" >> $GITHUB_OUTPUT
+        echo "vm_name=$(terraform output -raw vm_name)" >> $GITHUB_OUTPUT
+
+    - name: Create deployment package
+      run: |
+        mkdir -p deployment-package
+        cp artifacts/guardify-agent.exe deployment-package/
+        cp artifacts/tools/trufflehog.exe deployment-package/
+        cp artifacts/tools/osqueryi.exe deployment-package/
+        
+        # Create deployment script
+        cat > deployment-package/deploy-agent.ps1 << 'EOF'
+        # Deploy Defendo Agent Script
+        $defendoPath = "C:\defendo"
+        $logFile = "$defendoPath\logs\deployment-$(Get-Date -Format 'yyyy-MM-dd-HHmm').log"
+        
+        function Write-Log {
+            param($Message)
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            "$timestamp - $Message" | Tee-Object -FilePath $logFile -Append | Write-Output
+        }
+        
+        try {
+            Write-Log "Starting defendo agent deployment..."
+            
+            # Stop any existing agent
+            Get-Process -Name "guardify-agent" -ErrorAction SilentlyContinue | Stop-Process -Force
+            
+            # Copy binaries
+            Copy-Item "guardify-agent.exe" "$defendoPath\" -Force
+            New-Item -ItemType Directory -Path "$defendoPath\tools" -Force
+            Copy-Item "trufflehog.exe" "$defendoPath\tools\" -Force
+            Copy-Item "osqueryi.exe" "$defendoPath\tools\" -Force
+            
+            Write-Log "Binaries deployed successfully"
+            
+            # Create service to run agent
+            $serviceName = "DefendoAgent"
+            $serviceExists = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            
+            if ($serviceExists) {
+                Stop-Service -Name $serviceName -Force
+                & sc.exe delete $serviceName
+                Start-Sleep 2
+            }
+            
+            # Create new service
+            $project = "workflow-scanner"
+            $topic = "defendo-security-alerts"
+            $exePath = "$defendoPath\guardify-agent.exe"
+            $arguments = "--pubsub-project $project --pubsub-topic $topic --interval 1h --json"
+            
+            & sc.exe create $serviceName binPath= "`"$exePath`" $arguments" start= auto DisplayName= "Defendo Security Agent"
+            & sc.exe description $serviceName "Defendo security monitoring agent"
+            
+            Start-Service -Name $serviceName
+            Write-Log "Defendo agent service started successfully"
+            
+        } catch {
+            Write-Log "Error: $($_.Exception.Message)"
+            exit 1
+        }
+        EOF
+
+    - name: Upload to Cloud Storage
+      run: |
+        # Create bucket for deployment (if doesn't exist)
+        gsutil mb gs://${{ vars.GCP_PROJECT_ID }}-defendo-deployment || true
+        
+        # Upload deployment package
+        gsutil -m cp -r deployment-package/* gs://${{ vars.GCP_PROJECT_ID }}-defendo-deployment/
+
+    - name: Deploy to VM via startup script
+      run: |
+        # Create metadata script to download and run deployment
+        cat > vm-deploy.ps1 << 'EOF'
+        # Download and execute deployment from Cloud Storage
+        $bucket = "workflow-scanner-defendo-deployment"
+        
+        # Download gsutil if not present
+        if (!(Test-Path "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gsutil.cmd")) {
+            Invoke-WebRequest -Uri "https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe" -OutFile "C:\temp\gcloud-installer.exe"
+            Start-Process -FilePath "C:\temp\gcloud-installer.exe" -ArgumentList "/S" -Wait
+        }
+        
+        # Authenticate using VM service account
+        & "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd" auth activate-service-account --key-file=""
+        
+        # Download deployment files
+        & "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gsutil.cmd" -m cp gs://$bucket/* C:\defendo\
+        
+        # Execute deployment
+        cd C:\defendo
+        .\deploy-agent.ps1
+        EOF
+        
+        # Update VM metadata to trigger deployment
+        gcloud compute instances add-metadata ${{ steps.vm_info.outputs.vm_name }} \
+          --zone=europe-north1-a \
+          --metadata-from-file windows-startup-script-ps1=vm-deploy.ps1
+
+    - name: Deployment Summary
+      run: |
+        echo "## Defendo Agent Deployment Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **VM**: ${{ steps.vm_info.outputs.vm_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **IP**: ${{ steps.vm_info.outputs.vm_ip }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Agent**: guardify-agent.exe deployed as Windows service" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tools**: trufflehog.exe, osqueryi.exe" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Monitoring" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Pub/Sub Topic**: defendo-security-alerts" >> $GITHUB_STEP_SUMMARY
+        echo "- **Check Interval**: 1 hour" >> $GITHUB_STEP_SUMMARY
+        echo "- **Log Location**: C:\defendo\logs\"

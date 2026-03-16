@@ -1,0 +1,71 @@
+name: Deploy Wazuh Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+    - 'wazuh-manager/**'
+    - 'wazuh-windows-vm/**' 
+    - 'wazuh-autopilot/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-manager:
+    uses: ./.github/workflows/deploy-wazuh-manager.yml
+    with:
+      action: apply
+    secrets: inherit
+
+  deploy-vm:
+    uses: ./.github/workflows/deploy-wazuh-vm.yml
+    with:
+      action: apply
+    secrets: inherit
+
+  deploy-autopilot:
+    needs: deploy-manager
+    uses: ./.github/workflows/deploy-wazuh-autopilot.yml
+    with:
+      environment: production
+    secrets: inherit
+
+  deployment-summary:
+    needs: [deploy-manager, deploy-vm, deploy-autopilot]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Deployment Summary
+      run: |
+        VM_IP=$(gcloud compute instances describe wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null || echo "Not deployed")
+        
+        echo "## Complete Wazuh Infrastructure Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Main Dashboards" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Service | URL | Purpose |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|-----|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **AI Security Ops** | http://$VM_IP:18789 | OpenClaw AI Dashboard |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Traditional SIEM** | https://$VM_IP | Wazuh Dashboard |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### AI Infrastructure" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Service | URL | Purpose |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|-----|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Local AI Model** | http://$VM_IP:11434 | Ollama (llama3.2:3b) |" >> $GITHUB_STEP_SUMMARY
+        echo "| **AI Bridge** | http://$VM_IP:3000 | MCP Server API |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deployment Status" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Manager**: ${{ needs.deploy-manager.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Windows VM**: ${{ needs.deploy-vm.result }}" >> $GITHUB_STEP_SUMMARY  
+        echo "- **AI Autopilot**: ${{ needs.deploy-autopilot.result }}" >> $GITHUB_STEP_SUMMARY
