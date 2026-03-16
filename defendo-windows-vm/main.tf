@@ -1,5 +1,11 @@
 terraform {
   required_version = ">= 1.5"
+  
+  backend "gcs" {
+    bucket = "workflow-scanner-terraform-state-34659588692"
+    prefix = "terraform/defendo-windows-vm/state"
+  }
+  
   required_providers {
     google = {
       source  = "hashicorp/google"
