@@ -54,6 +54,8 @@ jobs:
         cd defendo-windows-vm
         echo "vm_ip=$(terraform output -raw vm_external_ip)" >> $GITHUB_OUTPUT
         echo "vm_name=$(terraform output -raw vm_name)" >> $GITHUB_OUTPUT
+        echo "VM Name: $(terraform output -raw vm_name)"
+        echo "VM IP: $(terraform output -raw vm_external_ip)"
 
     - name: Create deployment package
       run: |
@@ -150,9 +152,12 @@ jobs:
         EOF
         
         # Update VM metadata to trigger deployment
-        gcloud compute instances add-metadata ${{ steps.vm_info.outputs.vm_name }} \
+        cd defendo-windows-vm
+        VM_NAME=$(terraform output -raw vm_name)
+        echo "Deploying to VM: $VM_NAME"
+        gcloud compute instances add-metadata $VM_NAME \
           --zone=europe-north1-a \
-          --metadata-from-file windows-startup-script-ps1=vm-deploy.ps1
+          --metadata-from-file windows-startup-script-ps1=../vm-deploy.ps1
 
     - name: Deployment Summary
       run: |
