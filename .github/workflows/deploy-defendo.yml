@@ -119,17 +119,18 @@ jobs:
     - name: Upload to Cloud Storage
       run: |
         # Create bucket for deployment (if doesn't exist)
-        gsutil mb gs://${{ vars.GCP_PROJECT_ID }}-defendo-deployment || true
+        PROJECT_ID="${{ vars.GCP_PROJECT_ID || 'workflow-scanner' }}"
+        gsutil mb gs://${PROJECT_ID}-defendo-deployment || true
         
         # Upload deployment package
-        gsutil -m cp -r deployment-package/* gs://${{ vars.GCP_PROJECT_ID }}-defendo-deployment/
+        gsutil -m cp -r deployment-package/* gs://${PROJECT_ID}-defendo-deployment/
 
     - name: Deploy to VM via startup script
       run: |
         # Create metadata script to download and run deployment
         cat > vm-deploy.ps1 << 'EOF'
         # Download and execute deployment from Cloud Storage
-        $bucket = "workflow-scanner-defendo-deployment"
+        $bucket = "${{ vars.GCP_PROJECT_ID || 'workflow-scanner' }}-defendo-deployment"
         
         # Download gsutil if not present
         if (!(Test-Path "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gsutil.cmd")) {
