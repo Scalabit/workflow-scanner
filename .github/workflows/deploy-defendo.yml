@@ -116,7 +116,7 @@ jobs:
             Unregister-ScheduledTask -TaskName "DefendoAgent" -Confirm:$false -ErrorAction SilentlyContinue
             Write-Log "Removed existing scheduled task"
             
-            # Create scheduled task to run agent every 10 minutes (excluding WiFi check #8 for Windows Server)
+            # Create scheduled task to run agent every 10 minutes (excluding check #8 for Windows Server)
             $exePath = "$defendoPath\guardify-agent.exe"
             $arguments = "--pubsub-project workflow-scanner --pubsub-topic defendo-windows-alerts --interval 10m --json --only 1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34"
             
