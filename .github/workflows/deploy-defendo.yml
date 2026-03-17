@@ -161,9 +161,6 @@ jobs:
             Start-Process -FilePath "C:\temp\gcloud-installer.exe" -ArgumentList "/S" -Wait
         }
         
-        # Authenticate using VM service account
-        & "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd" auth activate-service-account --key-file=""
-        
         # Download deployment files
         & "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin\gsutil.cmd" -m cp gs://$bucket/* C:\defendo\
         
