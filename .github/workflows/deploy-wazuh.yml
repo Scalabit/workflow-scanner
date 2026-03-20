@@ -28,6 +28,9 @@ jobs:
     with:
       environment: production
     secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
 
   deployment-summary:
     needs: [deploy-manager, deploy-vm, deploy-autopilot]
