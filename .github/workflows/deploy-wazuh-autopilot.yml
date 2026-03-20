@@ -8,6 +8,18 @@ on:
         required: true
         default: 'production'
         type: string
+      gcp_zone:
+        description: 'GCP Zone'
+        required: true
+        type: string
+      gcp_project_id:
+        description: 'GCP Project ID'
+        required: true
+        type: string
+      gcp_region:
+        description: 'GCP Region'
+        required: true
+        type: string
 
   workflow_dispatch:
     inputs:
@@ -20,9 +32,9 @@ on:
         - production
 
 env:
-  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ secrets.GCP_REGION }}
-  GCP_ZONE: ${{ secrets.GCP_ZONE }}
+  GCP_PROJECT_ID: ${{ inputs.gcp_project_id || secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ inputs.gcp_region || secrets.GCP_REGION }}
+  GCP_ZONE: ${{ inputs.gcp_zone || secrets.GCP_ZONE }}
 
 jobs:
   deploy:
