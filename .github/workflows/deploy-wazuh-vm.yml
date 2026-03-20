@@ -2,6 +2,12 @@ name: Deploy Wazuh Windows VM
 
 on:
   workflow_call:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        default: 'plan'
+        type: string
 
   workflow_dispatch:
     inputs:
@@ -91,17 +97,17 @@ jobs:
     - name: Terraform Apply
       if: |
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-        (github.event.inputs.action == 'apply')
+        (inputs.action == 'apply' || github.event.inputs.action == 'apply')
       run: terraform apply -auto-approve
 
     - name: Terraform Destroy
-      if: github.event.inputs.action == 'destroy'
+      if: inputs.action == 'destroy' || github.event.inputs.action == 'destroy'
       run: terraform destroy -auto-approve
 
     - name: Output VM Details
       if: |
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-        (github.event.inputs.action == 'apply')
+        (inputs.action == 'apply' || github.event.inputs.action == 'apply')
       run: |
         echo "## Wazuh Windows VM Deployed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

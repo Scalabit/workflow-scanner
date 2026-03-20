@@ -2,6 +2,12 @@ name: Deploy Wazuh OpenClaw Autopilot
 
 on:
   workflow_call:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: string
 
   workflow_dispatch:
     inputs:
