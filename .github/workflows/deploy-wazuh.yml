@@ -31,8 +31,6 @@ jobs:
     with:
       environment: production
       gcp_zone: europe-north1-a
-      gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-      gcp_region: ${{ secrets.GCP_REGION }}
     secrets: inherit
     permissions:
       contents: read
