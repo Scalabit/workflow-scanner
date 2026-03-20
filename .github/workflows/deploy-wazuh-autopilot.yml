@@ -68,6 +68,10 @@ jobs:
           ollama pull llama3.2:3b
         fi
 
+        echo "Installing Python and pip..."
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip
+        
         echo "Installing MCP Server..."
         if [ ! -d "/opt/wazuh-mcp-server" ]; then
           cd /opt
