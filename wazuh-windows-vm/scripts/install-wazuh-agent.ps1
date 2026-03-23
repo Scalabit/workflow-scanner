@@ -19,9 +19,31 @@ try {
     Write-Log "Starting Wazuh agent installation..."
 
     $wazuhService = Get-Service -Name "WazuhSvc" -ErrorAction SilentlyContinue
-    if ($wazuhService -and $wazuhService.Status -eq 'Running') {
-        Write-Log "Wazuh agent is already installed and running. Exiting."
-        exit 0
+    $agentConfigPath = "C:\Program Files (x86)\ossec-agent\ossec.conf"
+    
+    if ($wazuhService -and $wazuhService.Status -eq 'Running' -and (Test-Path $agentConfigPath)) {
+        $configContent = Get-Content $agentConfigPath -Raw
+        if ($configContent -match "<server>\s*<address>$WazuhManagerHost</address>") {
+            Write-Log "Wazuh agent is already properly configured and running. Exiting."
+            exit 0
+        } else {
+            Write-Log "Wazuh agent installed but misconfigured. Reinstalling..."
+        }
+    }
+
+    # Stop and uninstall existing agent if present
+    if ($wazuhService) {
+        Write-Log "Stopping existing Wazuh service..."
+        Stop-Service -Name "WazuhSvc" -Force -ErrorAction SilentlyContinue
+        
+        # Uninstall existing agent
+        $uninstallString = Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.DisplayName -like "*Wazuh*" } | Select-Object -First 1 -ExpandProperty UninstallString
+        if ($uninstallString) {
+            Write-Log "Uninstalling existing Wazuh agent..."
+            $msiCode = $uninstallString -replace '.*\{([^}]+)\}.*', '$1'
+            Start-Process "msiexec.exe" -ArgumentList "/x", "{$msiCode}", "/q" -Wait
+            Start-Sleep -Seconds 10
+        }
     }
 
     # Create log directory

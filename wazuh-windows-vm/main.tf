@@ -76,6 +76,14 @@ resource "random_password" "windows_admin_password" {
   special = true
 }
 
+resource "random_id" "vm_deployment_id" {
+  byte_length = 8
+  
+  keepers = {
+    deployment_time = timestamp()
+  }
+}
+
 # Store the password in Secret Manager
 resource "google_secret_manager_secret" "windows_admin_password" {
   secret_id = "wazuh-windows-vm-admin-password"
@@ -126,6 +134,7 @@ resource "google_compute_instance" "wazuh_windows_vm" {
   # Enable OS Login for better security
   metadata = {
     enable-oslogin = "TRUE"
+    deployment-id = random_id.vm_deployment_id.hex
     windows-startup-script-ps1 = templatefile("${path.module}/scripts/install-wazuh-agent.ps1", {
       wazuh_manager_ip = data.google_secret_manager_secret_version.wazuh_manager_ip.secret_data
       wazuh_agent_name = "${var.vm_name}-agent"
