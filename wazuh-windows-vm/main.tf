@@ -84,6 +84,24 @@ resource "random_id" "vm_deployment_id" {
   }
 }
 
+# Cleanup old VMs with same base name before creating new one
+resource "null_resource" "cleanup_old_vms" {
+  triggers = {
+    deployment_id = random_id.vm_deployment_id.hex
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Find and delete old VMs with the same base name pattern
+      OLD_VMS=$(gcloud compute instances list --filter="name~'^${var.vm_name}-[a-f0-9]+$' AND zone:(${var.zone})" --format="value(name)" || true)
+      if [ ! -z "$OLD_VMS" ]; then
+        echo "Cleaning up old VMs: $OLD_VMS"
+        echo "$OLD_VMS" | xargs -r gcloud compute instances delete --zone=${var.zone} --quiet || true
+      fi
+    EOT
+  }
+}
+
 # Store the password in Secret Manager
 resource "google_secret_manager_secret" "windows_admin_password" {
   secret_id = "wazuh-windows-vm-admin-password"
@@ -108,7 +126,7 @@ data "google_compute_image" "windows_2022" {
 
 # Create Windows VM instance
 resource "google_compute_instance" "wazuh_windows_vm" {
-  name         = var.vm_name
+  name         = "${var.vm_name}-${random_id.vm_deployment_id.hex}"
   machine_type = var.machine_type
   zone         = var.zone
 
@@ -158,7 +176,8 @@ resource "google_compute_instance" "wazuh_windows_vm" {
     google_project_service.apis,
     data.google_compute_network.wazuh_manager_vpc,
     data.google_compute_subnetwork.wazuh_manager_subnet,
-    data.google_secret_manager_secret_version.wazuh_manager_ip
+    data.google_secret_manager_secret_version.wazuh_manager_ip,
+    null_resource.cleanup_old_vms
   ]
 
   lifecycle {
