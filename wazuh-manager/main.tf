@@ -99,6 +99,48 @@ resource "google_compute_firewall" "allow_wazuh_agents" {
   target_tags   = ["wazuh-manager"]
 }
 
+# Firewall rule for OpenClaw Autopilot dashboard
+resource "google_compute_firewall" "allow_openclaw_dashboard" {
+  name    = "allow-openclaw-dashboard"
+  network = google_compute_network.wazuh_manager_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["18789"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["wazuh-manager"]
+}
+
+# Firewall rule for MCP server API
+resource "google_compute_firewall" "allow_mcp_server" {
+  name    = "allow-mcp-server"
+  network = google_compute_network.wazuh_manager_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["3000"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["wazuh-manager"]
+}
+
+# Firewall rule for Ollama API
+resource "google_compute_firewall" "allow_ollama_api" {
+  name    = "allow-ollama-api"
+  network = google_compute_network.wazuh_manager_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["11434"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["wazuh-manager"]
+}
+
 # Get the latest Ubuntu 22.04 LTS image
 data "google_compute_image" "ubuntu" {
   family  = "ubuntu-2204-lts"
