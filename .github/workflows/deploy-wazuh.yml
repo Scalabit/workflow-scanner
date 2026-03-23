@@ -16,6 +16,7 @@ jobs:
     secrets: inherit
 
   deploy-vm:
+    needs: deploy-manager
     uses: ./.github/workflows/deploy-wazuh-vm.yml
     with:
       action: apply
