@@ -18,6 +18,12 @@ function Write-Log {
 try {
     Write-Log "Starting Wazuh agent installation..."
 
+    $wazuhService = Get-Service -Name "WazuhSvc" -ErrorAction SilentlyContinue
+    if ($wazuhService -and $wazuhService.Status -eq 'Running') {
+        Write-Log "Wazuh agent is already installed and running. Exiting."
+        exit 0
+    }
+
     # Create log directory
     if (!(Test-Path "C:\")) {
         New-Item -ItemType Directory -Path "C:\" -Force

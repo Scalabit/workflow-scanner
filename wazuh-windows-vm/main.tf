@@ -126,7 +126,7 @@ resource "google_compute_instance" "wazuh_windows_vm" {
   # Enable OS Login for better security
   metadata = {
     enable-oslogin = "TRUE"
-    sysprep-specialize-script-ps1 = templatefile("${path.module}/scripts/install-wazuh-agent.ps1", {
+    windows-startup-script-ps1 = templatefile("${path.module}/scripts/install-wazuh-agent.ps1", {
       wazuh_manager_ip = data.google_secret_manager_secret_version.wazuh_manager_ip.secret_data
       wazuh_agent_name = "${var.vm_name}-agent"
     })
