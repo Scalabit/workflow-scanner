@@ -171,10 +171,16 @@ jobs:
 
     - name: Deploy to Wazuh Manager VM
       run: |
-        gcloud compute scp deploy.sh wazuh-manager:~/deploy.sh --zone=${{ env.GCP_ZONE }}
+        echo "Waiting for VM to be ready..."
+        sleep 30
         
+        echo "Copying deployment script..."
+        gcloud compute scp deploy.sh wazuh-manager:~/deploy.sh --zone=${{ env.GCP_ZONE }} --ssh-key-expire-after=1h
+        
+        echo "Executing deployment script..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
           --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' bash ~/deploy.sh"
 
     - name: Output Autopilot Details
