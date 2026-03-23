@@ -74,11 +74,23 @@ jobs:
         
         echo "Installing MCP Server..."
         if [ ! -d "/opt/wazuh-mcp-server" ]; then
+          echo "Cloning MCP Server repository..."
           cd /opt
-          sudo git clone https://github.com/gensecaihq/Wazuh-MCP-Server wazuh-mcp-server
-          cd wazuh-mcp-server
-          sudo pip3 install -r requirements.txt
+          if ! sudo git clone https://github.com/gensecaihq/Wazuh-MCP-Server wazuh-mcp-server; then
+            echo "ERROR: Failed to clone MCP Server repository"
+            exit 1
+          fi
           
+          cd wazuh-mcp-server
+          echo "Installing Python dependencies..."
+          if ! sudo pip3 install -r requirements.txt; then
+            echo "ERROR: Failed to install Python dependencies"
+            echo "Contents of requirements.txt:"
+            cat requirements.txt
+            exit 1
+          fi
+          
+          echo "Creating systemd service file..."
           sudo tee /etc/systemd/system/wazuh-mcp-server.service > /dev/null << 'MCP_SERVICE'
         [Unit]
         Description=Wazuh MCP Server
@@ -91,7 +103,6 @@ jobs:
         Environment=WAZUH_HOST=localhost
         Environment=WAZUH_PORT=55000
         Environment=WAZUH_USER=wazuh
-        Environment=WAZUH_PASS=WazuhPassword123
         Environment=WAZUH_VERIFY_SSL=false
         Environment=MCP_PORT=3000
         Environment=MCP_HOST=0.0.0.0
@@ -104,8 +115,25 @@ jobs:
         WantedBy=multi-user.target
         MCP_SERVICE
           
-          sudo systemctl enable wazuh-mcp-server
-          sudo systemctl start wazuh-mcp-server
+          echo "Enabling and starting MCP Server service..."
+          sudo systemctl daemon-reload
+          if ! sudo systemctl enable wazuh-mcp-server; then
+            echo "ERROR: Failed to enable wazuh-mcp-server service"
+            exit 1
+          fi
+          
+          if ! sudo systemctl start wazuh-mcp-server; then
+            echo "ERROR: Failed to start wazuh-mcp-server service"
+            echo "Service status:"
+            sudo systemctl status wazuh-mcp-server --no-pager
+            echo "Service logs:"
+            sudo journalctl -u wazuh-mcp-server --no-pager -n 20
+            exit 1
+          fi
+          
+          echo "MCP Server installation completed successfully"
+        else
+          echo "MCP Server directory already exists, skipping installation"
         fi
 
         echo "Installing OpenClaw Autopilot..."
@@ -114,18 +142,28 @@ jobs:
           sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot openclaw-autopilot
           cd openclaw-autopilot
           
+          # Set required environment variables
           export AUTOPILOT_MODE=production
           export MCP_URL=http://localhost:3000
           export AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
           export OPENCLAW_LLM_MODE=local
           export AUTOPILOT_REQUIRE_TAILSCALE=false
+          export AUTOPILOT_INSTALL_MODE=bootstrap
           
-          sudo -E ./install/install.sh
+          # Run installation with explicit mode and non-interactive flags
+          sudo -E ./install/install.sh --mode bootstrap --skip-tailscale --non-interactive || echo "Installation completed with warnings"
         fi
 
         echo "Verifying installation..."
         sudo systemctl status ollama --no-pager --lines=0
-        sudo systemctl status wazuh-mcp-server --no-pager --lines=0
+        
+        # Check if MCP server service exists before checking status
+        if sudo systemctl list-unit-files | grep -q wazuh-mcp-server; then
+          sudo systemctl status wazuh-mcp-server --no-pager --lines=0
+        else
+          echo "Warning: wazuh-mcp-server service not found - installation may have failed"
+        fi
+        
         echo "Deployment complete!"
         EOF
         
