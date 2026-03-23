@@ -23,7 +23,7 @@ jobs:
     secrets: inherit
 
   deploy-autopilot:
-    needs: deploy-manager
+    needs: [deploy-manager, deploy-vm]
     uses: ./.github/workflows/deploy-wazuh-autopilot.yml
     with:
       environment: production
