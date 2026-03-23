@@ -3,10 +3,6 @@ name: Deploy Wazuh Infrastructure
 on:
   push:
     branches: [main]
-    paths:
-    - 'wazuh-manager/**'
-    - 'wazuh-windows-vm/**' 
-    - 'wazuh-autopilot/**'
   workflow_dispatch:
 
 env:
