@@ -92,7 +92,6 @@ jobs:
           
           echo "Creating systemd service file..."
           sudo tee /etc/systemd/system/wazuh-mcp-server.service > /dev/null << 'MCP_SERVICE'
-
         [Unit]
         Description=Wazuh MCP Server
         After=network.target wazuh-manager.service ollama.service
