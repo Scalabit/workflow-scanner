@@ -93,13 +93,52 @@ fi
 
 # Set up agent password
 log "Setting up agent registration password..."
-if [ -f /var/ossec/etc/authd.pass ]; then
-    # Use the default password if not specified
-    echo "WazuhPassword123" > /var/ossec/etc/authd.pass
-    chown ossec:ossec /var/ossec/etc/authd.pass
-    chmod 640 /var/ossec/etc/authd.pass
-    log "Agent registration password configured"
+echo "shHAjasldJAllnn87jioasd*aszKN" > /var/ossec/etc/authd.pass
+chown ossec:ossec /var/ossec/etc/authd.pass
+chmod 640 /var/ossec/etc/authd.pass
+log "Agent registration password configured"
+
+# Configure Windows Event Log monitoring in shared agent configuration
+log "Configuring Windows Event Log monitoring..."
+if [ -f /var/ossec/etc/shared/default/agent.conf ]; then
+    # Backup existing agent.conf
+    cp /var/ossec/etc/shared/default/agent.conf /var/ossec/etc/shared/default/agent.conf.backup
+else
+    # Create directory if it doesn't exist
+    mkdir -p /var/ossec/etc/shared/default
 fi
+
+# Create agent.conf with Windows Event Log monitoring
+cat > /var/ossec/etc/shared/default/agent.conf << 'EOF'
+<agent_config os="windows">
+  <!-- Windows Event Log monitoring -->
+  <localfile>
+    <location>Application</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+  <localfile>
+    <location>System</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+  <localfile>
+    <location>Security</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+  <localfile>
+    <location>Microsoft-Windows-Sysmon/Operational</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+  
+  <!-- Active response for Windows -->
+  <active-response>
+    <disabled>no</disabled>
+  </active-response>
+</agent_config>
+EOF
+
+chown ossec:ossec /var/ossec/etc/shared/default/agent.conf
+chmod 640 /var/ossec/etc/shared/default/agent.conf
+log "Windows Event Log monitoring configured in shared agent.conf"
 
 # Display installation summary
 log "=== Wazuh Installation Summary ==="

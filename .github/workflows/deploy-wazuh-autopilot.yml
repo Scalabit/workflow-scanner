@@ -52,6 +52,20 @@ jobs:
         #!/bin/bash
         set -e
         
+        echo "Starting fresh OpenClaw Autopilot deployment..."
+        
+        # Clean up any previous installations
+        echo "Cleaning up previous installations..."
+        sudo systemctl stop wazuh-mcp-server 2>/dev/null || true
+        sudo systemctl stop wazuh-autopilot 2>/dev/null || true
+        sudo systemctl disable wazuh-mcp-server 2>/dev/null || true
+        sudo systemctl disable wazuh-autopilot 2>/dev/null || true
+        sudo rm -f /etc/systemd/system/wazuh-mcp-server.service
+        sudo rm -f /etc/systemd/system/wazuh-autopilot.service
+        sudo rm -rf /opt/wazuh-mcp-server
+        sudo rm -rf /opt/openclaw-autopilot
+        sudo systemctl daemon-reload
+        
         echo "Installing Ollama..."
         if ! command -v ollama &> /dev/null; then
           curl -fsSL https://ollama.com/install.sh | sh
@@ -138,41 +152,97 @@ jobs:
         fi
 
         echo "Installing OpenClaw Autopilot..."
-        if [ ! -d "/opt/openclaw-autopilot" ]; then
-          cd /opt
-          sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot openclaw-autopilot
-          cd openclaw-autopilot
+        cd /opt
+        sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot openclaw-autopilot || true
+        cd openclaw-autopilot
+        
+        # Set required environment variables for installation
+        export AUTOPILOT_MODE=production
+        export MCP_URL=http://localhost:3000
+        export AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
+        export OPENCLAW_LLM_MODE=local
+        export AUTOPILOT_REQUIRE_TAILSCALE=false
+        export AUTOPILOT_INSTALL_MODE=bootstrap
+        export WAZUH_MANAGER_IP=localhost
+        export WAZUH_MANAGER_PORT=1514
+        
+        # Create environment file for OpenClaw
+        sudo tee /opt/openclaw-autopilot/.env > /dev/null << 'ENV_EOF'
+        AUTOPILOT_MODE=production
+        MCP_URL=http://localhost:3000
+        AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
+        OPENCLAW_LLM_MODE=local
+        AUTOPILOT_REQUIRE_TAILSCALE=false
+        AUTOPILOT_INSTALL_MODE=bootstrap
+        WAZUH_MANAGER_IP=localhost
+        WAZUH_MANAGER_PORT=1514
+        OLLAMA_URL=http://localhost:11434
+        ENV_EOF
+        
+        # Make installer executable and run with proper environment
+        chmod +x install/install.sh
+        echo "Running OpenClaw installation..."
+        sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || {
+          echo "Main installer failed, attempting manual service setup..."
           
-          # Set required environment variables
-          export AUTOPILOT_MODE=production
-          export MCP_URL=http://localhost:3000
-          export AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
-          export OPENCLAW_LLM_MODE=local
-          export AUTOPILOT_REQUIRE_TAILSCALE=false
-          export AUTOPILOT_INSTALL_MODE=bootstrap
+          # Install Python dependencies
+          sudo pip3 install -r requirements.txt 2>/dev/null || true
           
-          # Make installer executable and run with proper environment
-          chmod +x install/install.sh
-          echo "Running OpenClaw installation..."
-          sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || {
-            echo "Installation encountered issues, attempting alternative method..."
-            # Try direct setup if installer fails
-            sudo pip3 install -r requirements.txt 2>/dev/null || true
-            sudo python3 setup.py install 2>/dev/null || true
-          }
-        else
-          echo "OpenClaw Autopilot directory already exists, skipping installation"
+          # Create OpenClaw Autopilot systemd service
+          sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_SERVICE'
+        [Unit]
+        Description=Wazuh OpenClaw Autopilot
+        After=network.target wazuh-manager.service wazuh-mcp-server.service ollama.service
+        
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/opt/openclaw-autopilot
+        EnvironmentFile=/opt/openclaw-autopilot/.env
+        ExecStart=/usr/bin/python3 -m openclaw.main
+        Restart=always
+        RestartSec=10
+        
+        [Install]
+        WantedBy=multi-user.target
+        AUTOPILOT_SERVICE
+          
+          sudo systemctl daemon-reload
+          sudo systemctl enable wazuh-autopilot
+          sudo systemctl start wazuh-autopilot
+        }
+        
+        # Ensure MCP server is running before starting autopilot
+        echo "Ensuring MCP server is running..."
+        sudo systemctl restart wazuh-mcp-server 2>/dev/null || true
+        sleep 5
+        
+        # Start or restart autopilot service if it exists
+        if sudo systemctl list-unit-files | grep -q wazuh-autopilot; then
+          sudo systemctl restart wazuh-autopilot
+          echo "OpenClaw Autopilot service restarted"
         fi
 
         echo "Verifying installation..."
-        sudo systemctl status ollama --no-pager --lines=0
+        sudo systemctl status ollama --no-pager --lines=0 || echo "Ollama service check failed"
         
         # Check if MCP server service exists before checking status
         if sudo systemctl list-unit-files | grep -q wazuh-mcp-server; then
-          sudo systemctl status wazuh-mcp-server --no-pager --lines=0
+          sudo systemctl status wazuh-mcp-server --no-pager --lines=0 || echo "MCP server not running"
         else
           echo "Warning: wazuh-mcp-server service not found - installation may have failed"
         fi
+        
+        # Check if OpenClaw Autopilot service exists and is running
+        if sudo systemctl list-unit-files | grep -q wazuh-autopilot; then
+          sudo systemctl status wazuh-autopilot --no-pager --lines=0 || echo "OpenClaw Autopilot not running"
+        else
+          echo "Warning: wazuh-autopilot service not found"
+        fi
+        
+        # Test dashboard accessibility
+        echo "Testing OpenClaw dashboard accessibility..."
+        curl -s -o /dev/null -w "%{http_code}" http://localhost:18789 || echo "Dashboard not accessible on port 18789"
         
         echo "Deployment complete!"
         EOF

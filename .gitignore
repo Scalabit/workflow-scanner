@@ -26,3 +26,5 @@ invoice/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/7.
 
 wazuh-windows-vm/README.md
 wazuh-manager/README.md
+
+ssh-brute-force.sh
