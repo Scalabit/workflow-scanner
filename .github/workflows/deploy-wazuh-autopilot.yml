@@ -180,7 +180,7 @@ jobs:
         ENV_EOF
         
         # Make installer executable and run with proper environment
-        chmod +x install/install.sh
+        sudo chmod +x install/install.sh
         echo "Running OpenClaw installation..."
         sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || {
           echo "Main installer failed, attempting manual service setup..."
