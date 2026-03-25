@@ -4,6 +4,7 @@
 param(
     [string]$WazuhManagerHost = "${wazuh_manager_ip}",
     [string]$WazuhAgentName = "${wazuh_agent_name}",
+    [string]$WazuhRegistrationPassword = "${wazuh_registration_password}",
     [string]$WazuhVersion = "4.14.2"
 )
 
@@ -88,6 +89,7 @@ try {
         "/q",  # Quiet installation
         "WAZUH_MANAGER=`"$WazuhManagerHost`""
         "WAZUH_AGENT_NAME=`"$WazuhAgentName`""
+        "WAZUH_REGISTRATION_PASSWORD=`"$WazuhRegistrationPassword`""
     )
 
     # Only add registration server if manager host is provided
