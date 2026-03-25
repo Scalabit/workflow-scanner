@@ -74,6 +74,9 @@ jobs:
         [Service]
         Environment="OLLAMA_NUM_CTX=32768"
         Environment="OLLAMA_HOST=0.0.0.0"
+        Environment="OLLAMA_KEEP_ALIVE=24h"
+        Environment="OLLAMA_FLASH_ATTENTION=1"
+        Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
         OLLAMA_CONF
           sudo systemctl daemon-reload
           sudo systemctl enable ollama
@@ -157,7 +160,7 @@ jobs:
         cd openclaw-autopilot
         
         # Set required environment variables for installation
-        export AUTOPILOT_MODE=production
+        export AUTOPILOT_MODE=bootstrap
         export MCP_URL=http://localhost:3000
         export AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
         export OPENCLAW_LLM_MODE=local
@@ -179,6 +182,25 @@ jobs:
         OLLAMA_URL=http://localhost:11434
         AUTOPILOT_RESPONDER_ENABLED=true
         CORS_ORIGIN=*
+        
+        # OpenClaw Gateway Configuration
+        OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
+        OPENCLAW_TOKEN=${OPENCLAW_TOKEN}
+        OPENCLAW_WEBHOOK_TOKEN=${OPENCLAW_WEBHOOK_TOKEN}
+        OPENCLAW_HOST=127.0.0.1
+        OPENCLAW_PORT=18789
+        
+        # Runtime API Configuration
+        RUNTIME_PORT=9090
+        METRICS_HOST=127.0.0.1
+        
+        # Data Directories
+        AUTOPILOT_DATA_DIR=/var/lib/wazuh-autopilot
+        AUTOPILOT_CONFIG_DIR=/etc/wazuh-autopilot
+        
+        # Approval Settings
+        APPROVAL_TOKEN_TTL_MINUTES=60
+        PLAN_EXPIRY_MINUTES=60
         ENV_EOF
         
         # Make installer executable and run with proper environment
@@ -189,13 +211,15 @@ jobs:
           
           # Install Python dependencies
           sudo pip3 install -r requirements.txt 2>/dev/null || true
-
+          
+          # Install Node.js and OpenClaw CLI
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y nodejs
-
+          sudo npm install -g openclaw@latest
+          
+          # Install NPM dependencies and setup policies
           cd /opt/openclaw-autopilot/runtime/autopilot-service
           sudo npm install
-
           sudo mkdir -p /etc/wazuh-autopilot/policies
           sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/
           
@@ -218,9 +242,46 @@ jobs:
         WantedBy=multi-user.target
         AUTOPILOT_SERVICE
           
+          # Create OpenClaw Gateway systemd service
+          sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << 'GATEWAY_SERVICE'
+        [Unit]
+        Description=OpenClaw Gateway
+        After=network.target ollama.service
+        
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/root
+        EnvironmentFile=/opt/openclaw-autopilot/.env
+        Environment="NODE_OPTIONS=--require /root/undici-timeout-fix.cjs"
+        Environment="NODE_PATH=/usr/lib/node_modules"
+        Environment="OPENCLAW_LLM_MODE=local"
+        ExecStart=/usr/local/bin/openclaw gateway run --bind loopback --port 18789 --force
+        Restart=always
+        RestartSec=10
+        TimeoutStartSec=90
+        
+        [Install]
+        WantedBy=multi-user.target
+        GATEWAY_SERVICE
+          
+          # Create undici timeout fix for long LLM generations
+          sudo tee /root/undici-timeout-fix.cjs > /dev/null << 'TIMEOUT_FIX'
+        const { setGlobalDispatcher, Agent } = require('undici');
+        setGlobalDispatcher(new Agent({ 
+          connectTimeout: 300000,
+          bodyTimeout: 300000,
+          headersTimeout: 300000 
+        }));
+        TIMEOUT_FIX
+          
+          # Create OpenClaw data directories and start services
+          sudo mkdir -p /var/lib/wazuh-autopilot
+          sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
+          
           sudo systemctl daemon-reload
-          sudo systemctl enable wazuh-autopilot
-          sudo systemctl start wazuh-autopilot
+          sudo systemctl enable wazuh-autopilot openclaw-gateway
+          sudo systemctl start wazuh-autopilot openclaw-gateway
         }
         
         # Ensure MCP server is running before starting autopilot
@@ -250,9 +311,19 @@ jobs:
         else
           echo "Warning: wazuh-autopilot service not found"
         fi
+        
+        # Check if OpenClaw Gateway service exists and is running
+        if sudo systemctl list-unit-files | grep -q openclaw-gateway; then
+          sudo systemctl status openclaw-gateway --no-pager --lines=0 || echo "OpenClaw Gateway not running"
+        else
+          echo "Warning: openclaw-gateway service not found"
+        fi
 
         echo "Testing OpenClaw runtime API accessibility..."
         curl -s http://localhost:9090/health || echo "Runtime API not accessible on port 9090"
+        
+        echo "Testing OpenClaw Gateway dashboard accessibility..."
+        curl -s -o /dev/null -w "%{http_code}" http://localhost:18789 || echo "Gateway dashboard not accessible on port 18789"
         
         echo "Deployment complete!"
         EOF
@@ -271,7 +342,7 @@ jobs:
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' bash ~/deploy.sh"
+          --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' bash ~/deploy.sh"
 
     - name: Output Autopilot Details
       run: |
@@ -282,6 +353,8 @@ jobs:
         echo "## Wazuh OpenClaw Autopilot Deployed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### AI Security Operations Dashboard" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**OpenClaw Dashboard:** http://$VM_IP:18789" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**OpenClaw Runtime API:** http://$VM_IP:9090" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
