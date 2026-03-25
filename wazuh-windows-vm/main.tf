@@ -126,7 +126,7 @@ data "google_compute_image" "windows_2022" {
 
 # Create Windows VM instance
 resource "google_compute_instance" "wazuh_windows_vm" {
-  name         = "${var.vm_name}-${random_id.vm_deployment_id.hex}"
+  name         = var.vm_name
   machine_type = var.machine_type
   zone         = var.zone
 
