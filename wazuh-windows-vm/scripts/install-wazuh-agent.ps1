@@ -83,7 +83,6 @@ try {
         throw "Download verification failed - file too small"
     }
 
-    # Prepare installation parameters
     $installArgs = @(
         "/i", "`"$downloadPath`"",
         "/q",  # Quiet installation
