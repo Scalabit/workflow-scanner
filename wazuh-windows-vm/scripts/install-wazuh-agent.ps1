@@ -91,7 +91,6 @@ try {
         "WAZUH_REGISTRATION_PASSWORD=`"$WazuhRegistrationPassword`""
     )
 
-    # Only add registration server if manager host is provided
     if ($WazuhManagerHost -and $WazuhManagerHost -ne "") {
         $installArgs += "WAZUH_REGISTRATION_SERVER=`"$WazuhManagerHost`""
     }
