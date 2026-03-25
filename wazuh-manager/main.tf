@@ -100,13 +100,13 @@ resource "google_compute_firewall" "allow_wazuh_agents" {
 }
 
 # Firewall rule for OpenClaw Autopilot dashboard
-resource "google_compute_firewall" "allow_openclaw_dashboard" {
-  name    = "allow-openclaw-dashboard"
+resource "google_compute_firewall" "allow_openclaw_runtime" {
+  name    = "allow-openclaw-runtime"
   network = google_compute_network.wazuh_manager_vpc.name
 
   allow {
     protocol = "tcp"
-    ports    = ["18789"]
+    ports    = ["9090"]
   }
 
   source_ranges = ["0.0.0.0/0"]

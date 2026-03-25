@@ -168,7 +168,7 @@ jobs:
         
         # Create environment file for OpenClaw
         sudo tee /opt/openclaw-autopilot/.env > /dev/null << 'ENV_EOF'
-        AUTOPILOT_MODE=production
+        AUTOPILOT_MODE=bootstrap
         MCP_URL=http://localhost:3000
         AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
         OPENCLAW_LLM_MODE=local
@@ -177,6 +177,8 @@ jobs:
         WAZUH_MANAGER_IP=localhost
         WAZUH_MANAGER_PORT=1514
         OLLAMA_URL=http://localhost:11434
+        AUTOPILOT_RESPONDER_ENABLED=true
+        CORS_ORIGIN=*
         ENV_EOF
         
         # Make installer executable and run with proper environment
@@ -187,6 +189,15 @@ jobs:
           
           # Install Python dependencies
           sudo pip3 install -r requirements.txt 2>/dev/null || true
+
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+
+          cd /opt/openclaw-autopilot/runtime/autopilot-service
+          sudo npm install
+
+          sudo mkdir -p /etc/wazuh-autopilot/policies
+          sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/
           
           # Create OpenClaw Autopilot systemd service
           sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_SERVICE'
@@ -197,9 +208,9 @@ jobs:
         [Service]
         Type=simple
         User=root
-        WorkingDirectory=/opt/openclaw-autopilot
+        WorkingDirectory=/opt/openclaw-autopilot/runtime/autopilot-service
         EnvironmentFile=/opt/openclaw-autopilot/.env
-        ExecStart=/usr/bin/python3 -m openclaw.main
+        ExecStart=/usr/bin/node index.js
         Restart=always
         RestartSec=10
         
@@ -239,10 +250,9 @@ jobs:
         else
           echo "Warning: wazuh-autopilot service not found"
         fi
-        
-        # Test dashboard accessibility
-        echo "Testing OpenClaw dashboard accessibility..."
-        curl -s -o /dev/null -w "%{http_code}" http://localhost:18789 || echo "Dashboard not accessible on port 18789"
+
+        echo "Testing OpenClaw runtime API accessibility..."
+        curl -s http://localhost:9090/health || echo "Runtime API not accessible on port 9090"
         
         echo "Deployment complete!"
         EOF
@@ -273,7 +283,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### AI Security Operations Dashboard" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**OpenClaw Dashboard:** http://$VM_IP:18789" >> $GITHUB_STEP_SUMMARY
+        echo "**OpenClaw Runtime API:** http://$VM_IP:9090" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- View AI agent sessions and security analysis" >> $GITHUB_STEP_SUMMARY
         echo "- Manage automated incident response" >> $GITHUB_STEP_SUMMARY
