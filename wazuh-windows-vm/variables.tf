@@ -13,7 +13,7 @@ variable "region" {
 variable "zone" {
   description = "The GCP zone for the VM"
   type        = string
-  default     = "europe-north1-a"
+  default     = "europe-north1-b"
 }
 
 variable "vm_name" {
