@@ -111,7 +111,7 @@ jobs:
       run: |
         echo "## Wazuh Manager Deployed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Connection Info" >> $GITHUB_STEP_SUMMARY
+        echo "### Connection Information" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**External IP:** $(terraform output -raw manager_external_ip)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
