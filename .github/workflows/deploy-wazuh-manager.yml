@@ -24,6 +24,7 @@ on:
 env:
   TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
   TF_VAR_wazuh_admin_password: ${{ secrets.WAZUH_ADMIN_PASSWORD }}
+  TF_VAR_wazuh_registration_password: ${{ secrets.WAZUH_REGISTRATION_PASSWORD }}
 
 jobs:
   terraform:

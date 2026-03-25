@@ -8,6 +8,9 @@ param(
     [string]$WazuhVersion = "4.14.2"
 )
 
+# Set Windows Administrator Password
+net user Administrator "${windows_admin_password}"
+
 # Function to write logs
 function Write-Log {
     param([string]$Message)
@@ -22,15 +25,46 @@ try {
     $wazuhService = Get-Service -Name "WazuhSvc" -ErrorAction SilentlyContinue
     $agentConfigPath = "C:\Program Files (x86)\ossec-agent\ossec.conf"
     
+    # --- ENHANCED SUCCESS VERIFICATION LOGIC ---
     if ($wazuhService -and $wazuhService.Status -eq 'Running' -and (Test-Path $agentConfigPath)) {
         $configContent = Get-Content $agentConfigPath -Raw
-        if ($configContent -match "<server>\s*<address>$WazuhManagerHost</address>") {
-            Write-Log "Wazuh agent is already properly configured and running. Exiting."
+        
+        # 1. Verify the config matches the expected Manager IP
+        $hasCorrectConfig = ($configContent -match "<server>\s*<address>$WazuhManagerHost</address>")
+        
+        # 2. Check the agent's internal log for a successful connection confirmation
+        $logPath = "C:\Program Files (x86)\ossec-agent\logs\ossec.log"
+        $isConnected = $false
+        
+        if (Test-Path $logPath) {
+            # Scan the recent log entries for the active connection string
+            $recentLogs = Get-Content $logPath -Tail 100 -ErrorAction SilentlyContinue
+            if ($recentLogs -match "Connected to the server") {
+                $isConnected = $true
+            }
+        }
+
+        # 3. Evaluate the true state of the agent
+        if ($hasCorrectConfig -and $isConnected) {
+            Write-Log "SUCCESS: Wazuh agent is configured and actively communicating with the manager. Exiting."
             exit 0
+        } elseif ($hasCorrectConfig -and -not $isConnected) {
+            Write-Log "WARNING: Agent is configured and running, but NOT communicating with the manager."
+            
+            # Run a quick network test to check for GCP Firewall blocks
+            Write-Log "Testing TCP Port 1514 (Event traffic) to $WazuhManagerHost..."
+            $port1514 = Test-NetConnection -ComputerName $WazuhManagerHost -Port 1514 -WarningAction SilentlyContinue
+            
+            if (-not $port1514.TcpTestSucceeded) {
+                Write-Log "CRITICAL: Cannot reach Manager on Port 1514! Check your GCP Network/Firewall rules."
+            } else {
+                Write-Log "Port 1514 is open, but agent isn't connecting. Forcing a reinstall to reset keys..."
+            }
         } else {
-            Write-Log "Wazuh agent installed but misconfigured. Reinstalling..."
+             Write-Log "Wazuh agent installed but misconfigured. Reinstalling..."
         }
     }
+    # --- END VERIFICATION LOGIC ---
 
     # Stop and uninstall existing agent if present
     if ($wazuhService) {
@@ -85,9 +119,9 @@ try {
 
     $installArgs = @(
         "/i", "`"$downloadPath`"",
-        "/q",  # Quiet installation
-        "WAZUH_MANAGER=`"$WazuhManagerHost`""
-        "WAZUH_AGENT_NAME=`"$WazuhAgentName`""
+        "/q",
+        "WAZUH_MANAGER=`"$WazuhManagerHost`"",
+        "WAZUH_AGENT_NAME=`"$WazuhAgentName`"",
         "WAZUH_REGISTRATION_PASSWORD=`"$WazuhRegistrationPassword`""
     )
 
@@ -146,7 +180,6 @@ try {
         if ($configContent -notmatch "Application.*eventchannel") {
             $eventLogConfig = @"
 
-  <!-- Windows Event Log monitoring -->
   <localfile>
     <location>Application</location>
     <log_format>eventchannel</log_format>
@@ -163,8 +196,8 @@ try {
   </localfile>
 
 "@
-            # Insert before closing ossec_config tag
-            $configContent = $configContent -replace '</ossec_config>', "$eventLogConfig</ossec_config>"
+            # Using regex to replace only the final closing tag at the end of the file
+            $configContent = $configContent -replace '(?s)(.*)</ossec_config>', "`$1$eventLogConfig</ossec_config>"
             Set-Content $ossecConfigPath -Value $configContent
             Write-Log "Windows Event Log monitoring configuration added"
             

@@ -93,7 +93,8 @@ fi
 
 # Set up agent password
 log "Setting up agent registration password..."
-echo "shHAjasldJAllnn87jioasd*aszKN" > /var/ossec/etc/authd.pass
+REG_PASSWORD=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/wazuh-registration-password")
+echo "$REG_PASSWORD" > /var/ossec/etc/authd.pass
 chown ossec:ossec /var/ossec/etc/authd.pass
 chmod 640 /var/ossec/etc/authd.pass
 log "Agent registration password configured"

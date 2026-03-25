@@ -39,3 +39,9 @@ variable "wazuh_admin_password" {
   type        = string
   sensitive   = true
 }
+
+variable "wazuh_registration_password" {
+  description = "Password for agent registration"
+  type        = string
+  sensitive   = true
+}

@@ -176,6 +176,7 @@ resource "google_compute_instance" "wazuh_manager" {
   # Metadata for initialization
   metadata = {
     enable-oslogin = "TRUE"
+    wazuh-registration-password = var.wazuh_registration_password
     startup-script = file("${path.module}/scripts/install-wazuh-manager.sh")
   }
 

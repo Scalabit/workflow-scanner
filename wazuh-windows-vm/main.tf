@@ -157,6 +157,7 @@ resource "google_compute_instance" "wazuh_windows_vm" {
       wazuh_manager_ip = data.google_secret_manager_secret_version.wazuh_manager_ip.secret_data
       wazuh_agent_name = "${var.vm_name}-agent"
       wazuh_registration_password = var.wazuh_registration_password
+      windows_admin_password = random_password.windows_admin_password.result
     })
   }
 
@@ -169,9 +170,6 @@ resource "google_compute_instance" "wazuh_windows_vm" {
       "https://www.googleapis.com/auth/monitoring.write"
     ]
   }
-
-  # Set Windows password
-  metadata_startup_script = "net user Administrator ${random_password.windows_admin_password.result}"
 
   depends_on = [
     google_project_service.apis,
