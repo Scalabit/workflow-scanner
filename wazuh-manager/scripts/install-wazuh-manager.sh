@@ -81,12 +81,9 @@ if [ -f /var/ossec/etc/ossec.conf ]; then
     # Backup original configuration
     cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.backup
     
-    # Enable auto-enrollment and set registration password
+    # Enable auto-enrollment
     sed -i 's/<use_password>no<\/use_password>/<use_password>yes<\/use_password>/' /var/ossec/etc/ossec.conf
-    
-    # Restart wazuh-manager to apply changes
-    systemctl restart wazuh-manager
-    log "Agent registration configured"
+    log "Agent registration enabled in ossec.conf"
 else
     log "Warning: Wazuh configuration file not found"
 fi
@@ -98,6 +95,13 @@ echo "$REG_PASSWORD" > /var/ossec/etc/authd.pass
 chown ossec:ossec /var/ossec/etc/authd.pass
 chmod 640 /var/ossec/etc/authd.pass
 log "Agent registration password configured"
+
+# Restart wazuh-manager to apply BOTH the conf and password changes
+log "Restarting wazuh-manager service..."
+systemctl stop wazuh-manager
+sleep 5
+systemctl start wazuh-manager
+log "Wazuh manager restarted successfully"
 
 # Configure Windows Event Log monitoring in shared agent configuration
 log "Configuring Windows Event Log monitoring..."
@@ -112,7 +116,6 @@ fi
 # Create agent.conf with Windows Event Log monitoring
 cat > /var/ossec/etc/shared/default/agent.conf << 'EOF'
 <agent_config os="windows">
-  <!-- Windows Event Log monitoring -->
   <localfile>
     <location>Application</location>
     <log_format>eventchannel</log_format>
@@ -130,7 +133,6 @@ cat > /var/ossec/etc/shared/default/agent.conf << 'EOF'
     <log_format>eventchannel</log_format>
   </localfile>
   
-  <!-- Active response for Windows -->
   <active-response>
     <disabled>no</disabled>
   </active-response>
