@@ -140,6 +140,16 @@ chown ossec:ossec /var/ossec/etc/shared/default/agent.conf
 chmod 640 /var/ossec/etc/shared/default/agent.conf
 log "Windows Event Log monitoring configured in shared agent.conf"
 
+# Clean up old disconnected agents
+log "Cleaning up old disconnected agents..."
+/var/ossec/bin/agent_control -l | grep "Disconnected" | while read line; do
+  agent_id=$(echo "$line" | awk -F',' '{print $1}' | awk '{print $2}')
+  if [ ! -z "$agent_id" ] && [ "$agent_id" != "000" ]; then
+    log "Removing disconnected agent ID: $agent_id"
+    echo "y" | /var/ossec/bin/manage_agents -r "$agent_id" >/dev/null 2>&1 || true
+  fi
+done
+
 # Display installation summary
 log "=== Wazuh Installation Summary ==="
 log "Wazuh Manager: Installed"
