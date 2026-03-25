@@ -93,7 +93,7 @@ jobs:
 
         echo "Installing Python and pip..."
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip
+        sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq python3 python3-pip
         
         echo "Installing MCP Server..."
         if [ ! -d "/opt/wazuh-mcp-server" ]; then
@@ -220,7 +220,7 @@ jobs:
           
           # Install Node.js and OpenClaw CLI
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
+          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
           sudo npm install -g openclaw@latest
           
           # Install NPM dependencies and setup policies
