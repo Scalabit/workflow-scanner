@@ -348,7 +348,7 @@ jobs:
         
         # Create OpenClaw configuration with external access and device auth bypass
         echo "Creating OpenClaw configuration file..."
-        sudo tee /root/.openclaw/openclaw.json > /dev/null << 'EOF'
+        sudo tee /root/.openclaw/openclaw.json > /dev/null << 'OPENCLAW_JSON_EOF'
         {
           "meta": {
             "lastTouchedVersion": "2026.3.24",
@@ -378,7 +378,7 @@ jobs:
             }
           }
         }
-        EOF
+        OPENCLAW_JSON_EOF
         
         # Create OpenClaw data directories
         sudo mkdir -p /var/lib/wazuh-autopilot
