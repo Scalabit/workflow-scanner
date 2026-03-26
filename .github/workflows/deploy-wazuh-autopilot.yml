@@ -230,13 +230,13 @@ jobs:
         # Install NPM dependencies and setup policies
         echo "Setting up autopilot dependencies..."
         if [ -d "/opt/openclaw-autopilot" ]; then
-          echo "✓ OpenClaw autopilot directory exists"
+          echo " OpenClaw autopilot directory exists"
           cd /opt/openclaw-autopilot/runtime/autopilot-service || echo "Unable to change to autopilot-service directory"
           sudo npm install || true
           sudo mkdir -p /etc/wazuh-autopilot/policies
           sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/ 2>/dev/null || echo "No policies to copy"
         else
-          echo "✗ OpenClaw autopilot directory not found at /opt/openclaw-autopilot"
+          echo " OpenClaw autopilot directory not found at /opt/openclaw-autopilot"
           echo "Creating minimal directory structure..."
           sudo mkdir -p /opt/openclaw-autopilot/runtime/autopilot-service
           sudo mkdir -p /etc/wazuh-autopilot/policies
@@ -257,7 +257,8 @@ jobs:
         echo "Creating systemd service files..."
         
         # Create OpenClaw Autopilot systemd service
-        sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'EOF'
+        echo "Creating wazuh-autopilot service..."
+        if sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_EOF'; then
         [Unit]
         Description=Wazuh OpenClaw Autopilot
         After=network.target wazuh-manager.service wazuh-mcp-server.service ollama.service
@@ -273,7 +274,11 @@ jobs:
 
         [Install]
         WantedBy=multi-user.target
-        EOF
+        AUTOPILOT_EOF
+          echo "Autopilot service file written successfully"
+        else
+          echo "Failed to write autopilot service file"
+        fi
           
         # Find OpenClaw binary location
         OPENCLAW_PATH=$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
@@ -308,19 +313,25 @@ jobs:
         # Verify service files were created
         echo "Verifying service files..."
         if [ -f "/etc/systemd/system/wazuh-autopilot.service" ]; then
-          echo "✓ wazuh-autopilot.service created successfully"
+          echo " wazuh-autopilot.service created successfully"
         else
-          echo "✗ wazuh-autopilot.service creation failed"
+          echo " wazuh-autopilot.service creation failed"
         fi
         
         if [ -f "/etc/systemd/system/openclaw-gateway.service" ]; then
-          echo "✓ openclaw-gateway.service created successfully" 
+          echo " openclaw-gateway.service created successfully" 
         else
-          echo "✗ openclaw-gateway.service creation failed"
+          echo " openclaw-gateway.service creation failed"
         fi
         
         # Setup OpenClaw configuration
         echo "Setting up OpenClaw configuration..."
+        
+        # Debug OpenClaw CLI availability
+        echo "Debugging OpenClaw CLI at $OPENCLAW_PATH:"
+        echo "  File exists: $([ -f "$OPENCLAW_PATH" ] && echo 'YES' || echo 'NO')"
+        echo "  File executable: $([ -x "$OPENCLAW_PATH" ] && echo 'YES' || echo 'NO')"
+        echo "  File permissions: $(ls -la "$OPENCLAW_PATH" 2>/dev/null || echo 'Cannot read permissions')"
         
         # Verify OpenClaw CLI is available and executable
         if [ -x "$OPENCLAW_PATH" ]; then
@@ -376,8 +387,38 @@ jobs:
         # Enable and start services
         echo "Enabling and starting services..."
         sudo systemctl daemon-reload
-        sudo systemctl enable openclaw-gateway wazuh-autopilot || true
-        sudo systemctl start openclaw-gateway wazuh-autopilot || true
+        
+        # Enable services
+        if sudo systemctl enable openclaw-gateway 2>/dev/null; then
+          echo " openclaw-gateway enabled successfully"
+        else
+          echo " Failed to enable openclaw-gateway"
+        fi
+        
+        if sudo systemctl enable wazuh-autopilot 2>/dev/null; then
+          echo " wazuh-autopilot enabled successfully"
+        else
+          echo " Failed to enable wazuh-autopilot (file may not exist)"
+        fi
+        
+        # Start services individually with better error handling
+        echo "Starting openclaw-gateway service..."
+        if sudo systemctl start openclaw-gateway 2>/dev/null; then
+          echo " openclaw-gateway started successfully"
+        else
+          echo " Failed to start openclaw-gateway"
+          echo "Service status:"
+          sudo systemctl status openclaw-gateway --no-pager -l || true
+          echo "Recent logs:"
+          sudo journalctl -u openclaw-gateway --no-pager -n 10 || true
+        fi
+        
+        echo "Starting wazuh-autopilot service..."
+        if sudo systemctl start wazuh-autopilot 2>/dev/null; then
+          echo " wazuh-autopilot started successfully"
+        else
+          echo " Failed to start wazuh-autopilot"
+        fi
         
         # Ensure MCP server is running
         echo "Ensuring MCP server is running..."
