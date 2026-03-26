@@ -42,10 +42,8 @@ jobs:
       uses: google-github-actions/auth@v2
       with:
         credentials_json: ${{ secrets.GCP_SA_KEY }}
-
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
-
     - name: Create deployment script
       run: |
         cat > deploy.sh << 'EOF'
@@ -84,13 +82,11 @@ jobs:
           sleep 10
           ollama pull llama3.2:3b
         fi
-
         echo "Waiting for background apt processes to finish..."
         while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
           echo "Waiting for dpkg lock to be released..."
           sleep 5
         done
-
         echo "Installing Python and pip..."
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq python3 python3-pip
@@ -159,7 +155,6 @@ jobs:
         else
           echo "MCP Server directory already exists, skipping installation"
         fi
-
         echo "Installing OpenClaw Autopilot..."
         cd /opt
         sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot openclaw-autopilot || true
@@ -176,7 +171,7 @@ jobs:
         export WAZUH_MANAGER_PORT=1514
         
         # Create environment file for OpenClaw
-        cat > /tmp/openclaw-autopilot.env << ENV_EOF
+        cat > /tmp/openclaw-autopilot.env << 'ENV_EOF'
         AUTOPILOT_MODE=bootstrap
         MCP_URL=http://localhost:3000
         AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
@@ -265,7 +260,6 @@ jobs:
         [Unit]
         Description=Wazuh OpenClaw Autopilot
         After=network.target wazuh-manager.service wazuh-mcp-server.service ollama.service
-
         [Service]
         Type=simple
         User=root
@@ -274,7 +268,6 @@ jobs:
         ExecStart=/usr/bin/node index.js
         Restart=always
         RestartSec=10
-
         [Install]
         WantedBy=multi-user.target
         AUTOPILOT_EOF
@@ -291,7 +284,6 @@ jobs:
         [Unit]
         Description=OpenClaw Gateway
         After=network.target ollama.service
-
         [Service]
         Type=simple
         User=root
@@ -304,7 +296,6 @@ jobs:
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
-
         [Install]
         WantedBy=multi-user.target
         GATEWAY_EOF
@@ -493,7 +484,6 @@ jobs:
         # Configure webhook integration after all services are running
         echo "Configuring Wazuh webhook integration..."
         sudo /usr/local/bin/update-wazuh-webhooks.sh || echo "Webhook configuration failed, continuing..."
-
         echo "Verifying installation..."
         sudo systemctl status ollama --no-pager --lines=0 || echo "Ollama service check failed"
         
@@ -517,7 +507,6 @@ jobs:
         else
           echo "Warning: openclaw-gateway service not found"
         fi
-
         echo "Testing OpenClaw runtime API accessibility..."
         curl -s http://localhost:9090/health || echo "Runtime API not accessible on port 9090"
         
@@ -532,7 +521,6 @@ jobs:
         EOF
         
         chmod +x deploy.sh
-
     - name: Deploy to Wazuh Manager VM
       run: |
         echo "Waiting for VM to be ready..."
@@ -546,7 +534,6 @@ jobs:
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
           --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' bash ~/deploy.sh"
-
     - name: Output Autopilot Details
       run: |
         VM_IP=$(gcloud compute instances describe wazuh-manager \
