@@ -131,7 +131,7 @@ jobs:
         Environment=MCP_HOST=0.0.0.0
         Environment=AUTH_MODE=bearer
         Environment=MCP_API_KEY=${MCP_API_KEY}
-        ExecStart=/usr/bin/python3 -m src.main
+        ExecStart=/usr/bin/python3 -m src.wazuh_mcp_server
         Restart=always
         RestartSec=10
         
@@ -176,7 +176,7 @@ jobs:
         export WAZUH_MANAGER_PORT=1514
         
         # Create environment file for OpenClaw
-        sudo tee /opt/openclaw-autopilot/.env > /dev/null << 'ENV_EOF'
+        cat > /tmp/openclaw-autopilot.env << ENV_EOF
         AUTOPILOT_MODE=bootstrap
         MCP_URL=http://localhost:3000
         AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
@@ -193,6 +193,7 @@ jobs:
         OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
         OPENCLAW_TOKEN=${OPENCLAW_TOKEN}
         OPENCLAW_WEBHOOK_TOKEN=${OPENCLAW_WEBHOOK_TOKEN}
+        AUTOPILOT_API_KEY=${MCP_API_KEY}
         OPENCLAW_HOST=127.0.0.1
         OPENCLAW_PORT=18789
         
@@ -208,6 +209,8 @@ jobs:
         APPROVAL_TOKEN_TTL_MINUTES=60
         PLAN_EXPIRY_MINUTES=60
         ENV_EOF
+        
+        sudo mv /tmp/openclaw-autopilot.env /opt/openclaw-autopilot/.env
         
         # Install Python dependencies
         sudo pip3 install -r requirements.txt 2>/dev/null || true
@@ -258,7 +261,7 @@ jobs:
         
         # Create OpenClaw Autopilot systemd service
         echo "Creating wazuh-autopilot service..."
-        if sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_EOF'; then
+        cat > /tmp/wazuh-autopilot.service << 'AUTOPILOT_EOF'
         [Unit]
         Description=Wazuh OpenClaw Autopilot
         After=network.target wazuh-manager.service wazuh-mcp-server.service ollama.service
@@ -275,17 +278,16 @@ jobs:
         [Install]
         WantedBy=multi-user.target
         AUTOPILOT_EOF
-          echo "Autopilot service file written successfully"
-        else
-          echo "Failed to write autopilot service file"
-        fi
+        
+        sudo mv /tmp/wazuh-autopilot.service /etc/systemd/system/wazuh-autopilot.service
+        echo "Autopilot service file created successfully"
           
         # Find OpenClaw binary location
         OPENCLAW_PATH=$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
         echo "Using OpenClaw at: $OPENCLAW_PATH"
         
-        # Create OpenClaw Gateway systemd service
-        sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << 'GATEWAY_EOF'
+        # Create OpenClaw Gateway systemd service  
+        cat > /tmp/openclaw-gateway.service << 'GATEWAY_EOF'
         [Unit]
         Description=OpenClaw Gateway
         After=network.target ollama.service
@@ -297,7 +299,8 @@ jobs:
         EnvironmentFile=/opt/openclaw-autopilot/.env
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
-        ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
+        Environment="OLLAMA_API_KEY=ollama-local"
+        ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_TOKEN_PLACEHOLDER
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
@@ -306,9 +309,11 @@ jobs:
         WantedBy=multi-user.target
         GATEWAY_EOF
         
+        sudo mv /tmp/openclaw-gateway.service /etc/systemd/system/openclaw-gateway.service
+        
         # Replace placeholders in service file
         sudo sed -i "s|OPENCLAW_PATH_PLACEHOLDER|$OPENCLAW_PATH|g" /etc/systemd/system/openclaw-gateway.service
-        sudo sed -i "s/OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER/\${OPENCLAW_GATEWAY_TOKEN}/g" /etc/systemd/system/openclaw-gateway.service
+        sudo sed -i "s/OPENCLAW_TOKEN_PLACEHOLDER/\${OPENCLAW_TOKEN}/g" /etc/systemd/system/openclaw-gateway.service
         
         # Verify service files were created
         echo "Verifying service files..."
@@ -380,9 +385,59 @@ jobs:
         }
         OPENCLAW_JSON_EOF
         
+        # Create auth configuration for Ollama (no API key needed for local)
+        echo "Creating OpenClaw auth configuration for local Ollama..."
+        sudo mkdir -p /root/.openclaw/agents/main/agent
+        sudo tee /root/.openclaw/agents/main/agent/auth-profiles.json > /dev/null << 'AUTH_EOF'
+        {
+          "ollama": {
+            "baseUrl": "http://localhost:11434",
+            "apiKey": "ollama-local"
+          }
+        }
+        AUTH_EOF
+        echo "Auth configuration created successfully"
+        
         # Create OpenClaw data directories
         sudo mkdir -p /var/lib/wazuh-autopilot
         sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
+        
+        # Create webhook configuration updater script
+        echo "Creating webhook configuration script..."
+        sudo tee /usr/local/bin/update-wazuh-webhooks.sh > /dev/null << 'WEBHOOK_SCRIPT'
+        #!/bin/bash
+        
+        # Wait for OpenClaw to be ready
+        echo "Waiting for OpenClaw Gateway to be ready..."
+        while ! curl -s http://localhost:18789/ > /dev/null 2>&1; do
+            echo "Waiting for OpenClaw Gateway..."
+            sleep 5
+        done
+        
+        echo "OpenClaw Gateway is ready, updating Wazuh webhooks..."
+        
+        # Update webhook URLs with authentication tokens
+        if [ -f /var/ossec/etc/ossec.conf ]; then
+            cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.pre-webhook
+            
+            # Add Authorization headers to webhook configs
+            sed -i 's|<url>http://localhost:18789/webhook/wazuh-alert</url>|<url>http://localhost:18789/webhook/wazuh-alert</url>\n    <auth>\n      <type>bearer</type>\n      <token>'${OPENCLAW_TOKEN}'</token>\n    </auth>|g' /var/ossec/etc/ossec.conf
+            
+            echo "Webhook authentication updated"
+            
+            # Restart Wazuh manager to apply webhook config
+            systemctl restart wazuh-manager
+            echo "Wazuh manager restarted with webhook configuration"
+        else
+            echo "Error: Wazuh configuration file not found"
+        fi
+        WEBHOOK_SCRIPT
+        
+        sudo chmod +x /usr/local/bin/update-wazuh-webhooks.sh
+        
+        # Add root to wazuh group for alert file access
+        echo "Adding root user to wazuh group for alert file access..."
+        sudo usermod -a -G wazuh root || echo "Failed to add root to wazuh group"
         
         # Enable and start services
         echo "Enabling and starting services..."
@@ -424,6 +479,10 @@ jobs:
         echo "Ensuring MCP server is running..."
         sudo systemctl restart wazuh-mcp-server 2>/dev/null || true
         sleep 3
+        
+        # Configure webhook integration after all services are running
+        echo "Configuring Wazuh webhook integration..."
+        sudo /usr/local/bin/update-wazuh-webhooks.sh || echo "Webhook configuration failed, continuing..."
 
         echo "Verifying installation..."
         sudo systemctl status ollama --no-pager --lines=0 || echo "Ollama service check failed"

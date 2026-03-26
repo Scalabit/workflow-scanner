@@ -79,6 +79,41 @@ else
     log "Warning: Wazuh Dashboard service is not running"
 fi
 
+# Configure OpenClaw webhook integration
+log "Configuring OpenClaw webhook integration..."
+
+# Add webhook configuration to ossec.conf
+if [ -f /var/ossec/etc/ossec.conf ]; then
+    # Backup original configuration
+    cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.webhook_backup
+    
+    # Add webhook integration before closing tag
+    sed -i '/<\/ossec_config>/i \
+\
+  <!-- OpenClaw Autopilot Integration --> \
+  <integration> \
+    <name>webhook</name> \
+    <url>http://localhost:18789/webhook/wazuh-alert</url> \
+    <level>8</level> <!-- Forward alerts level 8+ to OpenClaw --> \
+    <rule_id>5763,40112,5712,5710</rule_id> <!-- SSH attacks and brute force --> \
+    <alert_format>json</alert_format> \
+    <max_log>5</max_log> \
+  </integration> \
+\
+  <!-- Alternative: Send to Autopilot API --> \
+  <integration> \
+    <name>webhook</name> \
+    <url>http://localhost:9090/api/alerts</url> \
+    <level>10</level> <!-- High priority alerts --> \
+    <alert_format>json</alert_format> \
+    <max_log>3</max_log> \
+  </integration>' /var/ossec/etc/ossec.conf
+    
+    log "OpenClaw webhook integration added to ossec.conf"
+else
+    log "Warning: Wazuh configuration file not found"
+fi
+
 # Configure agent enrollment settings
 log "Configuring agent enrollment..."
 

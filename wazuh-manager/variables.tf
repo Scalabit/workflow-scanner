@@ -25,7 +25,7 @@ variable "vm_name" {
 variable "machine_type" {
   description = "Machine type for the VM"
   type        = string
-  default     = "e2-standard-4"
+  default     = "e2-standard-8"  # 8 vCPUs, 32GB RAM for Ollama/OpenClaw
 }
 
 variable "disk_size_gb" {
