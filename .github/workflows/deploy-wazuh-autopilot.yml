@@ -340,14 +340,20 @@ jobs:
         
         # Verify OpenClaw CLI is available and executable
         if [ -x "$OPENCLAW_PATH" ]; then
-          echo "OpenClaw CLI found at $OPENCLAW_PATH, running setup with timeout..."
-          # Run setup with timeout and non-interactive flags
-          timeout 60s sudo -u root -H "$OPENCLAW_PATH" setup --non-interactive --force 2>/dev/null || \
-          timeout 60s sudo -u root -H "$OPENCLAW_PATH" setup --yes 2>/dev/null || \
-          echo "OpenClaw setup timed out or failed, creating directories manually..."
+          echo "OpenClaw CLI found at $OPENCLAW_PATH, running non-interactive onboarding for Ollama..."
+          # Use onboard command instead of setup, with non-interactive Ollama configuration
+          sudo -u root -H "$OPENCLAW_PATH" onboard --non-interactive \
+            --auth-choice ollama \
+            --accept-risk \
+            --gateway-port 18789 \
+            --gateway-bind lan \
+            --install-daemon \
+            --skip-skills 2>&1 || echo "OpenClaw onboarding completed with issues"
+        else
+          echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
         fi
         
-        # Always ensure directories exist (whether setup worked or not)
+        # Ensure directories exist
         echo "Ensuring OpenClaw directories exist..."
         sudo mkdir -p /root/.openclaw/workspace
         sudo mkdir -p /root/.openclaw/agents/main/sessions
