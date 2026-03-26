@@ -317,16 +317,25 @@ jobs:
           sudo systemctl start wazuh-autopilot openclaw-gateway
         }
         
-        # Ensure MCP server is running before starting autopilot
+        # Always ensure services are created and started (outside the if block)
+        echo "Ensuring all services are enabled and started..."
+        sudo systemctl daemon-reload
+        
+        # Enable and start services that should exist
+        if [ -f "/etc/systemd/system/openclaw-gateway.service" ]; then
+          sudo systemctl enable openclaw-gateway || true
+          sudo systemctl start openclaw-gateway || true
+        fi
+        
+        if [ -f "/etc/systemd/system/wazuh-autopilot.service" ]; then
+          sudo systemctl enable wazuh-autopilot || true
+          sudo systemctl start wazuh-autopilot || true
+        fi
+        
+        # Ensure MCP server is running
         echo "Ensuring MCP server is running..."
         sudo systemctl restart wazuh-mcp-server 2>/dev/null || true
-        sleep 5
-        
-        # Start or restart autopilot service if it exists
-        if sudo systemctl list-unit-files | grep -q wazuh-autopilot; then
-          sudo systemctl restart wazuh-autopilot
-          echo "OpenClaw Autopilot service restarted"
-        fi
+        sleep 3
 
         echo "Verifying installation..."
         sudo systemctl status ollama --no-pager --lines=0 || echo "Ollama service check failed"
