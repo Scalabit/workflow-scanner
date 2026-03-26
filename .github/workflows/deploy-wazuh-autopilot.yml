@@ -227,16 +227,31 @@ jobs:
           echo "WARNING: OpenClaw CLI installation failed"
         fi
         
-        # Install NPM dependencies and setup policies  
-        cd /opt/openclaw-autopilot/runtime/autopilot-service
-        sudo npm install || true
-        sudo mkdir -p /etc/wazuh-autopilot/policies
-        sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/ 2>/dev/null || true
+        # Install NPM dependencies and setup policies
+        echo "Setting up autopilot dependencies..."
+        if [ -d "/opt/openclaw-autopilot" ]; then
+          echo "✓ OpenClaw autopilot directory exists"
+          cd /opt/openclaw-autopilot/runtime/autopilot-service || echo "Unable to change to autopilot-service directory"
+          sudo npm install || true
+          sudo mkdir -p /etc/wazuh-autopilot/policies
+          sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/ 2>/dev/null || echo "No policies to copy"
+        else
+          echo "✗ OpenClaw autopilot directory not found at /opt/openclaw-autopilot"
+          echo "Creating minimal directory structure..."
+          sudo mkdir -p /opt/openclaw-autopilot/runtime/autopilot-service
+          sudo mkdir -p /etc/wazuh-autopilot/policies
+        fi
         
         # Try the main installer (may or may not work)
-        sudo chmod +x install/install.sh 2>/dev/null || true
         echo "Attempting OpenClaw installation..."
-        sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || echo "Main installer completed with issues, proceeding with manual setup..."
+        cd /opt/openclaw-autopilot || echo "Unable to change to autopilot directory"
+        if [ -f "install/install.sh" ]; then
+          echo "Found installer script, running..."
+          sudo chmod +x install/install.sh
+          sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || echo "Main installer completed with issues, proceeding with manual setup..."
+        else
+          echo "Install script not found, skipping main installer"
+        fi
         
         # Always create the systemd services (regardless of installer outcome)
         echo "Creating systemd service files..."
@@ -265,7 +280,7 @@ jobs:
         echo "Using OpenClaw at: $OPENCLAW_PATH"
         
         # Create OpenClaw Gateway systemd service
-        sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << EOF
+        sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << 'GATEWAY_EOF'
         [Unit]
         Description=OpenClaw Gateway
         After=network.target ollama.service
@@ -277,24 +292,42 @@ jobs:
         EnvironmentFile=/opt/openclaw-autopilot/.env
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
-        ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token \${OPENCLAW_GATEWAY_TOKEN}
+        ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
 
         [Install]
         WantedBy=multi-user.target
-        EOF
+        GATEWAY_EOF
+        
+        # Replace placeholders in service file
+        sudo sed -i "s|OPENCLAW_PATH_PLACEHOLDER|$OPENCLAW_PATH|g" /etc/systemd/system/openclaw-gateway.service
+        sudo sed -i "s/OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER/\${OPENCLAW_GATEWAY_TOKEN}/g" /etc/systemd/system/openclaw-gateway.service
+        
+        # Verify service files were created
+        echo "Verifying service files..."
+        if [ -f "/etc/systemd/system/wazuh-autopilot.service" ]; then
+          echo "✓ wazuh-autopilot.service created successfully"
+        else
+          echo "✗ wazuh-autopilot.service creation failed"
+        fi
+        
+        if [ -f "/etc/systemd/system/openclaw-gateway.service" ]; then
+          echo "✓ openclaw-gateway.service created successfully" 
+        else
+          echo "✗ openclaw-gateway.service creation failed"
+        fi
         
         # Setup OpenClaw configuration
         echo "Setting up OpenClaw configuration..."
         
-        # Verify OpenClaw CLI is available
-        if command -v openclaw >/dev/null 2>&1; then
-          echo "OpenClaw CLI found, running setup..."
-          sudo -u root -H openclaw setup || echo "OpenClaw setup completed with issues"
+        # Verify OpenClaw CLI is available and executable
+        if [ -x "$OPENCLAW_PATH" ]; then
+          echo "OpenClaw CLI found at $OPENCLAW_PATH, running setup..."
+          sudo -u root -H "$OPENCLAW_PATH" setup || echo "OpenClaw setup completed with issues"
         else
-          echo "OpenClaw CLI not found, creating directories manually..."
+          echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
           sudo mkdir -p /root/.openclaw/workspace
           sudo mkdir -p /root/.openclaw/agents/main/sessions
         fi
