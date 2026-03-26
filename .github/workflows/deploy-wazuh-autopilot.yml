@@ -233,11 +233,11 @@ jobs:
         echo "Creating systemd service files..."
         
         # Create OpenClaw Autopilot systemd service
-        sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_SERVICE'
+        sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'EOF'
         [Unit]
         Description=Wazuh OpenClaw Autopilot
         After=network.target wazuh-manager.service wazuh-mcp-server.service ollama.service
-        
+
         [Service]
         Type=simple
         User=root
@@ -246,17 +246,17 @@ jobs:
         ExecStart=/usr/bin/node index.js
         Restart=always
         RestartSec=10
-        
+
         [Install]
         WantedBy=multi-user.target
-        AUTOPILOT_SERVICE
+        EOF
           
-          # Create OpenClaw Gateway systemd service
-          sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << 'GATEWAY_SERVICE'
+        # Create OpenClaw Gateway systemd service
+        sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << 'EOF'
         [Unit]
         Description=OpenClaw Gateway
         After=network.target ollama.service
-        
+
         [Service]
         Type=simple
         User=root
@@ -264,25 +264,25 @@ jobs:
         EnvironmentFile=/opt/openclaw-autopilot/.env
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
-        ExecStart=/usr/bin/openclaw gateway run --bind lan --port 18789 --force --token ${OPENCLAW_GATEWAY_TOKEN}
+        ExecStart=/usr/bin/openclaw gateway run --bind lan --port 18789 --force --token \${OPENCLAW_GATEWAY_TOKEN}
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
-        
+
         [Install]
         WantedBy=multi-user.target
-        GATEWAY_SERVICE
-          
-          # Setup OpenClaw configuration
-          echo "Setting up OpenClaw configuration..."
-          sudo -u root -H openclaw setup || echo "OpenClaw setup completed"
-          
-          # Create OpenClaw configuration with external access and device auth bypass
-          sudo tee /root/.openclaw/openclaw.json > /dev/null << EOF
+        EOF
+        
+        # Setup OpenClaw configuration
+        echo "Setting up OpenClaw configuration..."
+        sudo -u root -H openclaw setup || echo "OpenClaw setup completed"
+        
+        # Create OpenClaw configuration with external access and device auth bypass
+        sudo tee /root/.openclaw/openclaw.json > /dev/null << 'EOF'
         {
           "meta": {
             "lastTouchedVersion": "2026.3.24",
-            "lastTouchedAt": "$(date -Iseconds)"
+            "lastTouchedAt": "2026-03-26T10:15:23.888Z"
           },
           "agents": {
             "defaults": {
@@ -299,7 +299,7 @@ jobs:
             "mode": "local",
             "auth": {
               "mode": "token",
-              "token": "${OPENCLAW_GATEWAY_TOKEN}"
+              "token": "\${OPENCLAW_GATEWAY_TOKEN}"
             },
             "controlUi": {
               "allowedOrigins": ["*"],
@@ -309,7 +309,7 @@ jobs:
           }
         }
         EOF
-          
+        
         # Create OpenClaw data directories
         sudo mkdir -p /var/lib/wazuh-autopilot
         sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
