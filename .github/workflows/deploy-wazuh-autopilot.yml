@@ -213,10 +213,19 @@ jobs:
         sudo pip3 install -r requirements.txt 2>/dev/null || true
         
         # Install Node.js 24.x and OpenClaw CLI (requires Node.js 22.12+)
+        echo "Installing Node.js 24.x..."
         curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
         sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
         echo "Node.js version: $(node -v)"
-        sudo npm install -g openclaw@latest
+        echo "NPM version: $(npm -v)"
+        
+        echo "Installing OpenClaw CLI..."
+        if sudo npm install -g openclaw@latest; then
+          echo "OpenClaw CLI installed successfully"
+          echo "OpenClaw version: $(openclaw --version 2>/dev/null || echo 'Version check failed')"
+        else
+          echo "WARNING: OpenClaw CLI installation failed"
+        fi
         
         # Install NPM dependencies and setup policies  
         cd /opt/openclaw-autopilot/runtime/autopilot-service
@@ -251,8 +260,12 @@ jobs:
         WantedBy=multi-user.target
         EOF
           
+        # Find OpenClaw binary location
+        OPENCLAW_PATH=$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
+        echo "Using OpenClaw at: $OPENCLAW_PATH"
+        
         # Create OpenClaw Gateway systemd service
-        sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << 'EOF'
+        sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << EOF
         [Unit]
         Description=OpenClaw Gateway
         After=network.target ollama.service
@@ -264,7 +277,7 @@ jobs:
         EnvironmentFile=/opt/openclaw-autopilot/.env
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
-        ExecStart=/usr/bin/openclaw gateway run --bind lan --port 18789 --force --token \${OPENCLAW_GATEWAY_TOKEN}
+        ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token \${OPENCLAW_GATEWAY_TOKEN}
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
@@ -275,9 +288,22 @@ jobs:
         
         # Setup OpenClaw configuration
         echo "Setting up OpenClaw configuration..."
-        sudo -u root -H openclaw setup || echo "OpenClaw setup completed"
+        
+        # Verify OpenClaw CLI is available
+        if command -v openclaw >/dev/null 2>&1; then
+          echo "OpenClaw CLI found, running setup..."
+          sudo -u root -H openclaw setup || echo "OpenClaw setup completed with issues"
+        else
+          echo "OpenClaw CLI not found, creating directories manually..."
+          sudo mkdir -p /root/.openclaw/workspace
+          sudo mkdir -p /root/.openclaw/agents/main/sessions
+        fi
+        
+        # Ensure .openclaw directory exists before creating config
+        sudo mkdir -p /root/.openclaw
         
         # Create OpenClaw configuration with external access and device auth bypass
+        echo "Creating OpenClaw configuration file..."
         sudo tee /root/.openclaw/openclaw.json > /dev/null << 'EOF'
         {
           "meta": {
