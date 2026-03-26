@@ -209,29 +209,31 @@ jobs:
         PLAN_EXPIRY_MINUTES=60
         ENV_EOF
         
-        # Make installer executable and run with proper environment
-        sudo chmod +x install/install.sh
-        echo "Running OpenClaw installation..."
-        sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || {
-          echo "Main installer failed, attempting manual service setup..."
-          
-          # Install Python dependencies
-          sudo pip3 install -r requirements.txt 2>/dev/null || true
-          
-          # Install Node.js 24.x and OpenClaw CLI (requires Node.js 22.12+)
-          curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
-          echo "Node.js version: $(node -v)"
-          sudo npm install -g openclaw@latest
-          
-          # Install NPM dependencies and setup policies
-          cd /opt/openclaw-autopilot/runtime/autopilot-service
-          sudo npm install
-          sudo mkdir -p /etc/wazuh-autopilot/policies
-          sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/
-          
-          # Create OpenClaw Autopilot systemd service
-          sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_SERVICE'
+        # Install Python dependencies
+        sudo pip3 install -r requirements.txt 2>/dev/null || true
+        
+        # Install Node.js 24.x and OpenClaw CLI (requires Node.js 22.12+)
+        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+        sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
+        echo "Node.js version: $(node -v)"
+        sudo npm install -g openclaw@latest
+        
+        # Install NPM dependencies and setup policies  
+        cd /opt/openclaw-autopilot/runtime/autopilot-service
+        sudo npm install || true
+        sudo mkdir -p /etc/wazuh-autopilot/policies
+        sudo cp /opt/openclaw-autopilot/policies/* /etc/wazuh-autopilot/policies/ 2>/dev/null || true
+        
+        # Try the main installer (may or may not work)
+        sudo chmod +x install/install.sh 2>/dev/null || true
+        echo "Attempting OpenClaw installation..."
+        sudo -E bash install/install.sh --mode bootstrap --skip-tailscale 2>&1 || echo "Main installer completed with issues, proceeding with manual setup..."
+        
+        # Always create the systemd services (regardless of installer outcome)
+        echo "Creating systemd service files..."
+        
+        # Create OpenClaw Autopilot systemd service
+        sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_SERVICE'
         [Unit]
         Description=Wazuh OpenClaw Autopilot
         After=network.target wazuh-manager.service wazuh-mcp-server.service ollama.service
@@ -308,29 +310,15 @@ jobs:
         }
         EOF
           
-          # Create OpenClaw data directories and start services
-          sudo mkdir -p /var/lib/wazuh-autopilot
-          sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
-          
-          sudo systemctl daemon-reload
-          sudo systemctl enable wazuh-autopilot openclaw-gateway
-          sudo systemctl start wazuh-autopilot openclaw-gateway
-        }
+        # Create OpenClaw data directories
+        sudo mkdir -p /var/lib/wazuh-autopilot
+        sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
         
-        # Always ensure services are created and started (outside the if block)
-        echo "Ensuring all services are enabled and started..."
+        # Enable and start services
+        echo "Enabling and starting services..."
         sudo systemctl daemon-reload
-        
-        # Enable and start services that should exist
-        if [ -f "/etc/systemd/system/openclaw-gateway.service" ]; then
-          sudo systemctl enable openclaw-gateway || true
-          sudo systemctl start openclaw-gateway || true
-        fi
-        
-        if [ -f "/etc/systemd/system/wazuh-autopilot.service" ]; then
-          sudo systemctl enable wazuh-autopilot || true
-          sudo systemctl start wazuh-autopilot || true
-        fi
+        sudo systemctl enable openclaw-gateway wazuh-autopilot || true
+        sudo systemctl start openclaw-gateway wazuh-autopilot || true
         
         # Ensure MCP server is running
         echo "Ensuring MCP server is running..."
