@@ -340,13 +340,17 @@ jobs:
         
         # Verify OpenClaw CLI is available and executable
         if [ -x "$OPENCLAW_PATH" ]; then
-          echo "OpenClaw CLI found at $OPENCLAW_PATH, running setup..."
-          sudo -u root -H "$OPENCLAW_PATH" setup || echo "OpenClaw setup completed with issues"
-        else
-          echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
-          sudo mkdir -p /root/.openclaw/workspace
-          sudo mkdir -p /root/.openclaw/agents/main/sessions
+          echo "OpenClaw CLI found at $OPENCLAW_PATH, running setup with timeout..."
+          # Run setup with timeout and non-interactive flags
+          timeout 60s sudo -u root -H "$OPENCLAW_PATH" setup --non-interactive --force 2>/dev/null || \
+          timeout 60s sudo -u root -H "$OPENCLAW_PATH" setup --yes 2>/dev/null || \
+          echo "OpenClaw setup timed out or failed, creating directories manually..."
         fi
+        
+        # Always ensure directories exist (whether setup worked or not)
+        echo "Ensuring OpenClaw directories exist..."
+        sudo mkdir -p /root/.openclaw/workspace
+        sudo mkdir -p /root/.openclaw/agents/main/sessions
         
         # Ensure .openclaw directory exists before creating config
         sudo mkdir -p /root/.openclaw
