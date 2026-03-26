@@ -103,7 +103,6 @@ sleep 5
 systemctl start wazuh-manager
 log "Wazuh manager restarted successfully"
 
-# Configure Windows Event Log monitoring in shared agent configuration
 log "Configuring Windows Event Log monitoring..."
 if [ -f /var/ossec/etc/shared/default/agent.conf ]; then
     # Backup existing agent.conf
