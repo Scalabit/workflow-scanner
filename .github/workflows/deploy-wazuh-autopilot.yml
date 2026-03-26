@@ -345,7 +345,7 @@ jobs:
             --accept-risk \
             --gateway-port 18789 \
             --gateway-bind lan \
-            --install-daemon \
+            --token "${OPENCLAW_GATEWAY_TOKEN}" \
             --skip-skills 2>&1 || echo "OpenClaw onboarding completed with issues"
         else
           echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
