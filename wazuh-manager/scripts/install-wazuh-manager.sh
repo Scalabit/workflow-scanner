@@ -21,6 +21,12 @@ apt-get upgrade -y
 log "Installing required dependencies..."
 apt-get install -y curl wget gnupg lsb-release
 
+# Install Node.js 24.x (required for OpenClaw)
+log "Installing Node.js 24.x for OpenClaw compatibility..."
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y nodejs
+log "Node.js version: $(node -v)"
+
 # Download and install Wazuh all-in-one
 log "Downloading Wazuh installation script..."
 cd /tmp

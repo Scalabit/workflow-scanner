@@ -218,9 +218,10 @@ jobs:
           # Install Python dependencies
           sudo pip3 install -r requirements.txt 2>/dev/null || true
           
-          # Install Node.js and OpenClaw CLI
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          # Install Node.js 24.x and OpenClaw CLI (requires Node.js 22.12+)
+          curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
           sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
+          echo "Node.js version: $(node -v)"
           sudo npm install -g openclaw@latest
           
           # Install NPM dependencies and setup policies
@@ -259,10 +260,9 @@ jobs:
         User=root
         WorkingDirectory=/root
         EnvironmentFile=/opt/openclaw-autopilot/.env
-        Environment="NODE_OPTIONS=--require /root/undici-timeout-fix.cjs"
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
-        ExecStart=/usr/local/bin/openclaw gateway run --bind loopback --port 18789 --force
+        ExecStart=/usr/bin/openclaw gateway run --bind lan --port 18789 --force --token ${OPENCLAW_GATEWAY_TOKEN}
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
@@ -271,15 +271,42 @@ jobs:
         WantedBy=multi-user.target
         GATEWAY_SERVICE
           
-          # Create undici timeout fix for long LLM generations
-          sudo tee /root/undici-timeout-fix.cjs > /dev/null << 'TIMEOUT_FIX'
-        const { setGlobalDispatcher, Agent } = require('undici');
-        setGlobalDispatcher(new Agent({ 
-          connectTimeout: 300000,
-          bodyTimeout: 300000,
-          headersTimeout: 300000 
-        }));
-        TIMEOUT_FIX
+          # Setup OpenClaw configuration
+          echo "Setting up OpenClaw configuration..."
+          sudo -u root -H openclaw setup || echo "OpenClaw setup completed"
+          
+          # Create OpenClaw configuration with external access and device auth bypass
+          sudo tee /root/.openclaw/openclaw.json > /dev/null << EOF
+        {
+          "meta": {
+            "lastTouchedVersion": "2026.3.24",
+            "lastTouchedAt": "$(date -Iseconds)"
+          },
+          "agents": {
+            "defaults": {
+              "workspace": "/root/.openclaw/workspace"
+            }
+          },
+          "commands": {
+            "native": "auto",
+            "nativeSkills": "auto",
+            "restart": true,
+            "ownerDisplay": "raw"
+          },
+          "gateway": {
+            "mode": "local",
+            "auth": {
+              "mode": "token",
+              "token": "${OPENCLAW_GATEWAY_TOKEN}"
+            },
+            "controlUi": {
+              "allowedOrigins": ["*"],
+              "dangerouslyAllowHostHeaderOriginFallback": true,
+              "dangerouslyDisableDeviceAuth": true
+            }
+          }
+        }
+        EOF
           
           # Create OpenClaw data directories and start services
           sudo mkdir -p /var/lib/wazuh-autopilot
@@ -331,6 +358,10 @@ jobs:
         echo "Testing OpenClaw Gateway dashboard accessibility..."
         curl -s -o /dev/null -w "%{http_code}" http://localhost:18789 || echo "Gateway dashboard not accessible on port 18789"
         
+        echo "=== OpenClaw Gateway Ready ==="
+        echo "Dashboard URL: http://$(curl -s ifconfig.me 2>/dev/null):18789"
+        echo "Use the OPENCLAW_GATEWAY_TOKEN secret to authenticate when connecting"
+        
         echo "Deployment complete!"
         EOF
         
@@ -348,7 +379,7 @@ jobs:
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' bash ~/deploy.sh"
+          --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' bash ~/deploy.sh"
 
     - name: Output Autopilot Details
       run: |
@@ -361,6 +392,8 @@ jobs:
         echo "### AI Security Operations Dashboard" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**OpenClaw Dashboard:** http://$VM_IP:18789" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Authentication:** Use the \`OPENCLAW_GATEWAY_TOKEN\` repository secret" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**OpenClaw Runtime API:** http://$VM_IP:9090" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
