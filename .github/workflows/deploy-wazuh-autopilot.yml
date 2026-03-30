@@ -87,11 +87,25 @@ jobs:
         fi
 
         echo "Waiting for background apt processes to finish..."
-        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
-          echo "Waiting for dpkg lock to be released..."
-          sleep 5
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 || sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+          echo "Waiting for apt/dpkg locks to be released..."
+          sleep 10
         done
-
+        
+        # Kill any hanging apt processes
+        sudo pkill -f apt-get || true
+        sudo pkill -f dpkg || true
+        sleep 5
+        
+        # Wait for system to be ready
+        echo "Ensuring system is ready for package installation..."
+        sudo systemctl is-system-running --wait || true
+        
+        # Remove any stale locks
+        sudo rm -f /var/lib/apt/lists/lock
+        sudo rm -f /var/cache/apt/archives/lock
+        sudo rm -f /var/lib/dpkg/lock*
+        
         echo "Installing Python and pip..."
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq python3 python3-pip
