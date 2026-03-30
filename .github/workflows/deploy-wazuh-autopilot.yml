@@ -477,8 +477,7 @@ jobs:
             "defaults": {
               "model": {
                 "primary": "ollama/qwen2.5:0.5b",
-                "fallbacks": [],
-                "timeout": 300000
+                "fallbacks": []
               },
               "workspace": "/root/.openclaw/workspace"
             },
