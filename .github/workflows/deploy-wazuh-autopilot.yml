@@ -303,7 +303,7 @@ jobs:
         echo "Using OpenClaw at: \$OPENCLAW_PATH"
         
         # Create OpenClaw Gateway systemd service with nuclear environment overrides
-        cat > /tmp/openclaw-gateway.service << GATEWAY_EOF
+        cat > /tmp/openclaw-gateway.service << 'GATEWAY_EOF'
         [Unit]
         Description=OpenClaw Gateway
         After=network.target ollama.service
@@ -319,7 +319,7 @@ jobs:
         Environment="MODEL=ollama/llama3.2:3b"
         Environment="LLM_MODEL=ollama/llama3.2:3b"
         Environment="ANTHROPIC_API_KEY=not-needed"
-        ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token \${OPENCLAW_GATEWAY_TOKEN}
+        ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
@@ -327,6 +327,10 @@ jobs:
         [Install]
         WantedBy=multi-user.target
         GATEWAY_EOF
+        
+        # Replace placeholders in the gateway service file
+        sed -i "s|OPENCLAW_PATH_PLACEHOLDER|\$OPENCLAW_PATH|g" /tmp/openclaw-gateway.service
+        sed -i "s|OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER|\${OPENCLAW_GATEWAY_TOKEN}|g" /tmp/openclaw-gateway.service
         
         sudo mv /tmp/openclaw-gateway.service /etc/systemd/system/openclaw-gateway.service
         
