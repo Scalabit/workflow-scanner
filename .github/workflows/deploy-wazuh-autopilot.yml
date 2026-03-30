@@ -235,13 +235,13 @@ jobs:
         echo "Installing Node.js 24.x..."
         curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
         sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
-        echo "Node.js version: $(node -v)"
-        echo "NPM version: $(npm -v)"
+        echo "Node.js version: \$(node -v)"
+        echo "NPM version: \$(npm -v)"
         
         echo "Installing OpenClaw CLI..."
         if sudo npm install -g openclaw@latest; then
           echo "OpenClaw CLI installed successfully"
-          echo "OpenClaw version: $(openclaw --version 2>/dev/null || echo 'Version check failed')"
+          echo "OpenClaw version: \$(openclaw --version 2>/dev/null || echo 'Version check failed')"
         else
           echo "WARNING: OpenClaw CLI installation failed"
         fi
@@ -299,8 +299,8 @@ jobs:
         echo "Autopilot service file created successfully"
           
         # Find OpenClaw binary location
-        OPENCLAW_PATH=$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
-        echo "Using OpenClaw at: $OPENCLAW_PATH"
+        OPENCLAW_PATH=\$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
+        echo "Using OpenClaw at: \$OPENCLAW_PATH"
         
         # Create OpenClaw Gateway systemd service with nuclear environment overrides
         cat > /tmp/openclaw-gateway.service << GATEWAY_EOF
@@ -348,16 +348,24 @@ jobs:
         echo "Setting up OpenClaw configuration..."
         
         # Debug OpenClaw CLI availability
-        echo "Debugging OpenClaw CLI at $OPENCLAW_PATH:"
-        echo "  File exists: $([ -f "$OPENCLAW_PATH" ] && echo 'YES' || echo 'NO')"
-        echo "  File executable: $([ -x "$OPENCLAW_PATH" ] && echo 'YES' || echo 'NO')"
-        echo "  File permissions: $(ls -la "$OPENCLAW_PATH" 2>/dev/null || echo 'Cannot read permissions')"
+        echo "Debugging OpenClaw CLI at \$OPENCLAW_PATH:"
+        if [ -f "\$OPENCLAW_PATH" ]; then
+          echo "  File exists: YES"
+        else
+          echo "  File exists: NO"
+        fi
+        if [ -x "\$OPENCLAW_PATH" ]; then
+          echo "  File executable: YES"
+        else
+          echo "  File executable: NO"
+        fi
+        echo "  File permissions: \$(ls -la \"\$OPENCLAW_PATH\" 2>/dev/null || echo 'Cannot read permissions')"
         
         # Verify OpenClaw CLI is available and executable
-        if [ -x "$OPENCLAW_PATH" ]; then
-          echo "OpenClaw CLI found at $OPENCLAW_PATH, running non-interactive onboarding for Ollama..."
+        if [ -x "\$OPENCLAW_PATH" ]; then
+          echo "OpenClaw CLI found at \$OPENCLAW_PATH, running non-interactive onboarding for Ollama..."
           # Use onboard command instead of setup, with non-interactive Ollama configuration
-          sudo -u root -H "$OPENCLAW_PATH" onboard --non-interactive \
+          sudo -u root -H "\$OPENCLAW_PATH" onboard --non-interactive \
             --auth-choice ollama \
             --custom-model-id "llama3.2:3b" \
             --accept-risk \
@@ -366,7 +374,7 @@ jobs:
             --token "${OPENCLAW_GATEWAY_TOKEN}" \
             --skip-skills 2>&1 || echo "OpenClaw onboarding completed with issues"
         else
-          echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
+          echo "OpenClaw CLI not found or not executable at \$OPENCLAW_PATH, creating directories manually..."
         fi
         
         # NUCLEAR OPTION: Patch all OpenClaw files to replace hardcoded Anthropic defaults
