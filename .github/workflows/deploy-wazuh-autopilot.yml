@@ -373,35 +373,25 @@ jobs:
         echo "Applying nuclear patch to OpenClaw files to force Ollama usage..."
         echo "WARNING: Performing comprehensive binary patching of OpenClaw to override hardcoded Anthropic defaults"
         
-        # Nuclear patch 1: Replace full anthropic model path in ALL files
-        echo " Applying nuclear patch 1: anthropic/claude-opus-4-6 -> ollama/llama3.2:3b"
-        sudo find /usr/lib/node_modules/openclaw -type f -name "*.js" -o -name "*.mjs" -o -name "*.json" | while read -r file; do
-          sudo sed -i 's|anthropic/claude-opus-4-6|ollama/llama3.2:3b|g' "\$file" 2>/dev/null || true
-        done
+        # Nuclear patch: Use grep and xargs for faster, more reliable patching
+        echo " Applying nuclear patch: Replace Anthropic references with Ollama"
+        cd /usr/lib/node_modules/openclaw 2>/dev/null || echo "OpenClaw directory not found, skipping nuclear patch"
         
-        # Nuclear patch 2: Replace claude-opus identifier in ALL files
-        echo " Applying nuclear patch 2: claude-opus-4-6 -> llama3.2:3b"
-        sudo find /usr/lib/node_modules/openclaw -type f -name "*.js" -o -name "*.mjs" -o -name "*.json" | while read -r file; do
-          sudo sed -i 's|claude-opus-4-6|llama3.2:3b|g' "\$file" 2>/dev/null || true
-        done
-        
-        # Nuclear patch 3: Patch frontend/UI files specifically
-        echo " Applying nuclear patch 3: Frontend/UI files"
-        if [ -d "/usr/lib/node_modules/openclaw/dist" ]; then
-          sudo find /usr/lib/node_modules/openclaw/dist -type f -name "*.js" -o -name "*.mjs" -o -name "*.json" | while read -r file; do
-            sudo sed -i 's|anthropic/claude-opus-4-6|ollama/llama3.2:3b|g' "\$file" 2>/dev/null || true
-            sudo sed -i 's|claude-opus-4-6|llama3.2:3b|g' "\$file" 2>/dev/null || true
-          done
-          echo " Frontend/UI files patched"
-        else
-          echo " OpenClaw dist directory not found, skipping frontend patch"
+        if [ -d "/usr/lib/node_modules/openclaw" ]; then
+          # Patch 1: Full model paths
+          sudo grep -r -l "anthropic/claude-opus-4-6" . 2>/dev/null | sudo xargs -r sed -i 's|anthropic/claude-opus-4-6|ollama/llama3.2:3b|g' 2>/dev/null || true
+          echo " - anthropic/claude-opus-4-6 -> ollama/llama3.2:3b"
+          
+          # Patch 2: Model identifiers  
+          sudo grep -r -l "claude-opus-4-6" . 2>/dev/null | sudo xargs -r sed -i 's|claude-opus-4-6|llama3.2:3b|g' 2>/dev/null || true
+          echo " - claude-opus-4-6 -> llama3.2:3b"
+          
+          # Patch 3: Provider references
+          sudo grep -r -l "anthropic/claude" . 2>/dev/null | sudo xargs -r sed -i 's|anthropic/claude|ollama/llama|g' 2>/dev/null || true
+          echo " - anthropic/claude -> ollama/llama"
+          
+          echo " Nuclear patching completed"
         fi
-        
-        # Nuclear patch 4: Additional anthropic references
-        echo " Applying nuclear patch 4: Additional anthropic patterns"
-        sudo find /usr/lib/node_modules/openclaw -type f -name "*.js" -o -name "*.mjs" -o -name "*.json" | while read -r file; do
-          sudo sed -i 's|anthropic/claude|ollama/llama|g' "\$file" 2>/dev/null || true
-        done
         
         echo "Nuclear patching completed - OpenClaw should now use Ollama instead of Anthropic"
         
