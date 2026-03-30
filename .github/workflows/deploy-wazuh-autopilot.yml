@@ -227,10 +227,10 @@ jobs:
         ENV_EOF
         
         # Replace placeholders in environment file
-        sed -i "s/MCP_API_KEY_PLACEHOLDER/\${MCP_API_KEY}/g" /tmp/openclaw-autopilot.env
-        sed -i "s/OPENCLAW_TOKEN_PLACEHOLDER/\${OPENCLAW_TOKEN}/g" /tmp/openclaw-autopilot.env
-        sed -i "s/OPENCLAW_WEBHOOK_TOKEN_PLACEHOLDER/\${OPENCLAW_WEBHOOK_TOKEN}/g" /tmp/openclaw-autopilot.env
-        sed -i "s/OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER/\${OPENCLAW_GATEWAY_TOKEN}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/MCP_API_KEY_PLACEHOLDER/${MCP_API_KEY}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/OPENCLAW_TOKEN_PLACEHOLDER/${OPENCLAW_TOKEN}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/OPENCLAW_WEBHOOK_TOKEN_PLACEHOLDER/${OPENCLAW_WEBHOOK_TOKEN}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER/${OPENCLAW_GATEWAY_TOKEN}/g" /tmp/openclaw-autopilot.env
         
         sudo mv /tmp/openclaw-autopilot.env /opt/openclaw-autopilot/.env
         
@@ -241,13 +241,13 @@ jobs:
         echo "Installing Node.js 24.x..."
         curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
         sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -yq nodejs
-        echo "Node.js version: \$(node -v)"
-        echo "NPM version: \$(npm -v)"
+        echo "Node.js version: $(node -v)"
+        echo "NPM version: $(npm -v)"
         
         echo "Installing OpenClaw CLI..."
         if sudo npm install -g openclaw@latest; then
           echo "OpenClaw CLI installed successfully"
-          echo "OpenClaw version: \$(openclaw --version 2>/dev/null || echo 'Version check failed')"
+          echo "OpenClaw version: $(openclaw --version 2>/dev/null || echo 'Version check failed')"
         else
           echo "WARNING: OpenClaw CLI installation failed"
         fi
@@ -305,8 +305,8 @@ jobs:
         echo "Autopilot service file created successfully"
           
         # Find OpenClaw binary location
-        OPENCLAW_PATH=\$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
-        echo "Using OpenClaw at: \$OPENCLAW_PATH"
+        OPENCLAW_PATH=$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
+        echo "Using OpenClaw at: $OPENCLAW_PATH"
         
         # Create OpenClaw Gateway systemd service with nuclear environment overrides
         cat > /tmp/openclaw-gateway.service << 'GATEWAY_EOF'
@@ -335,8 +335,8 @@ jobs:
         GATEWAY_EOF
         
         # Replace placeholders in the gateway service file
-        sed -i "s|OPENCLAW_PATH_PLACEHOLDER|\$OPENCLAW_PATH|g" /tmp/openclaw-gateway.service
-        sed -i "s|OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER|\${OPENCLAW_GATEWAY_TOKEN}|g" /tmp/openclaw-gateway.service
+        sed -i "s|OPENCLAW_PATH_PLACEHOLDER|$OPENCLAW_PATH|g" /tmp/openclaw-gateway.service
+        sed -i "s|OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER|${OPENCLAW_GATEWAY_TOKEN}|g" /tmp/openclaw-gateway.service
         
         sudo mv /tmp/openclaw-gateway.service /etc/systemd/system/openclaw-gateway.service
         
@@ -358,24 +358,24 @@ jobs:
         echo "Setting up OpenClaw configuration..."
         
         # Debug OpenClaw CLI availability
-        echo "Debugging OpenClaw CLI at \$OPENCLAW_PATH:"
-        if [ -f "\$OPENCLAW_PATH" ]; then
+        echo "Debugging OpenClaw CLI at $OPENCLAW_PATH:"
+        if [ -f "$OPENCLAW_PATH" ]; then
           echo "  File exists: YES"
         else
           echo "  File exists: NO"
         fi
-        if [ -x "\$OPENCLAW_PATH" ]; then
+        if [ -x "$OPENCLAW_PATH" ]; then
           echo "  File executable: YES"
         else
           echo "  File executable: NO"
         fi
-        echo "  File permissions: \$(ls -la \"\$OPENCLAW_PATH\" 2>/dev/null || echo 'Cannot read permissions')"
+        echo "  File permissions: $(ls -la "$OPENCLAW_PATH" 2>/dev/null || echo 'Cannot read permissions')"
         
         # Verify OpenClaw CLI is available and executable
-        if [ -x "\$OPENCLAW_PATH" ]; then
-          echo "OpenClaw CLI found at \$OPENCLAW_PATH, running non-interactive onboarding for Ollama..."
+        if [ -x "$OPENCLAW_PATH" ]; then
+          echo "OpenClaw CLI found at $OPENCLAW_PATH, running non-interactive onboarding for Ollama..."
           # Use onboard command instead of setup, with non-interactive Ollama configuration
-          sudo -u root -H "\$OPENCLAW_PATH" onboard --non-interactive \
+          sudo -u root -H "$OPENCLAW_PATH" onboard --non-interactive \
             --auth-choice ollama \
             --custom-model-id "llama3.2:3b" \
             --accept-risk \
@@ -384,7 +384,7 @@ jobs:
             --token "${OPENCLAW_GATEWAY_TOKEN}" \
             --skip-skills 2>&1 || echo "OpenClaw onboarding completed with issues"
         else
-          echo "OpenClaw CLI not found or not executable at \$OPENCLAW_PATH, creating directories manually..."
+          echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
         fi
         
         # NUCLEAR OPTION: Patch all OpenClaw files to replace hardcoded Anthropic defaults
@@ -422,8 +422,8 @@ jobs:
         sudo mkdir -p /root/.openclaw
         
         # Generate separate token for hooks (cannot be same as gateway token)
-        HOOKS_TOKEN=\$(openssl rand -hex 24)
-        echo "Generated hooks token: \$HOOKS_TOKEN"
+        HOOKS_TOKEN=$(openssl rand -hex 24)
+        echo "Generated hooks token: $HOOKS_TOKEN"
         
         # Create OpenClaw configuration with proper models and webhook hooks
         echo "Creating OpenClaw configuration file with Ollama and webhook support..."
@@ -560,7 +560,7 @@ jobs:
         OPENCLAW_JSON_EOF
         
         # Replace the hooks token placeholder with the actual token
-        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/\$HOOKS_TOKEN/g" /root/.openclaw/openclaw.json
+        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/openclaw.json
         echo "Hooks token replaced in configuration"
         
         # Create auth configuration for Ollama (no API key needed for local)
@@ -602,7 +602,7 @@ jobs:
         INTEGRATION_SCRIPT
         
         # Replace the hooks token placeholder in integration script
-        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/\$HOOKS_TOKEN/g" /var/ossec/integrations/custom-openclaw
+        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /var/ossec/integrations/custom-openclaw
         
         # Set proper permissions for integration script
         sudo chmod 750 /var/ossec/integrations/custom-openclaw
@@ -732,16 +732,16 @@ jobs:
         
         # Test webhook endpoint is working
         echo "Testing webhook endpoint..."
-        WEBHOOK_TEST_RESPONSE=\$(curl -s -X POST \
+        WEBHOOK_TEST_RESPONSE=$(curl -s -X POST \
           -H "Content-Type: application/json" \
-          -H "Authorization: Bearer \$HOOKS_TOKEN" \
-          -d "{\"test\":\"webhook\",\"timestamp\":\"\$(date -Iseconds)\",\"rule\":{\"id\":\"test\",\"level\":8,\"description\":\"Test webhook\"}}" \
+          -H "Authorization: Bearer ${HOOKS_TOKEN}" \
+          -d "{\"test\":\"webhook\",\"timestamp\":\"$(date -Iseconds)\",\"rule\":{\"id\":\"test\",\"level\":8,\"description\":\"Test webhook\"}}" \
           http://localhost:18789/hooks/wazuh-alert)
         
-        if echo "\$WEBHOOK_TEST_RESPONSE" | grep -q '"ok":true'; then
+        if echo "${WEBHOOK_TEST_RESPONSE}" | grep -q '"ok":true'; then
           echo " Webhook endpoint is working correctly"
         else
-          echo " WARNING: Webhook endpoint test failed - Response: \$WEBHOOK_TEST_RESPONSE"
+          echo " WARNING: Webhook endpoint test failed - Response: ${WEBHOOK_TEST_RESPONSE}"
         fi
         
         # Verify integration script exists and has correct permissions
@@ -766,9 +766,9 @@ jobs:
         fi
         
         echo "=== OpenClaw Gateway Ready ==="
-        echo "Dashboard URL: http://\$(curl -s ifconfig.me 2>/dev/null):18789"
+        echo "Dashboard URL: http://$(curl -s ifconfig.me 2>/dev/null):18789"
         echo "Use the OPENCLAW_GATEWAY_TOKEN secret to authenticate when connecting"
-        echo "Webhook Token: \$HOOKS_TOKEN"
+        echo "Webhook Token: ${HOOKS_TOKEN}"
         echo "Integration: Wazuh -> OpenClaw webhook communication configured"
         
         echo "Deployment complete!"
