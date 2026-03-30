@@ -288,7 +288,7 @@ jobs:
         OPENCLAW_PATH=$(which openclaw 2>/dev/null || echo "/usr/bin/openclaw")
         echo "Using OpenClaw at: $OPENCLAW_PATH"
         
-        # Create OpenClaw Gateway systemd service  
+        # Create OpenClaw Gateway systemd service with nuclear environment overrides
         cat > /tmp/openclaw-gateway.service << GATEWAY_EOF
         [Unit]
         Description=OpenClaw Gateway
@@ -302,6 +302,9 @@ jobs:
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
         Environment="OLLAMA_API_KEY=ollama-local"
+        Environment="MODEL=ollama/llama3.2:3b"
+        Environment="LLM_MODEL=ollama/llama3.2:3b"
+        Environment="ANTHROPIC_API_KEY=not-needed"
         ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token \${OPENCLAW_GATEWAY_TOKEN}
         Restart=always
         RestartSec=10
@@ -342,6 +345,7 @@ jobs:
           # Use onboard command instead of setup, with non-interactive Ollama configuration
           sudo -u root -H "$OPENCLAW_PATH" onboard --non-interactive \
             --auth-choice ollama \
+            --custom-model-id "llama3.2:3b" \
             --accept-risk \
             --gateway-port 18789 \
             --gateway-bind lan \
@@ -351,6 +355,34 @@ jobs:
           echo "OpenClaw CLI not found or not executable at $OPENCLAW_PATH, creating directories manually..."
         fi
         
+        # NUCLEAR OPTION: Patch all OpenClaw files to replace hardcoded Anthropic defaults
+        echo "Applying nuclear patch to OpenClaw files to force Ollama usage..."
+        echo "WARNING: Performing comprehensive binary patching of OpenClaw to override hardcoded Anthropic defaults"
+        
+        # Nuclear patch 1: Replace full anthropic model path in ALL files
+        echo " Applying nuclear patch 1: anthropic/claude-opus-4-6 -> ollama/llama3.2:3b"
+        sudo find /usr/lib/node_modules/openclaw -type f -exec sed -i 's|anthropic/claude-opus-4-6|ollama/llama3.2:3b|g' {} + 2>/dev/null || echo "Nuclear patch 1 completed with some files inaccessible"
+        
+        # Nuclear patch 2: Replace claude-opus identifier in ALL files
+        echo " Applying nuclear patch 2: claude-opus-4-6 -> llama3.2:3b"
+        sudo find /usr/lib/node_modules/openclaw -type f -exec sed -i 's|claude-opus-4-6|llama3.2:3b|g' {} + 2>/dev/null || echo "Nuclear patch 2 completed with some files inaccessible"
+        
+        # Nuclear patch 3: Patch frontend/UI files specifically
+        echo " Applying nuclear patch 3: Frontend/UI files"
+        if [ -d "/usr/lib/node_modules/openclaw/dist" ]; then
+          sudo find /usr/lib/node_modules/openclaw/dist -type f -exec sed -i 's|anthropic/claude-opus-4-6|ollama/llama3.2:3b|g' {} + 2>/dev/null || true
+          sudo find /usr/lib/node_modules/openclaw/dist -type f -exec sed -i 's|claude-opus-4-6|llama3.2:3b|g' {} + 2>/dev/null || true
+          echo " Frontend/UI files patched"
+        else
+          echo " OpenClaw dist directory not found, skipping frontend patch"
+        fi
+        
+        # Nuclear patch 4: Additional anthropic references
+        echo " Applying nuclear patch 4: Additional anthropic patterns"
+        sudo find /usr/lib/node_modules/openclaw -type f -exec sed -i 's|anthropic/claude|ollama/llama|g' {} + 2>/dev/null || true
+        
+        echo "Nuclear patching completed - OpenClaw should now use Ollama instead of Anthropic"
+        
         # Ensure directories exist
         echo "Ensuring OpenClaw directories exist..."
         sudo mkdir -p /root/.openclaw/workspace
@@ -359,18 +391,78 @@ jobs:
         # Ensure .openclaw directory exists before creating config
         sudo mkdir -p /root/.openclaw
         
-        # Create OpenClaw configuration with external access and device auth bypass
-        echo "Creating OpenClaw configuration file..."
-        sudo tee /root/.openclaw/openclaw.json > /dev/null << OPENCLAW_JSON_EOF
+        # Generate separate token for hooks (cannot be same as gateway token)
+        HOOKS_TOKEN=\$(openssl rand -hex 24)
+        echo "Generated hooks token: \$HOOKS_TOKEN"
+        
+        # Create OpenClaw configuration with proper models and webhook hooks
+        echo "Creating OpenClaw configuration file with Ollama and webhook support..."
+        sudo tee /root/.openclaw/openclaw.json > /dev/null << 'OPENCLAW_JSON_EOF'
         {
           "meta": {
             "lastTouchedVersion": "2026.3.24",
-            "lastTouchedAt": "2026-03-26T10:15:23.888Z"
+            "lastTouchedAt": "2026-03-30T09:00:00.000Z"
+          },
+          "wizard": {
+            "lastRunAt": "2026-03-30T09:00:00.000Z",
+            "lastRunVersion": "2026.3.24",
+            "lastRunCommand": "onboard",
+            "lastRunMode": "local"
+          },
+          "models": {
+            "mode": "replace",
+            "providers": {
+              "ollama": {
+                "baseUrl": "http://localhost:11434",
+                "apiKey": "ollama-local",
+                "api": "ollama",
+                "models": [
+                  {
+                    "id": "llama3.2:3b",
+                    "name": "llama3.2:3b",
+                    "reasoning": false,
+                    "input": [
+                      "text"
+                    ],
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0
+                    },
+                    "contextWindow": 131072,
+                    "maxTokens": 8192
+                  }
+                ]
+              }
+            }
           },
           "agents": {
             "defaults": {
+              "model": {
+                "primary": "ollama/llama3.2:3b",
+                "fallbacks": [
+                  "ollama/llama3.2:3b"
+                ]
+              },
               "workspace": "/root/.openclaw/workspace"
-            }
+            },
+            "list": [
+              {
+                "id": "main",
+                "model": "ollama/llama3.2:3b"
+              },
+              {
+                "id": "wazuh-agent",
+                "name": "wazuh-agent",
+                "workspace": "/root/.openclaw/workspace",
+                "agentDir": "/root/.openclaw/agents/wazuh-agent/agent",
+                "model": "ollama/llama3.2:3b"
+              }
+            ]
+          },
+          "tools": {
+            "profile": "coding"
           },
           "commands": {
             "native": "auto",
@@ -378,20 +470,68 @@ jobs:
             "restart": true,
             "ownerDisplay": "raw"
           },
+          "session": {
+            "dmScope": "per-channel-peer"
+          },
           "gateway": {
+            "port": 18789,
             "mode": "local",
+            "bind": "loopback",
             "auth": {
               "mode": "token",
               "token": "${OPENCLAW_GATEWAY_TOKEN}"
+            },
+            "tailscale": {
+              "mode": "off",
+              "resetOnExit": false
             },
             "controlUi": {
               "allowedOrigins": ["*"],
               "dangerouslyAllowHostHeaderOriginFallback": true,
               "dangerouslyDisableDeviceAuth": true
             }
+          },
+          "hooks": {
+            "enabled": true,
+            "token": "HOOKS_TOKEN_PLACEHOLDER",
+            "path": "/hooks",
+            "defaultSessionKey": "hook:wazuh",
+            "allowRequestSessionKey": false,
+            "allowedSessionKeyPrefixes": ["hook:"],
+            "mappings": [
+              {
+                "id": "wazuh-alert",
+                "match": { "path": "wazuh-alert" },
+                "action": "agent",
+                "agentId": "main",
+                "wakeMode": "now",
+                "name": "Wazuh Security Alert",
+                "sessionKey": "hook:wazuh:{{rule.id}}",
+                "messageTemplate": "WAZUH SECURITY ALERT\\n\\nRule: {{rule.description}} (ID: {{rule.id}})\\nLevel: {{rule.level}}\\nAgent: {{agent.name}}\\nTimestamp: {{timestamp}}\\n\\nFull Alert:\\n{{.}}",
+                "deliver": true,
+                "thinking": "low",
+                "timeoutSeconds": 300
+              }
+            ]
+          },
+          "skills": {
+            "install": {
+              "nodeManager": "npm"
+            }
+          },
+          "plugins": {
+            "entries": {
+              "ollama": {
+                "enabled": true
+              }
+            }
           }
         }
         OPENCLAW_JSON_EOF
+        
+        # Replace the hooks token placeholder with the actual token
+        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/\$HOOKS_TOKEN/g" /root/.openclaw/openclaw.json
+        echo "Hooks token replaced in configuration"
         
         # Create auth configuration for Ollama (no API key needed for local)
         echo "Creating OpenClaw auth configuration for local Ollama..."
@@ -410,6 +550,35 @@ jobs:
         sudo mkdir -p /var/lib/wazuh-autopilot
         sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
         
+        # Create Wazuh integration script for OpenClaw webhooks
+        echo "Creating Wazuh integration script for OpenClaw..."
+        sudo tee /var/ossec/integrations/custom-openclaw > /dev/null << 'INTEGRATION_SCRIPT'
+        #!/bin/bash
+        
+        # OpenClaw Webhook Integration for Wazuh
+        # This script forwards Wazuh alerts to OpenClaw via webhook
+        
+        # Read the JSON alert from stdin
+        while read ALERT; do
+            # Forward the alert to OpenClaw webhook endpoint
+            curl -X POST \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer HOOKS_TOKEN_PLACEHOLDER" \
+                --data "$ALERT" \
+                "http://localhost:18789/hooks/wazuh-alert" \
+                --silent --show-error --max-time 10 || \
+                echo "$(date) - Failed to send alert to OpenClaw: $ALERT" >> /var/log/wazuh-openclaw-integration.log
+        done
+        INTEGRATION_SCRIPT
+        
+        # Replace the hooks token placeholder in integration script
+        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/\$HOOKS_TOKEN/g" /var/ossec/integrations/custom-openclaw
+        
+        # Set proper permissions for integration script
+        sudo chmod 750 /var/ossec/integrations/custom-openclaw
+        sudo chown root:wazuh /var/ossec/integrations/custom-openclaw
+        echo "Wazuh integration script created successfully"
+        
         # Create webhook configuration updater script
         echo "Creating webhook configuration script..."
         sudo tee /usr/local/bin/update-wazuh-webhooks.sh > /dev/null << WEBHOOK_SCRIPT
@@ -424,14 +593,23 @@ jobs:
         
         echo "OpenClaw Gateway is ready, updating Wazuh webhooks..."
         
-        # Update webhook URLs with authentication tokens
+        # Update webhook URLs with correct endpoints and authentication
         if [ -f /var/ossec/etc/ossec.conf ]; then
             cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.pre-webhook
             
-            # Add Authorization headers to webhook configs
-            sed -i 's|<url>http://localhost:18789/webhook/wazuh-alert</url>|<url>http://localhost:18789/webhook/wazuh-alert</url>\n    <auth>\n      <type>bearer</type>\n      <token>'${OPENCLAW_TOKEN}'</token>\n    </auth>|g' /var/ossec/etc/ossec.conf
+            # Check if integration already exists and update it
+            if grep -q "custom-openclaw" /var/ossec/etc/ossec.conf; then
+                echo "Updating existing custom-openclaw integration"
+                # Update the webhook URL to use correct endpoint
+                sed -i 's|<url>http://localhost:18789/webhook/wazuh-alert</url>|<url>http://localhost:18789/hooks/wazuh-alert</url>|g' /var/ossec/etc/ossec.conf
+            else
+                echo "Adding new custom-openclaw integration to ossec.conf"
+                # Create integration block and add it before closing tag
+                INTEGRATION_BLOCK="  <integration>\\n      <name>custom-openclaw</name>\\n      <url>http://localhost:18789/hooks/wazuh-alert</url>\\n      <level>8</level>\\n      <rule_id>5763,40112,5712,5710</rule_id>\\n      <alert_format>json</alert_format>\\n  </integration>"
+                sed -i "/<\/ossec_config>/i\\$INTEGRATION_BLOCK" /var/ossec/etc/ossec.conf
+            fi
             
-            echo "Webhook authentication updated"
+            echo "Webhook configuration updated with correct endpoints"
             
             # Restart Wazuh manager to apply webhook config
             systemctl restart wazuh-manager
@@ -522,9 +700,46 @@ jobs:
         echo "Testing OpenClaw Gateway dashboard accessibility..."
         curl -s -o /dev/null -w "%{http_code}" http://localhost:18789 || echo "Gateway dashboard not accessible on port 18789"
         
+        # Test webhook endpoint is working
+        echo "Testing webhook endpoint..."
+        WEBHOOK_TEST_RESPONSE=\$(curl -s -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer \$HOOKS_TOKEN" \
+          -d "{\"test\":\"webhook\",\"timestamp\":\"\$(date -Iseconds)\",\"rule\":{\"id\":\"test\",\"level\":8,\"description\":\"Test webhook\"}}" \
+          http://localhost:18789/hooks/wazuh-alert)
+        
+        if echo "\$WEBHOOK_TEST_RESPONSE" | grep -q '"ok":true'; then
+          echo " Webhook endpoint is working correctly"
+        else
+          echo " WARNING: Webhook endpoint test failed - Response: \$WEBHOOK_TEST_RESPONSE"
+        fi
+        
+        # Verify integration script exists and has correct permissions
+        if [ -f "/var/ossec/integrations/custom-openclaw" ] && [ -x "/var/ossec/integrations/custom-openclaw" ]; then
+          echo " Wazuh integration script is properly installed"
+        else
+          echo " ERROR: Wazuh integration script missing or not executable"
+        fi
+        
+        # Check if Wazuh integration is enabled
+        if grep -q "custom-openclaw" /var/ossec/logs/ossec.log; then
+          echo " Wazuh integration is enabled and recognized"
+        else
+          echo " WARNING: Wazuh integration may not be properly enabled"
+        fi
+        
+        # Verify OpenClaw is using Ollama model
+        if sudo journalctl -u openclaw-gateway --no-pager -n 10 | grep -q "agent model: ollama/llama3.2:3b"; then
+          echo " OpenClaw is correctly using Ollama model"
+        else
+          echo " WARNING: OpenClaw may not be using the correct Ollama model"
+        fi
+        
         echo "=== OpenClaw Gateway Ready ==="
-        echo "Dashboard URL: http://$(curl -s ifconfig.me 2>/dev/null):18789"
+        echo "Dashboard URL: http://\$(curl -s ifconfig.me 2>/dev/null):18789"
         echo "Use the OPENCLAW_GATEWAY_TOKEN secret to authenticate when connecting"
+        echo "Webhook Token: \$HOOKS_TOKEN"
+        echo "Integration: Wazuh -> OpenClaw webhook communication configured"
         
         echo "Deployment complete!"
         EOF
