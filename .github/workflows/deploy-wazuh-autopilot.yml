@@ -191,10 +191,10 @@ jobs:
         export WAZUH_MANAGER_PORT=1514
         
         # Create environment file for OpenClaw
-        cat > /tmp/openclaw-autopilot.env << ENV_EOF
+        cat > /tmp/openclaw-autopilot.env << 'ENV_EOF'
         AUTOPILOT_MODE=bootstrap
         MCP_URL=http://localhost:3000
-        AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
+        AUTOPILOT_MCP_AUTH=MCP_API_KEY_PLACEHOLDER
         OPENCLAW_LLM_MODE=local
         AUTOPILOT_REQUIRE_TAILSCALE=false
         AUTOPILOT_INSTALL_MODE=bootstrap
@@ -206,10 +206,10 @@ jobs:
         
         # OpenClaw Gateway Configuration
         OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
-        OPENCLAW_TOKEN=${OPENCLAW_TOKEN}
-        OPENCLAW_WEBHOOK_TOKEN=${OPENCLAW_WEBHOOK_TOKEN}
-        OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
-        AUTOPILOT_API_KEY=${MCP_API_KEY}
+        OPENCLAW_TOKEN=OPENCLAW_TOKEN_PLACEHOLDER
+        OPENCLAW_WEBHOOK_TOKEN=OPENCLAW_WEBHOOK_TOKEN_PLACEHOLDER
+        OPENCLAW_GATEWAY_TOKEN=OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
+        AUTOPILOT_API_KEY=MCP_API_KEY_PLACEHOLDER
         OPENCLAW_HOST=127.0.0.1
         OPENCLAW_PORT=18789
         
@@ -225,6 +225,12 @@ jobs:
         APPROVAL_TOKEN_TTL_MINUTES=60
         PLAN_EXPIRY_MINUTES=60
         ENV_EOF
+        
+        # Replace placeholders in environment file
+        sed -i "s/MCP_API_KEY_PLACEHOLDER/\${MCP_API_KEY}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/OPENCLAW_TOKEN_PLACEHOLDER/\${OPENCLAW_TOKEN}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/OPENCLAW_WEBHOOK_TOKEN_PLACEHOLDER/\${OPENCLAW_WEBHOOK_TOKEN}/g" /tmp/openclaw-autopilot.env
+        sed -i "s/OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER/\${OPENCLAW_GATEWAY_TOKEN}/g" /tmp/openclaw-autopilot.env
         
         sudo mv /tmp/openclaw-autopilot.env /opt/openclaw-autopilot/.env
         
