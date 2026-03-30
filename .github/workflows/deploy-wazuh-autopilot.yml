@@ -83,7 +83,13 @@ jobs:
           sudo systemctl enable ollama
           sudo systemctl start ollama
           sleep 10
-          ollama pull llama3.2:3b
+          # Clean up any existing models to prevent conflicts
+          ollama rm smollm:135m 2>/dev/null || true
+          ollama rm llama3.2:1b 2>/dev/null || true  
+          ollama rm llama3.2:3b 2>/dev/null || true
+          
+          # Pull the working model that supports tools
+          ollama pull qwen2.5:0.5b
         fi
 
         echo "Waiting for background apt processes to finish..."
@@ -322,8 +328,8 @@ jobs:
         Environment="NODE_PATH=/usr/lib/node_modules"
         Environment="OPENCLAW_LLM_MODE=local"
         Environment="OLLAMA_API_KEY=ollama-local"
-        Environment="MODEL=ollama/llama3.2:3b"
-        Environment="LLM_MODEL=ollama/llama3.2:3b"
+        Environment="MODEL=ollama/qwen2.5:0.5b"
+        Environment="LLM_MODEL=ollama/qwen2.5:0.5b"
         Environment="ANTHROPIC_API_KEY=not-needed"
         ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
         Restart=always
@@ -377,7 +383,7 @@ jobs:
           # Use onboard command instead of setup, with non-interactive Ollama configuration
           sudo -u root -H "$OPENCLAW_PATH" onboard --non-interactive \
             --auth-choice ollama \
-            --custom-model-id "llama3.2:3b" \
+            --custom-model-id "qwen2.5:0.5b" \
             --accept-risk \
             --gateway-port 18789 \
             --gateway-bind lan \
@@ -397,12 +403,12 @@ jobs:
         
         if [ -d "/usr/lib/node_modules/openclaw" ]; then
           # Patch 1: Full model paths
-          sudo grep -r -l "anthropic/claude-opus-4-6" . 2>/dev/null | sudo xargs -r sed -i 's|anthropic/claude-opus-4-6|ollama/llama3.2:3b|g' 2>/dev/null || true
-          echo " - anthropic/claude-opus-4-6 -> ollama/llama3.2:3b"
+          sudo grep -r -l "anthropic/claude-opus-4-6" . 2>/dev/null | sudo xargs -r sed -i 's|anthropic/claude-opus-4-6|ollama/qwen2.5:0.5b|g' 2>/dev/null || true
+          echo " - anthropic/claude-opus-4-6 -> ollama/qwen2.5:0.5b"
           
           # Patch 2: Model identifiers  
-          sudo grep -r -l "claude-opus-4-6" . 2>/dev/null | sudo xargs -r sed -i 's|claude-opus-4-6|llama3.2:3b|g' 2>/dev/null || true
-          echo " - claude-opus-4-6 -> llama3.2:3b"
+          sudo grep -r -l "claude-opus-4-6" . 2>/dev/null | sudo xargs -r sed -i 's|claude-opus-4-6|qwen2.5:0.5b|g' 2>/dev/null || true
+          echo " - claude-opus-4-6 -> qwen2.5:0.5b"
           
           # Patch 3: Provider references
           sudo grep -r -l "anthropic/claude" . 2>/dev/null | sudo xargs -r sed -i 's|anthropic/claude|ollama/llama|g' 2>/dev/null || true
@@ -448,8 +454,8 @@ jobs:
                 "api": "ollama",
                 "models": [
                   {
-                    "id": "llama3.2:3b",
-                    "name": "llama3.2:3b",
+                    "id": "qwen2.5:0.5b",
+                    "name": "qwen2.5:0.5b",
                     "reasoning": false,
                     "input": [
                       "text"
@@ -470,24 +476,23 @@ jobs:
           "agents": {
             "defaults": {
               "model": {
-                "primary": "ollama/llama3.2:3b",
-                "fallbacks": [
-                  "ollama/llama3.2:3b"
-                ]
+                "primary": "ollama/qwen2.5:0.5b",
+                "fallbacks": [],
+                "timeout": 300000
               },
               "workspace": "/root/.openclaw/workspace"
             },
             "list": [
               {
                 "id": "main",
-                "model": "ollama/llama3.2:3b"
+                "model": "ollama/qwen2.5:0.5b"
               },
               {
                 "id": "wazuh-agent",
                 "name": "wazuh-agent",
                 "workspace": "/root/.openclaw/workspace",
                 "agentDir": "/root/.openclaw/agents/wazuh-agent/agent",
-                "model": "ollama/llama3.2:3b"
+                "model": "ollama/qwen2.5:0.5b"
               }
             ]
           },
@@ -759,7 +764,7 @@ jobs:
         fi
         
         # Verify OpenClaw is using Ollama model
-        if sudo journalctl -u openclaw-gateway --no-pager -n 10 | grep -q "agent model: ollama/llama3.2:3b"; then
+        if sudo journalctl -u openclaw-gateway --no-pager -n 10 | grep -q "agent model: ollama/qwen2.5:0.5b"; then
           echo " OpenClaw is correctly using Ollama model"
         else
           echo " WARNING: OpenClaw may not be using the correct Ollama model"
@@ -814,7 +819,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Ollama API:** http://$VM_IP:11434" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- Local AI model (llama3.2:3b)" >> $GITHUB_STEP_SUMMARY
+        echo "- Local AI model (qwen2.5:0.5b)" >> $GITHUB_STEP_SUMMARY
         echo "- No external API costs" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**MCP Server:** http://$VM_IP:3000" >> $GITHUB_STEP_SUMMARY
