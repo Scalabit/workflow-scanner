@@ -639,7 +639,7 @@ jobs:
             else
                 echo "Adding new custom-openclaw integration to ossec.conf"
                 # Create integration block and add it before closing tag
-                INTEGRATION_BLOCK="  <integration>\\n      <name>custom-openclaw</name>\\n      <url>http://localhost:18789/hooks/wazuh-alert</url>\\n      <level>8</level>\\n      <rule_id>5763,40112,5712,5710</rule_id>\\n      <alert_format>json</alert_format>\\n  </integration>"
+                INTEGRATION_BLOCK="  <integration>\\n      <name>custom-openclaw</name>\\n      <level>5</level>\\n      <alert_format>json</alert_format>\\n  </integration>"
                 sed -i "/<\/ossec_config>/i\\$INTEGRATION_BLOCK" /var/ossec/etc/ossec.conf
             fi
             
