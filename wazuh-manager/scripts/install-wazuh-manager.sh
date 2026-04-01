@@ -85,7 +85,7 @@ log "Configuring OpenClaw webhook integration..."
 # Create the custom integration script
 cat > /var/ossec/integrations/custom-openclaw << 'EOF'
 #!/bin/bash
-# OpenClaw Webhook Integration for Wazuh
+# OpenClaw Webhook Integration for Wazuh (Middleware Version)
 ALERT_FILE=$1
 ALERT_OUTPUT=`cat $ALERT_FILE`
 
@@ -104,36 +104,45 @@ if [ -z "$WEBHOOK_TOKEN" ]; then
     WEBHOOK_TOKEN="__OPENCLAW_WEBHOOK_TOKEN__"
 fi
 
+# Send alert to MCP Server Middleware (port 3001) which translates it for OpenClaw Runtime API
 curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $WEBHOOK_TOKEN" \
   --data "$ALERT_OUTPUT" \
-  "http://localhost:18789/webhook/wazuh-alert" \
+  "http://localhost:3001/webhook/wazuh-alert" \
   --silent --show-error --max-time 10 || \
-  echo "$(date) - Failed to send alert to OpenClaw: $ALERT_OUTPUT" >> /var/log/wazuh-openclaw-integration.log
+  echo "$(date) - Failed to send alert to OpenClaw Middleware: $ALERT_OUTPUT" >> /var/log/wazuh-openclaw-integration.log
 EOF
 
 # Set correct permissions for Wazuh integration script
 chown root:wazuh /var/ossec/integrations/custom-openclaw
-chmod 550 /var/ossec/integrations/custom-openclaw
+chmod 750 /var/ossec/integrations/custom-openclaw
 
 # Add webhook configuration to ossec.conf
 if [ -f /var/ossec/etc/ossec.conf ]; then
     # Backup original configuration
     cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.webhook_backup
     
+    # Enable integratord if not already present
+    if ! grep -q "<integratord>" /var/ossec/etc/ossec.conf; then
+        sed -i '/<\/ossec_config>/i \
+  <integratord> \
+    <enabled>yes</enabled> \
+  </integratord>' /var/ossec/etc/ossec.conf
+    fi
+
     # Add webhook integration before closing tag
     sed -i '/<\/ossec_config>/i \
 \
   <!-- OpenClaw Autonomous SOC Integration --> \
   <integration> \
     <name>custom-openclaw</name> \
-    <level>10</level> <!-- Forward medium top, high severity alerts to AI agents --> \
+    <level>12</level> <!-- Forward high severity alerts to AI agents (Changed from 10 to 12+) --> \
     <alert_format>json</alert_format> \
     <max_log>50</max_log> \
   </integration>' /var/ossec/etc/ossec.conf
     
-    log "OpenClaw webhook integration added to ossec.conf"
+    log "OpenClaw webhook integration (Level 12) added to ossec.conf"
 else
     log "Warning: Wazuh configuration file not found"
 fi

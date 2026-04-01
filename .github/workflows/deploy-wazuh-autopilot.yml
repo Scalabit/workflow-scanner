@@ -149,7 +149,7 @@ jobs:
         Environment=WAZUH_PORT=55000
         Environment=WAZUH_USER=wazuh
         Environment=WAZUH_VERIFY_SSL=false
-        Environment=MCP_PORT=3000
+        Environment=MCP_PORT=3001
         Environment=MCP_HOST=0.0.0.0
         Environment=AUTH_MODE=bearer
         Environment=MCP_API_KEY=${MCP_API_KEY}
@@ -189,7 +189,7 @@ jobs:
         
         # Set required environment variables for installation
         export AUTOPILOT_MODE=bootstrap
-        export MCP_URL=http://localhost:3000
+        export MCP_URL=http://localhost:3001
         export AUTOPILOT_MCP_AUTH=${MCP_API_KEY}
         export OPENCLAW_LLM_MODE=local
         export AUTOPILOT_REQUIRE_TAILSCALE=false
@@ -200,7 +200,7 @@ jobs:
         # Create environment file for OpenClaw
         cat > /tmp/openclaw-autopilot.env << 'ENV_EOF'
         AUTOPILOT_MODE=bootstrap
-        MCP_URL=http://localhost:3000
+        MCP_URL=http://localhost:3001
         AUTOPILOT_MCP_AUTH=MCP_API_KEY_PLACEHOLDER
         OPENCLAW_LLM_MODE=local
         AUTOPILOT_REQUIRE_TAILSCALE=false
@@ -212,12 +212,12 @@ jobs:
         CORS_ORIGIN=*
         
         # OpenClaw Gateway Configuration
-        OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
+        OPENCLAW_GATEWAY_URL=http://$(curl -s ifconfig.me):18789
         OPENCLAW_TOKEN=OPENCLAW_TOKEN_PLACEHOLDER
         OPENCLAW_WEBHOOK_TOKEN=OPENCLAW_WEBHOOK_TOKEN_PLACEHOLDER
         OPENCLAW_GATEWAY_TOKEN=OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
         AUTOPILOT_API_KEY=MCP_API_KEY_PLACEHOLDER
-        OPENCLAW_HOST=127.0.0.1
+        OPENCLAW_HOST=0.0.0.0
         OPENCLAW_PORT=18789
         
         # Runtime API Configuration
@@ -833,7 +833,7 @@ jobs:
         echo "- Local AI model (qwen2.5:0.5b)" >> $GITHUB_STEP_SUMMARY
         echo "- No external API costs" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**MCP Server:** http://$VM_IP:3000" >> $GITHUB_STEP_SUMMARY
+        echo "**MCP Server:** http://$VM_IP:3001" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- AI bridge to Wazuh Manager" >> $GITHUB_STEP_SUMMARY
         echo "- Security data API for AI agents" >> $GITHUB_STEP_SUMMARY

@@ -11,6 +11,15 @@ param(
 # Set Windows Administrator Password
 net user Administrator "${windows_admin_password}"
 
+# Enable Remote Desktop (RDP)
+Write-Log "Enabling Remote Desktop (RDP)..."
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+# Ensure Firewall allows RDP
+New-NetFirewallRule -Name "AllowRDP" -DisplayName "Allow RDP" -Enabled True -Profile Any -Action Allow -Protocol TCP -LocalPort 3389 -ErrorAction SilentlyContinue
+
 # Function to write logs
 function Write-Log {
     param([string]$Message)
