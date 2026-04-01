@@ -23,9 +23,9 @@ variable "vm_name" {
 }
 
 variable "machine_type" {
-  description = "Machine type for the VM (cheap option)"
+  description = "Machine type for the VM (4GB RAM for Windows)"
   type        = string
-  default     = "e2-micro"
+  default     = "e2-medium"
 }
 
 variable "disk_size_gb" {

@@ -218,6 +218,64 @@ try {
         Write-Log "Cleaned up downloaded installer"
     }
 
+    # === SYSTEM CLEANUP AND OPTIMIZATION ===
+    Write-Log "Starting system cleanup and optimization..."
+    
+    try {
+        # Clean temporary files
+        Write-Log "Cleaning temporary files..."
+        Get-ChildItem -Path $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        Get-ChildItem -Path "C:\Windows\Temp" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        
+        # Clean Windows Update cache
+        Write-Log "Cleaning Windows Update cache..."
+        Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "C:\Windows\SoftwareDistribution\Download\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Start-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+        
+        # Clean IIS logs if present
+        if (Test-Path "C:\inetpub\logs") {
+            Write-Log "Cleaning IIS logs..."
+            Get-ChildItem -Path "C:\inetpub\logs" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        }
+        
+        # Disk cleanup
+        Write-Log "Running disk cleanup..."
+        Start-Process -FilePath "cleanmgr.exe" -ArgumentList "/sagerun:1" -Wait -NoNewWindow -ErrorAction SilentlyContinue
+        
+        # Memory optimization - set virtual memory to system managed
+        Write-Log "Optimizing virtual memory settings..."
+        $cs = Get-WmiObject -Class Win32_ComputerSystem -EnableAllPrivileges
+        if ($cs.AutomaticManagedPagefile -eq $false) {
+            $cs.AutomaticManagedPagefile = $true
+            $cs.Put()
+        }
+        
+        # Enable compression on system drive to save space
+        Write-Log "Enabling NTFS compression on system drive..."
+        compact /c /s:C:\ /i /q 2>$null
+        
+        # Set power plan to balanced
+        Write-Log "Setting power plan to balanced..."
+        powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e
+        
+        # Optimize services for performance
+        Write-Log "Optimizing services..."
+        $servicesToDisable = @("Fax", "TabletInputService", "WebClient", "WMPNetworkSvc")
+        foreach ($service in $servicesToDisable) {
+            $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
+            if ($svc -and $svc.StartType -ne "Disabled") {
+                Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
+                Write-Log "Disabled service: $service"
+            }
+        }
+        
+        Write-Log "System cleanup and optimization completed successfully"
+        
+    } catch {
+        Write-Log "Warning: Some cleanup operations failed: $($_.Exception.Message)"
+    }
+
     Write-Log "Wazuh agent installation and configuration completed successfully"
     
     # Create a completion marker file
