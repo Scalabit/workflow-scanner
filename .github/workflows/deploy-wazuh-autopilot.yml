@@ -27,6 +27,7 @@ env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   GCP_REGION: ${{ secrets.GCP_REGION }}
   GCP_ZONE: ${{ inputs.gcp_zone || secrets.GCP_ZONE }}
+  OPENCLAW_WEBHOOK_TOKEN: ${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}
 
 jobs:
   deploy:
@@ -592,12 +593,23 @@ jobs:
         # OpenClaw Webhook Integration for Wazuh
         # This script forwards Wazuh alerts to OpenClaw via webhook
         
-        # Read the JSON alert from stdin
+        # Get webhook token from environment or metadata
+        WEBHOOK_TOKEN=""
+        if [ -f /opt/openclaw-autopilot/.env ]; then
+            WEBHOOK_TOKEN=$(grep "OPENCLAW_WEBHOOK_TOKEN=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
+        fi
+        
+        # Fallback to hooks token
+        if [ -z "$WEBHOOK_TOKEN" ]; then
+            WEBHOOK_TOKEN="HOOKS_TOKEN_PLACEHOLDER"
+        fi
+        
+        # Read the JSON alert from stdin  
         while read ALERT; do
             # Forward the alert to OpenClaw webhook endpoint
             curl -X POST \
                 -H "Content-Type: application/json" \
-                -H "Authorization: Bearer HOOKS_TOKEN_PLACEHOLDER" \
+                -H "Authorization: Bearer $WEBHOOK_TOKEN" \
                 --data "$ALERT" \
                 "http://localhost:18789/hooks/wazuh-alert" \
                 --silent --show-error --max-time 10 || \

@@ -82,6 +82,41 @@ fi
 # Configure OpenClaw webhook integration
 log "Configuring OpenClaw webhook integration..."
 
+# Create the custom integration script
+cat > /var/ossec/integrations/custom-openclaw << 'EOF'
+#!/bin/bash
+# OpenClaw Webhook Integration for Wazuh
+ALERT_FILE=$1
+ALERT_OUTPUT=`cat $ALERT_FILE`
+
+# Get webhook token from environment or metadata
+WEBHOOK_TOKEN=""
+if [ -f /opt/openclaw-autopilot/.env ]; then
+    WEBHOOK_TOKEN=$(grep "OPENCLAW_WEBHOOK_TOKEN=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
+fi
+
+if [ -z "$WEBHOOK_TOKEN" ] && command -v curl >/dev/null 2>&1; then
+    WEBHOOK_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/openclaw-webhook-token" 2>/dev/null || echo "")
+fi
+
+# Default fallback (will be replaced by GitHub Actions)
+if [ -z "$WEBHOOK_TOKEN" ]; then
+    WEBHOOK_TOKEN="__OPENCLAW_WEBHOOK_TOKEN__"
+fi
+
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $WEBHOOK_TOKEN" \
+  --data "$ALERT_OUTPUT" \
+  "http://localhost:18789/webhook/wazuh-alert" \
+  --silent --show-error --max-time 10 || \
+  echo "$(date) - Failed to send alert to OpenClaw: $ALERT_OUTPUT" >> /var/log/wazuh-openclaw-integration.log
+EOF
+
+# Set correct permissions for Wazuh integration script
+chown root:wazuh /var/ossec/integrations/custom-openclaw
+chmod 550 /var/ossec/integrations/custom-openclaw
+
 # Add webhook configuration to ossec.conf
 if [ -f /var/ossec/etc/ossec.conf ]; then
     # Backup original configuration
@@ -90,23 +125,12 @@ if [ -f /var/ossec/etc/ossec.conf ]; then
     # Add webhook integration before closing tag
     sed -i '/<\/ossec_config>/i \
 \
-  <!-- OpenClaw Autopilot Integration --> \
+  <!-- OpenClaw Autonomous SOC Integration --> \
   <integration> \
-    <name>webhook</name> \
-    <url>http://localhost:18789/webhook/wazuh-alert</url> \
-    <level>8</level> <!-- Forward alerts level 8+ to OpenClaw --> \
-    <rule_id>5763,40112,5712,5710</rule_id> <!-- SSH attacks and brute force --> \
+    <name>custom-openclaw</name> \
+    <level>10</level> <!-- Forward medium top, high severity alerts to AI agents --> \
     <alert_format>json</alert_format> \
-    <max_log>5</max_log> \
-  </integration> \
-\
-  <!-- Alternative: Send to Autopilot API --> \
-  <integration> \
-    <name>webhook</name> \
-    <url>http://localhost:9090/api/alerts</url> \
-    <level>10</level> <!-- High priority alerts --> \
-    <alert_format>json</alert_format> \
-    <max_log>3</max_log> \
+    <max_log>50</max_log> \
   </integration>' /var/ossec/etc/ossec.conf
     
     log "OpenClaw webhook integration added to ossec.conf"
@@ -193,11 +217,25 @@ log "Cleaning up old disconnected agents..."
   fi
 done
 
+# Configure OpenClaw for proper webhook handling
+log "Setting up OpenClaw configuration for webhook integration..."
+
+# Ensure OpenClaw config directory exists
+mkdir -p ~/.openclaw/wazuh-autopilot
+
+# Copy OpenClaw autopilot configuration if it exists
+if [ -d /opt/openclaw-autopilot/openclaw ]; then
+    log "Copying OpenClaw autopilot configuration..."
+    cp /opt/openclaw-autopilot/openclaw/openclaw.json ~/.openclaw/ 2>/dev/null || log "Warning: Could not copy OpenClaw config"
+    cp -r /opt/openclaw-autopilot/openclaw/agents ~/.openclaw/wazuh-autopilot/ 2>/dev/null || log "Warning: Could not copy OpenClaw agents"
+fi
+
 # Display installation summary
 log "=== Wazuh Installation Summary ==="
 log "Wazuh Manager: Installed"
 log "Wazuh Indexer: Installed" 
 log "Wazuh Dashboard: Installed"
+log "OpenClaw Integration: Configured"
 log "External IP: $(curl -s ifconfig.me 2>/dev/null || echo 'Unable to determine')"
 log "Internal IP: $(hostname -I | awk '{print $1}')"
 log ""
