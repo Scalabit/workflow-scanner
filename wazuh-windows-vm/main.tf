@@ -130,6 +130,7 @@ resource "google_compute_instance" "wazuh_windows_vm" {
   name         = var.vm_name
   machine_type = var.machine_type
   zone         = var.zone
+  allow_stopping_for_update = true
 
   tags = ["wazuh-windows-vm"]
 
