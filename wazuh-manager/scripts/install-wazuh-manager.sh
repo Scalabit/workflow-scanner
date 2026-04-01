@@ -142,7 +142,20 @@ if [ -f /var/ossec/etc/ossec.conf ]; then
     <max_log>50</max_log> \
   </integration>' /var/ossec/etc/ossec.conf
     
-    log "OpenClaw webhook integration (Level 12) added to ossec.conf"
+    # Add monitoring for local logs (syslog and auth.log)
+    if ! grep -q "/var/log/syslog" /var/ossec/etc/ossec.conf; then
+        sed -i '/<\/ossec_config>/i \
+  <localfile> \
+    <log_format>syslog</log_format> \
+    <location>/var/log/syslog</location> \
+  </localfile> \
+  <localfile> \
+    <log_format>syslog</log_format> \
+    <location>/var/log/auth.log</location> \
+  </localfile>' /var/ossec/etc/ossec.conf
+    fi
+    
+    log "OpenClaw webhook integration (Level 12) and local log monitoring added to ossec.conf"
 else
     log "Warning: Wazuh configuration file not found"
 fi
