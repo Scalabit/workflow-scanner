@@ -570,8 +570,30 @@ jobs:
         sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/openclaw.json
         echo "Hooks token replaced in configuration"
         
-        # Create auth configuration for Ollama (no API key needed for local)
-        echo "Creating OpenClaw auth configuration for local Ollama..."
+        # Deploy OpenClaw configuration and scripts from repository
+        echo "Deploying OpenClaw configuration and scripts..."
+        sudo mkdir -p /root/.openclaw
+        sudo cp wazuh-autopilot/config/openclaw.json /root/.openclaw/openclaw.json
+        sudo cp wazuh-autopilot/scripts/update-wazuh-webhooks.sh /usr/local/bin/update-wazuh-webhooks.sh
+        sudo chmod +x /usr/local/bin/update-wazuh-webhooks.sh
+
+        # Deploy OpenClaw configuration and scripts from repository
+        echo "Deploying OpenClaw configuration and scripts..."
+        sudo mkdir -p /root/.openclaw/workspace
+        sudo mkdir -p /root/.openclaw/agents/main/sessions
+        sudo mkdir -p /var/lib/wazuh-autopilot
+        
+        sudo cp wazuh-autopilot/config/openclaw.json /root/.openclaw/openclaw.json
+        sudo cp wazuh-autopilot/scripts/update-wazuh-webhooks.sh /usr/local/bin/update-wazuh-webhooks.sh
+        sudo chmod +x /usr/local/bin/update-wazuh-webhooks.sh
+
+        # Replace placeholders in the config
+        HOOKS_TOKEN=$(openssl rand -hex 24)
+        sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/openclaw.json
+        sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /root/.openclaw/openclaw.json
+        sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /root/.openclaw/openclaw.json
+
+        # Create auth configuration for Ollama
         sudo mkdir -p /root/.openclaw/agents/main/agent
         sudo tee /root/.openclaw/agents/main/agent/auth-profiles.json > /dev/null << 'AUTH_EOF'
         {
@@ -581,173 +603,62 @@ jobs:
           }
         }
         AUTH_EOF
-        echo "Auth configuration created successfully"
-        
-        # Create OpenClaw data directories
-        sudo mkdir -p /var/lib/wazuh-autopilot
-        sudo mkdir -p /root/.openclaw/wazuh-autopilot/workspace
-        
+
         # Create Wazuh integration script for OpenClaw webhooks
         echo "Creating Wazuh integration script for OpenClaw..."
         sudo tee /var/ossec/integrations/custom-openclaw > /dev/null << 'INTEGRATION_SCRIPT'
         #!/bin/bash
-        
-        # OpenClaw Webhook Integration for Wazuh
-        # This script forwards Wazuh alerts to OpenClaw via webhook
-        
-        # Get webhook token from environment or metadata
         WEBHOOK_TOKEN=""
         if [ -f /opt/openclaw-autopilot/.env ]; then
             WEBHOOK_TOKEN=$(grep "OPENCLAW_WEBHOOK_TOKEN=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
         fi
-        
-        # Fallback to hooks token
         if [ -z "$WEBHOOK_TOKEN" ]; then
             WEBHOOK_TOKEN="HOOKS_TOKEN_PLACEHOLDER"
         fi
         
-        # Read the JSON alert from stdin  
         while read ALERT; do
-            # Forward the alert to OpenClaw webhook endpoint
-            curl -X POST \
-                -H "Content-Type: application/json" \
-                -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-                --data "$ALERT" \
-                "http://localhost:18789/hooks/wazuh-alert" \
+            curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $WEBHOOK_TOKEN" \
+                --data "$ALERT" "http://localhost:18789/hooks/wazuh-alert" \
                 --silent --show-error --max-time 10 || \
-                echo "$(date) - Failed to send alert to OpenClaw: $ALERT" >> /var/log/wazuh-openclaw-integration.log
+                echo "$(date) - Failed to send alert to OpenClaw" >> /var/log/wazuh-openclaw-integration.log
         done
         INTEGRATION_SCRIPT
-        
-        # Replace the hooks token placeholder in integration script
+
         sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /var/ossec/integrations/custom-openclaw
-        
-        # Set proper permissions for integration script
         sudo chmod 750 /var/ossec/integrations/custom-openclaw
         sudo chown root:wazuh /var/ossec/integrations/custom-openclaw
-        echo "Wazuh integration script created successfully"
-        
-        # Create webhook configuration updater script
-        echo "Creating webhook configuration script..."
-        sudo tee /usr/local/bin/update-wazuh-webhooks.sh > /dev/null << 'WEBHOOK_SCRIPT'
-        #!/bin/bash
-        
-        # Wait for OpenClaw to be ready
-        echo "Waiting for OpenClaw Gateway to be ready..."
-        while ! curl -s http://localhost:18789/ > /dev/null 2>&1; do
-            echo "Waiting for OpenClaw Gateway..."
-            sleep 5
-        done
-        
-        echo "OpenClaw Gateway is ready, updating Wazuh webhooks..."
-        
-        # Update webhook URLs with correct endpoints and authentication
-        if [ -f /var/ossec/etc/ossec.conf ]; then
-            cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.pre-webhook
-            
-            # Check if integration already exists and update it
-            if grep -q "custom-openclaw" /var/ossec/etc/ossec.conf; then
-                echo "Updating existing custom-openclaw integration"
-                # Update the level to 12
-                sed -i 's|<level>[0-9]*</level> <!-- Forward.*|<level>12</level> <!-- Forward high severity alerts to AI agents (Level 12) -->|' /var/ossec/etc/ossec.conf
-            else
-                echo "Adding new custom-openclaw integration to ossec.conf"
-                # Create integration block and add it before closing tag
-                INTEGRATION_BLOCK="  <integration>\\n      <name>custom-openclaw</name>\\n      <level>12</level>\\n      <alert_format>json</alert_format>\\n  </integration>"
-                sed -i "/<\/ossec_config>/i\\$INTEGRATION_BLOCK" /var/ossec/etc/ossec.conf
-            fi
-            
-            echo "Webhook configuration updated with correct endpoints"
-            
-            # Restart Wazuh manager to apply webhook config
-            systemctl restart wazuh-manager
-            echo "Wazuh manager restarted with webhook configuration"
-        else
-            echo "Error: Wazuh configuration file not found"
-        fi
-        WEBHOOK_SCRIPT
-        
-        sudo chmod +x /usr/local/bin/update-wazuh-webhooks.sh
-        
+
         # Add root to wazuh group for alert file access
         echo "Adding root user to wazuh group for alert file access..."
         sudo usermod -a -G wazuh root || echo "Failed to add root to wazuh group"
-        
-        # Enable and start services
+
+        # Enable and restart services
         echo "Enabling and starting services..."
         sudo systemctl daemon-reload
-        
-        # Enable services
-        if sudo systemctl enable openclaw-gateway 2>/dev/null; then
-          echo " openclaw-gateway enabled successfully"
-        else
-          echo " Failed to enable openclaw-gateway"
-        fi
-        
-        if sudo systemctl enable wazuh-autopilot 2>/dev/null; then
-          echo " wazuh-autopilot enabled successfully"
-        else
-          echo " Failed to enable wazuh-autopilot (file may not exist)"
-        fi
-        
-        # Start services individually with better error handling
-        echo "Starting openclaw-gateway service..."
-        if sudo systemctl start openclaw-gateway 2>/dev/null; then
-          echo " openclaw-gateway started successfully"
-        else
-          echo " Failed to start openclaw-gateway"
-          echo "Service status:"
-          sudo systemctl status openclaw-gateway --no-pager -l || true
-          echo "Recent logs:"
-          sudo journalctl -u openclaw-gateway --no-pager -n 10 || true
-        fi
-        
-        echo "Starting wazuh-autopilot service..."
-        if sudo systemctl start wazuh-autopilot 2>/dev/null; then
-          echo " wazuh-autopilot started successfully"
-        else
-          echo " Failed to start wazuh-autopilot"
-        fi
-        
+        sudo systemctl enable openclaw-gateway wazuh-autopilot 2>/dev/null || true
+        sudo systemctl restart openclaw-gateway wazuh-autopilot
+
         # Ensure MCP server is running
         echo "Ensuring MCP server is running..."
         sudo systemctl restart wazuh-mcp-server 2>/dev/null || true
         sleep 3
-        
-        # Configure webhook integration after all services are running
+
+        # Configure webhook integration
         echo "Configuring Wazuh webhook integration..."
         sudo /usr/local/bin/update-wazuh-webhooks.sh || echo "Webhook configuration failed, continuing..."
 
         echo "Verifying installation..."
         sudo systemctl status ollama --no-pager --lines=0 || echo "Ollama service check failed"
-        
-        # Check if MCP server service exists before checking status
-        if sudo systemctl list-unit-files | grep -q wazuh-mcp-server; then
-          sudo systemctl status wazuh-mcp-server --no-pager --lines=0 || echo "MCP server not running"
-        else
-          echo "Warning: wazuh-mcp-server service not found - installation may have failed"
-        fi
-        
-        # Check if OpenClaw Autopilot service exists and is running
-        if sudo systemctl list-unit-files | grep -q wazuh-autopilot; then
-          sudo systemctl status wazuh-autopilot --no-pager --lines=0 || echo "OpenClaw Autopilot not running"
-        else
-          echo "Warning: wazuh-autopilot service not found"
-        fi
-        
-        # Check if OpenClaw Gateway service exists and is running
-        if sudo systemctl list-unit-files | grep -q openclaw-gateway; then
-          sudo systemctl status openclaw-gateway --no-pager --lines=0 || echo "OpenClaw Gateway not running"
-        else
-          echo "Warning: openclaw-gateway service not found"
-        fi
+        sudo systemctl status wazuh-mcp-server --no-pager --lines=0 || echo "MCP server not running"
+        sudo systemctl status wazuh-autopilot --no-pager --lines=0 || echo "OpenClaw Autopilot not running"
+        sudo systemctl status openclaw-gateway --no-pager --lines=0 || echo "OpenClaw Gateway not running"
 
         echo "Testing OpenClaw runtime API accessibility..."
         curl -s http://localhost:9090/health || echo "Runtime API not accessible on port 9090"
-        
+
         echo "Testing OpenClaw Gateway dashboard accessibility..."
         curl -s -o /dev/null -w "%{http_code}" http://localhost:18789 || echo "Gateway dashboard not accessible on port 18789"
-        
+
         # Test webhook endpoint is working
         echo "Testing webhook endpoint..."
         WEBHOOK_TEST_RESPONSE=$(curl -s -X POST \
@@ -755,45 +666,20 @@ jobs:
           -H "Authorization: Bearer ${HOOKS_TOKEN}" \
           -d "{\"test\":\"webhook\",\"timestamp\":\"$(date -Iseconds)\",\"rule\":{\"id\":\"test\",\"level\":8,\"description\":\"Test webhook\"}}" \
           http://localhost:18789/hooks/wazuh-alert)
-        
+
         if echo "${WEBHOOK_TEST_RESPONSE}" | grep -q '"ok":true'; then
           echo " Webhook endpoint is working correctly"
         else
           echo " WARNING: Webhook endpoint test failed - Response: ${WEBHOOK_TEST_RESPONSE}"
         fi
-        
-        # Verify integration script exists and has correct permissions
-        if [ -f "/var/ossec/integrations/custom-openclaw" ] && [ -x "/var/ossec/integrations/custom-openclaw" ]; then
-          echo " Wazuh integration script is properly installed"
-        else
-          echo " ERROR: Wazuh integration script missing or not executable"
-        fi
-        
-        # Check if Wazuh integration is enabled
-        if grep -q "custom-openclaw" /var/ossec/logs/ossec.log; then
-          echo " Wazuh integration is enabled and recognized"
-        else
-          echo " WARNING: Wazuh integration may not be properly enabled"
-        fi
-        
-        # Verify OpenClaw is using Ollama model
-        if sudo journalctl -u openclaw-gateway --no-pager -n 10 | grep -q "agent model: ollama/qwen2.5:0.5b"; then
-          echo " OpenClaw is correctly using Ollama model"
-        else
-          echo " WARNING: OpenClaw may not be using the correct Ollama model"
-        fi
-        
+
         echo "=== OpenClaw Gateway Ready ==="
         echo "Dashboard URL: http://$(curl -s ifconfig.me 2>/dev/null):18789"
-        echo "Use the OPENCLAW_GATEWAY_TOKEN secret to authenticate when connecting"
         echo "Webhook Token: ${HOOKS_TOKEN}"
-        echo "Integration: Wazuh -> OpenClaw webhook communication configured"
-        
         echo "Deployment complete!"
         EOF
-        
-        chmod +x deploy.sh
 
+        chmod +x deploy.sh
     - name: Deploy to Wazuh Manager VM
       run: |
         echo "Waiting for VM to be ready..."

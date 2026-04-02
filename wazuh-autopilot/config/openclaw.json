@@ -1,0 +1,61 @@
+{
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "0.0.0.0",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "controlUi": {
+      "allowedOrigins": ["*"],
+      "dangerouslyAllowHostHeaderOriginFallback": true,
+      "dangerouslyDisableDeviceAuth": true
+    }
+  },
+  "models": {
+    "mode": "replace",
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://localhost:11434",
+        "apiKey": "ollama-local",
+        "api": "ollama",
+        "models": [
+          {
+            "id": "qwen2.5:0.5b",
+            "name": "qwen2.5:0.5b",
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "anthropic": {
+        "apiKey": "${ANTHROPIC_API_KEY}"
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/qwen2.5:0.5b",
+        "fallbacks": ["anthropic/claude-3-haiku-20240307"]
+      }
+    }
+  },
+  "hooks": {
+    "enabled": true,
+    "token": "HOOKS_TOKEN_PLACEHOLDER",
+    "path": "/hooks",
+    "mappings": [
+      {
+        "id": "wazuh-alert",
+        "match": { "path": "wazuh-alert" },
+        "action": "agent",
+        "agentId": "main",
+        "name": "Wazuh Security Alert",
+        "messageTemplate": "WAZUH SECURITY ALERT\n\nRule: {{rule.description}}\nLevel: {{rule.level}}\nFull Alert:\n{{.}}",
+        "deliver": true
+      }
+    ]
+  }
+}
