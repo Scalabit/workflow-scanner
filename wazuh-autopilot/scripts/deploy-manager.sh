@@ -106,29 +106,17 @@ ENV_EOF
 echo "Installing OpenClaw CLI..."
 sudo npm install -g openclaw@latest
 
-# OpenClaw Config
-sudo mkdir -p /root/.openclaw /root/.openclaw/workspace /root/.openclaw/agents/main/sessions /var/lib/wazuh-autopilot
-sudo cp /tmp/wazuh-autopilot/config/openclaw.json /root/.openclaw/openclaw.json
+# OpenClaw Config and Agents (Unified state dir)
+echo "Deploying OpenClaw configuration and specialized agents..."
+sudo mkdir -p /var/lib/openclaw/wazuh-autopilot/agents
+sudo mkdir -p /etc/openclaw
+sudo cp /tmp/wazuh-autopilot/config/openclaw.json /etc/openclaw/openclaw.json
 
-# Auth profiles
-sudo mkdir -p /root/.openclaw/agents/main/agent
-sudo tee /root/.openclaw/agents/main/agent/auth-profiles.json > /dev/null << 'AUTH_EOF'
-{
-  "ollama": {
-    "baseUrl": "http://localhost:11434",
-    "apiKey": "ollama-local"
-  }
-}
-AUTH_EOF
-
-# Replace placeholders
-HOOKS_TOKEN=$(openssl rand -hex 24)
-sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/openclaw.json
-sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /root/.openclaw/openclaw.json
-sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /root/.openclaw/openclaw.json
-
-# Fix config using doctor
-sudo openclaw doctor --fix || echo "Doctor fixed some issues"
+# Copy all specialized agents from the cloned repository
+if [ -d "/opt/openclaw-autopilot/openclaw/agents" ]; then
+    sudo cp -r /opt/openclaw-autopilot/openclaw/agents/* /var/lib/openclaw/wazuh-autopilot/agents/
+    echo "Specialized agents deployed to /var/lib/openclaw/wazuh-autopilot/agents/"
+fi
 
 # Services
 sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_EOF'
@@ -157,8 +145,10 @@ After=network.target ollama.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root
+WorkingDirectory=/var/lib/openclaw
 EnvironmentFile=/opt/openclaw-autopilot/.env
+Environment="OPENCLAW_STATE_DIR=/var/lib/openclaw"
+Environment="OPENCLAW_CONFIG_FILE=/etc/openclaw/openclaw.json"
 ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token ${OPENCLAW_GATEWAY_TOKEN} --auth token
 Restart=always
 
@@ -166,9 +156,23 @@ Restart=always
 WantedBy=multi-user.target
 GATEWAY_EOF
 
+# Ensure the config exists in both places for safety
+sudo mkdir -p /root/.openclaw
+sudo cp /etc/openclaw/openclaw.json /root/.openclaw/openclaw.json
+
 sudo systemctl daemon-reload
 sudo systemctl enable wazuh-autopilot openclaw-gateway
 sudo systemctl start wazuh-autopilot openclaw-gateway
+
+# Replace placeholders in the central config
+HOOKS_TOKEN=$(openssl rand -hex 24)
+sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /etc/openclaw/openclaw.json
+sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/openclaw.json
+sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /etc/openclaw/openclaw.json
+sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /etc/openclaw/openclaw.json
+
+# Fix config using doctor
+sudo OPENCLAW_STATE_DIR=/var/lib/openclaw OPENCLAW_CONFIG_FILE=/etc/openclaw/openclaw.json openclaw doctor --fix
 
 # 7. Wazuh Integration
 echo "Configuring Wazuh integration..."
@@ -177,19 +181,19 @@ sudo chmod +x /usr/local/bin/update-wazuh-webhooks.sh
 
 sudo tee /var/ossec/integrations/custom-openclaw > /dev/null << 'INTEGRATION_SCRIPT'
 #!/bin/bash
-WEBHOOK_TOKEN=""
+# Wazuh Autopilot Integration
+# Forwards alerts to the Autopilot API for AI triage
+
+API_KEY=""
 if [ -f /opt/openclaw-autopilot/.env ]; then
-    WEBHOOK_TOKEN=$(grep "OPENCLAW_WEBHOOK_TOKEN=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
-fi
-if [ -z "$WEBHOOK_TOKEN" ]; then
-    WEBHOOK_TOKEN="HOOKS_TOKEN_PLACEHOLDER"
+    API_KEY=$(grep "AUTOPILOT_API_KEY=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
 fi
 
 while read ALERT; do
-    curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-        --data "$ALERT" "http://localhost:18789/hooks/wazuh-alert" \
+    curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY" \
+        --data "$ALERT" "http://localhost:9090/api/alerts" \
         --silent --show-error --max-time 10 || \
-        echo "$(date) - Failed to send alert to OpenClaw" >> /var/log/wazuh-openclaw-integration.log
+        echo "$(date) - Failed to send alert to Autopilot API" >> /var/log/wazuh-openclaw-integration.log
 done
 INTEGRATION_SCRIPT
 
