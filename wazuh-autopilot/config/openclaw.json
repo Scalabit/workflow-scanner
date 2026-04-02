@@ -13,6 +13,16 @@
       "dangerouslyDisableDeviceAuth": true
     }
   },
+  "browser": {
+    "ssrfPolicy": {
+      "dangerouslyAllowPrivateNetwork": true
+    }
+  },
+  "tools": {
+    "web": {
+      "dangerouslyAllowInternalDestinations": true
+    }
+  },
   "env": {
     "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
   },
