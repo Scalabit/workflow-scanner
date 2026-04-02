@@ -37,8 +37,8 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "ollama/qwen2.5:0.5b",
-        "fallbacks": ["anthropic/claude-3-haiku-20240307"]
+        "primary": "anthropic/claude-haiku-4-5",
+        "fallbacks": ["ollama/qwen2.5:0.5b"]
       }
     }
   },

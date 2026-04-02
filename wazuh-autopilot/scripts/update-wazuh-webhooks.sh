@@ -1,38 +1,46 @@
 #!/bin/bash
-# Wait for OpenClaw to be ready
-echo "Waiting for OpenClaw Gateway to be ready..."
-while ! curl -s http://localhost:18789/ > /dev/null 2>&1; do
-    echo "Waiting for OpenClaw Gateway..."
-    sleep 5
-done
-
-echo "OpenClaw Gateway is ready, updating Wazuh webhooks..."
+# Safer Wazuh Webhook Configuration Script
 
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
-if [ -f "$OSSEC_CONF" ]; then
-    cp "$OSSEC_CONF" "${OSSEC_CONF}.pre-webhook"
-    
-    # Clean up any existing custom-openclaw integration to ensure a clean state
-    # (Matches various formats used in previous attempts)
-    sudo sed -i '/<integration>/,/<\/integration>/ { /custom-openclaw/d }' "$OSSEC_CONF"
-    sudo sed -i '/<name>custom-openclaw<\/name>/d' "$OSSEC_CONF"
+TMP_CONF="/tmp/ossec.conf.tmp"
 
-    # Add new integration block before the closing tag
-    # Using level 12 as requested
-    sudo sed -i '/<\/ossec_config>/i \
-\
-  <!-- OpenClaw Autonomous SOC Integration --> \
+echo "Updating Wazuh configuration..."
+
+if [ -f "$OSSEC_CONF" ]; then
+    # 1. Create a clean base from the backup if possible, otherwise use current
+    if [ -f "${OSSEC_CONF}.backup" ]; then
+        cp "${OSSEC_CONF}.backup" "$TMP_CONF"
+    else
+        cp "$OSSEC_CONF" "$TMP_CONF"
+    fi
+    
+    # 2. Remove any existing custom-openclaw sections to prevent duplicates
+    # This is a robust way to strip the specific integration block
+    sed -i '/<integration>/,/<\/integration>/ { /custom-openclaw/d; }' "$TMP_CONF"
+    # Clean up empty integration tags left behind
+    sed -i '/<integration>/{N;/<\/integration>/d;}' "$TMP_CONF"
+
+    # 3. Insert the new clean integration block before the closing tag
+    # Using Level 12 as requested
+    sed -i '/<\/ossec_config>/i \
   <integration> \
     <name>custom-openclaw</name> \
-    <level>12</level> <!-- High severity alerts for AI analysis --> \
+    <level>12</level> \
     <alert_format>json</alert_format> \
-    <max_log>50</max_log> \
-  </integration>' "$OSSEC_CONF"
-    
-    echo "Webhook configuration added to ossec.conf (Level 12)"
-    sudo systemctl restart wazuh-manager
-    echo "Wazuh manager restarted"
+  </integration>' "$TMP_CONF"
+
+    # 4. Verify the config before applying
+    if /var/ossec/bin/wazuh-analysisd -t -c "$TMP_CONF" > /dev/null 2>&1; then
+        echo "Configuration validated successfully. Applying..."
+        sudo cp "$TMP_CONF" "$OSSEC_CONF"
+        sudo systemctl restart wazuh-manager
+        echo "Wazuh manager restarted successfully."
+    else
+        echo "ERROR: New configuration is invalid. Check for XML syntax errors."
+        /var/ossec/bin/wazuh-analysisd -t -c "$TMP_CONF"
+        exit 1
+    fi
 else
-    echo "Error: Wazuh configuration file not found"
+    echo "ERROR: ossec.conf not found at $OSSEC_CONF"
     exit 1
 fi
