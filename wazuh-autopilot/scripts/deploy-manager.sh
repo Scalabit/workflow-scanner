@@ -31,7 +31,7 @@ fi
 # 3. System dependencies
 echo "Installing system dependencies..."
 sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq python3 python3-pip nodejs npm
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq python3 python3-pip nodejs
 
 # 4. MCP Server
 echo "Installing MCP Server..."
