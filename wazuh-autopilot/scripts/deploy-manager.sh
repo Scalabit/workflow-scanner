@@ -75,7 +75,7 @@ sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot /opt/openc
 cd /opt/openclaw-autopilot/runtime/autopilot-service
 sudo npm install
 
-# Create .env
+# Create .env (Synchronized with VM Fixes)
 sudo tee /opt/openclaw-autopilot/.env << ENV_EOF
 AUTOPILOT_MODE=bootstrap
 MCP_URL=http://localhost:3001
@@ -89,15 +89,15 @@ OLLAMA_URL=http://localhost:11434
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 AUTOPILOT_RESPONDER_ENABLED=true
 CORS_ORIGIN=*
-OPENCLAW_GATEWAY_URL=http://$(curl -s ifconfig.me):18789
+OPENCLAW_GATEWAY_URL=http://localhost:18789
 OPENCLAW_TOKEN=${OPENCLAW_TOKEN}
-OPENCLAW_WEBHOOK_TOKEN=${OPENCLAW_WEBHOOK_TOKEN}
+OPENCLAW_WEBHOOK_TOKEN=HOOKS_TOKEN_PLACEHOLDER
 OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
 AUTOPILOT_API_KEY=${MCP_API_KEY}
-OPENCLAW_HOST=0.0.0.0
+OPENCLAW_HOST=127.0.0.1
 OPENCLAW_PORT=18789
 RUNTIME_PORT=9090
-AUTOPILOT_DATA_DIR=/var/lib/wazuh-autopilot
+AUTOPILOT_DATA_DIR=/var/lib/openclaw
 AUTOPILOT_CONFIG_DIR=/etc/wazuh-autopilot
 APPROVAL_TOKEN_TTL_MINUTES=60
 ENV_EOF
@@ -156,10 +156,6 @@ Restart=always
 WantedBy=multi-user.target
 GATEWAY_EOF
 
-# Ensure the config exists in both places for safety
-sudo mkdir -p /root/.openclaw
-sudo cp /etc/openclaw/openclaw.json /root/.openclaw/openclaw.json
-
 sudo systemctl daemon-reload
 sudo systemctl enable wazuh-autopilot openclaw-gateway
 sudo systemctl start wazuh-autopilot openclaw-gateway
@@ -167,7 +163,7 @@ sudo systemctl start wazuh-autopilot openclaw-gateway
 # Replace placeholders in the central config
 HOOKS_TOKEN=$(openssl rand -hex 24)
 sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /etc/openclaw/openclaw.json
-sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/openclaw.json
+sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /opt/openclaw-autopilot/.env
 sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /etc/openclaw/openclaw.json
 sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /etc/openclaw/openclaw.json
 
@@ -197,7 +193,6 @@ while read ALERT; do
 done
 INTEGRATION_SCRIPT
 
-sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /var/ossec/integrations/custom-openclaw
 sudo chmod 750 /var/ossec/integrations/custom-openclaw
 sudo chown root:wazuh /var/ossec/integrations/custom-openclaw
 
