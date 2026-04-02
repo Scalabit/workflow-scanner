@@ -75,7 +75,7 @@ sudo git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot /opt/openc
 cd /opt/openclaw-autopilot/runtime/autopilot-service
 sudo npm install
 
-# Create .env (Synchronized with VM Fixes)
+# Create .env
 sudo tee /opt/openclaw-autopilot/.env << ENV_EOF
 AUTOPILOT_MODE=bootstrap
 MCP_URL=http://localhost:3001
@@ -89,22 +89,19 @@ OLLAMA_URL=http://localhost:11434
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 AUTOPILOT_RESPONDER_ENABLED=true
 CORS_ORIGIN=*
-OPENCLAW_GATEWAY_URL=http://$(curl -s ifconfig.me):18789
+OPENCLAW_GATEWAY_URL=http://localhost:18789
 OPENCLAW_TOKEN=${OPENCLAW_TOKEN}
 OPENCLAW_WEBHOOK_TOKEN=HOOKS_TOKEN_PLACEHOLDER
 OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
 AUTOPILOT_API_KEY=${MCP_API_KEY}
-OPENCLAW_HOST=0.0.0.0
+OPENCLAW_HOST=127.0.0.1
 OPENCLAW_PORT=18789
 RUNTIME_PORT=9090
 AUTOPILOT_DATA_DIR=/var/lib/openclaw
 AUTOPILOT_CONFIG_DIR=/etc/wazuh-autopilot
 APPROVAL_TOKEN_TTL_MINUTES=60
-# Credit Protection: Reduce aggressive re-dispatches
 STALLED_PIPELINE_THRESHOLD_MINUTES=360
 STALLED_PIPELINE_MAX_ATTEMPTS=1
-STALLED_PIPELINE_CHECK_INTERVAL_MS=3600000
-# Important: Match the agent ID used in openclaw.json
 STALLED_PIPELINE_AGENT_ID=wazuh-triage
 ENV_EOF
 
@@ -112,16 +109,14 @@ ENV_EOF
 echo "Installing OpenClaw CLI..."
 sudo npm install -g openclaw@latest
 
-# OpenClaw Config and Agents (Unified state dir)
+# OpenClaw Config and Agents
 echo "Deploying OpenClaw configuration and specialized agents..."
 sudo mkdir -p /var/lib/openclaw/wazuh-autopilot/agents
 sudo mkdir -p /etc/openclaw
 sudo cp /tmp/wazuh-autopilot/config/openclaw.json /etc/openclaw/openclaw.json
 
-# Copy all specialized agents from the cloned repository
 if [ -d "/opt/openclaw-autopilot/openclaw/agents" ]; then
     sudo cp -r /opt/openclaw-autopilot/openclaw/agents/* /var/lib/openclaw/wazuh-autopilot/agents/
-    echo "Specialized agents deployed to /var/lib/openclaw/wazuh-autopilot/agents/"
 fi
 
 # Services
@@ -166,14 +161,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable wazuh-autopilot openclaw-gateway
 sudo systemctl start wazuh-autopilot openclaw-gateway
 
-# Replace placeholders in the central config
+# Replace placeholders
 HOOKS_TOKEN=$(openssl rand -hex 24)
 sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /etc/openclaw/openclaw.json
 sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /opt/openclaw-autopilot/.env
 sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /etc/openclaw/openclaw.json
 sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /etc/openclaw/openclaw.json
 
-# Fix config using doctor
 sudo OPENCLAW_STATE_DIR=/var/lib/openclaw OPENCLAW_CONFIG_FILE=/etc/openclaw/openclaw.json openclaw doctor --fix
 
 # 7. Wazuh Integration
@@ -181,21 +175,15 @@ echo "Configuring Wazuh integration..."
 sudo cp /tmp/wazuh-autopilot/scripts/update-wazuh-webhooks.sh /usr/local/bin/update-wazuh-webhooks.sh
 sudo chmod +x /usr/local/bin/update-wazuh-webhooks.sh
 
-sudo tee /var/ossec/integrations/custom-openclaw > /dev/null << 'INTEGRATION_SCRIPT'
+sudo tee /var/ossec/integrations/custom-openclaw > /dev/null << INTEGRATION_SCRIPT
 #!/bin/bash
 # Wazuh Autopilot Integration
-# Forwards alerts to the Autopilot API for AI triage
-
-API_KEY=""
-if [ -f /opt/openclaw-autopilot/.env ]; then
-    API_KEY=$(grep "AUTOPILOT_API_KEY=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
-fi
-
+API_KEY="${MCP_API_KEY}"
 while read ALERT; do
-    curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $API_KEY" \
-        --data "$ALERT" "http://localhost:9090/api/alerts" \
+    curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer \$API_KEY" \
+        --data "\$ALERT" "http://localhost:9090/api/alerts" \
         --silent --show-error --max-time 10 || \
-        echo "$(date) - Failed to send alert to Autopilot API" >> /var/log/wazuh-openclaw-integration.log
+        echo "\$(date) - Failed to send alert to Autopilot API" >> /var/log/wazuh-openclaw-integration.log
 done
 INTEGRATION_SCRIPT
 
