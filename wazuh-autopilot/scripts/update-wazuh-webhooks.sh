@@ -14,11 +14,18 @@ if [ -f "$OSSEC_CONF" ]; then
         cp "$OSSEC_CONF" "$TMP_CONF"
     fi
     
-    # 2. Remove any existing custom-openclaw sections to prevent duplicates
-    # This is a robust way to strip the specific integration block
+    # 2. Robust Cleanup: Remove any invalid or duplicate blocks
+    # Remove integratord blocks (invalid in ossec.conf)
+    sed -i '/<integratord>/,/<\/integratord>/d' "$TMP_CONF"
+    
+    # Remove existing custom-openclaw integration blocks
     sed -i '/<integration>/,/<\/integration>/ { /custom-openclaw/d; }' "$TMP_CONF"
-    # Clean up empty integration tags left behind
+    # Clean up empty integration tags left behind by the previous sed
     sed -i '/<integration>/{N;/<\/integration>/d;}' "$TMP_CONF"
+    
+    # Ensure only ONE closing tag exists at the very end
+    sed -i '/<\/ossec_config>/d' "$TMP_CONF"
+    echo "</ossec_config>" >> "$TMP_CONF"
 
     # 3. Insert the new clean integration block before the closing tag
     # Using Level 12 as requested
@@ -37,6 +44,7 @@ if [ -f "$OSSEC_CONF" ]; then
         echo "Wazuh manager restarted successfully."
     else
         echo "ERROR: New configuration is invalid. Check for XML syntax errors."
+        # Output the actual error for the logs
         /var/ossec/bin/wazuh-analysisd -t -c "$TMP_CONF"
         exit 1
     fi
