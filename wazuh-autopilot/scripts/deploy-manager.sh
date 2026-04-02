@@ -127,6 +127,9 @@ sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /root/.openclaw/opencla
 sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /root/.openclaw/openclaw.json
 sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /root/.openclaw/openclaw.json
 
+# Fix config using doctor
+sudo openclaw doctor --fix || echo "Doctor fixed some issues"
+
 # Services
 sudo tee /etc/systemd/system/wazuh-autopilot.service > /dev/null << 'AUTOPILOT_EOF'
 [Unit]

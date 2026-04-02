@@ -13,6 +13,9 @@
       "dangerouslyDisableDeviceAuth": true
     }
   },
+  "env": {
+    "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+  },
   "models": {
     "mode": "replace",
     "providers": {
@@ -28,9 +31,6 @@
             "maxTokens": 8192
           }
         ]
-      },
-      "anthropic": {
-        "apiKey": "${ANTHROPIC_API_KEY}"
       }
     }
   },
