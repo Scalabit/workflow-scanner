@@ -208,11 +208,13 @@ jobs:
         WAZUH_MANAGER_IP=localhost
         WAZUH_MANAGER_PORT=1514
         OLLAMA_URL=http://localhost:11434
+        ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
         AUTOPILOT_RESPONDER_ENABLED=true
         CORS_ORIGIN=*
         
         # OpenClaw Gateway Configuration
-        OPENCLAW_GATEWAY_URL=http://$(curl -s ifconfig.me):18789
+        VM_IP=$(curl -s ifconfig.me)
+        OPENCLAW_GATEWAY_URL=http://$VM_IP:18789
         OPENCLAW_TOKEN=OPENCLAW_TOKEN_PLACEHOLDER
         OPENCLAW_WEBHOOK_TOKEN=OPENCLAW_WEBHOOK_TOKEN_PLACEHOLDER
         OPENCLAW_GATEWAY_TOKEN=OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
@@ -332,7 +334,7 @@ jobs:
         Environment="MODEL=ollama/qwen2.5:0.5b"
         Environment="LLM_MODEL=ollama/qwen2.5:0.5b"
         Environment="ANTHROPIC_API_KEY=not-needed"
-        ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER
+        ExecStart=OPENCLAW_PATH_PLACEHOLDER gateway run --bind lan --port 18789 --force --token OPENCLAW_GATEWAY_TOKEN_PLACEHOLDER --auth none
         Restart=always
         RestartSec=10
         TimeoutStartSec=90
@@ -627,7 +629,7 @@ jobs:
         
         # Create webhook configuration updater script
         echo "Creating webhook configuration script..."
-        sudo tee /usr/local/bin/update-wazuh-webhooks.sh > /dev/null << WEBHOOK_SCRIPT
+        sudo tee /usr/local/bin/update-wazuh-webhooks.sh > /dev/null << 'WEBHOOK_SCRIPT'
         #!/bin/bash
         
         # Wait for OpenClaw to be ready
@@ -646,12 +648,12 @@ jobs:
             # Check if integration already exists and update it
             if grep -q "custom-openclaw" /var/ossec/etc/ossec.conf; then
                 echo "Updating existing custom-openclaw integration"
-                # Update the webhook URL to use correct endpoint
-                sed -i 's|<url>http://localhost:18789/webhook/wazuh-alert</url>|<url>http://localhost:18789/hooks/wazuh-alert</url>|g' /var/ossec/etc/ossec.conf
+                # Update the level to 12
+                sed -i 's|<level>[0-9]*</level> <!-- Forward.*|<level>12</level> <!-- Forward high severity alerts to AI agents (Level 12) -->|' /var/ossec/etc/ossec.conf
             else
                 echo "Adding new custom-openclaw integration to ossec.conf"
                 # Create integration block and add it before closing tag
-                INTEGRATION_BLOCK="  <integration>\\n      <name>custom-openclaw</name>\\n      <level>5</level>\\n      <alert_format>json</alert_format>\\n  </integration>"
+                INTEGRATION_BLOCK="  <integration>\\n      <name>custom-openclaw</name>\\n      <level>12</level>\\n      <alert_format>json</alert_format>\\n  </integration>"
                 sed -i "/<\/ossec_config>/i\\$INTEGRATION_BLOCK" /var/ossec/etc/ossec.conf
             fi
             
@@ -804,7 +806,7 @@ jobs:
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="MCP_API_KEY='${{ secrets.MCP_API_KEY }}' OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' bash ~/deploy.sh"
+          --command="ANTHROPIC_API_KEY='${{ secrets.ANTHROPIC_API_KEY }}' MCP_API_KEY='${{ secrets.MCP_API_KEY }}' OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' bash ~/deploy.sh"
 
     - name: Output Autopilot Details
       run: |
