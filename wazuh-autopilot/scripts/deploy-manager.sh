@@ -109,7 +109,7 @@ ENV_EOF
 echo "Installing OpenClaw CLI..."
 sudo npm install -g openclaw@latest
 
-# OpenClaw Config and Agents
+# OpenClaw Config and Agents (Unified state dir)
 echo "Deploying OpenClaw configuration and specialized agents..."
 sudo mkdir -p /var/lib/openclaw/wazuh-autopilot/agents
 sudo mkdir -p /etc/openclaw
@@ -159,6 +159,7 @@ GATEWAY_EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable wazuh-autopilot openclaw-gateway
+sudo systemctl stop wazuh-autopilot openclaw-gateway
 sudo systemctl start wazuh-autopilot openclaw-gateway
 
 # Replace placeholders
@@ -168,6 +169,10 @@ sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /opt/openclaw-autopilot
 sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /etc/openclaw/openclaw.json
 sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /etc/openclaw/openclaw.json
 
+# Hard restart to pick up tokens
+sudo systemctl restart wazuh-autopilot openclaw-gateway
+
+# Fix config using doctor
 sudo OPENCLAW_STATE_DIR=/var/lib/openclaw OPENCLAW_CONFIG_FILE=/etc/openclaw/openclaw.json openclaw doctor --fix
 
 # 7. Wazuh Integration

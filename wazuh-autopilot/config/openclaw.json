@@ -47,8 +47,8 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "anthropic/claude-haiku-4-5",
-        "fallbacks": ["ollama/qwen2.5:0.5b"]
+        "primary": "ollama/qwen2.5:0.5b",
+        "fallbacks": ["anthropic/claude-haiku-4-5"]
       }
     },
     "list": [
@@ -76,62 +76,6 @@
           "deny": ["write", "exec", "delete", "browser"]
         },
         "heartbeat": { "every": "5m" }
-      },
-      {
-        "id": "wazuh-investigation",
-        "name": "Wazuh Threat Investigation",
-        "workspace": "/var/lib/openclaw/wazuh-autopilot/agents/investigation",
-        "agentDir": "/var/lib/openclaw/wazuh-autopilot/agents/investigation",
-        "tools": {
-          "profile": "minimal",
-          "alsoAllow": ["read", "edit", "web_fetch", "sessions_list", "sessions_history"],
-          "deny": ["write", "exec", "delete", "browser"]
-        }
-      },
-      {
-        "id": "wazuh-response-planner",
-        "name": "Wazuh Response Planner",
-        "workspace": "/var/lib/openclaw/wazuh-autopilot/agents/response-planner",
-        "agentDir": "/var/lib/openclaw/wazuh-autopilot/agents/response-planner",
-        "tools": {
-          "profile": "minimal",
-          "alsoAllow": ["read", "write", "web_fetch", "sessions_list", "sessions_history", "sessions_send"],
-          "deny": ["exec", "delete", "browser"]
-        }
-      },
-      {
-        "id": "wazuh-policy-guard",
-        "name": "Wazuh Policy Guard",
-        "workspace": "/var/lib/openclaw/wazuh-autopilot/agents/policy-guard",
-        "agentDir": "/var/lib/openclaw/wazuh-autopilot/agents/policy-guard",
-        "tools": {
-          "profile": "minimal",
-          "alsoAllow": ["read", "edit", "web_fetch", "sessions_list", "sessions_history", "sessions_send"],
-          "deny": ["write", "exec", "delete", "browser"]
-        }
-      },
-      {
-        "id": "wazuh-responder",
-        "name": "Wazuh Incident Responder",
-        "workspace": "/var/lib/openclaw/wazuh-autopilot/agents/responder",
-        "agentDir": "/var/lib/openclaw/wazuh-autopilot/agents/responder",
-        "tools": {
-          "profile": "coding",
-          "alsoAllow": ["read", "write", "web_fetch", "sessions_list", "sessions_history", "sessions_send"],
-          "deny": ["browser", "delete"],
-          "elevated": { "enabled": true }
-        }
-      },
-      {
-        "id": "wazuh-reporting",
-        "name": "Wazuh SOC Reporting",
-        "workspace": "/var/lib/openclaw/wazuh-autopilot/agents/reporting",
-        "agentDir": "/var/lib/openclaw/wazuh-autopilot/agents/reporting",
-        "tools": {
-          "profile": "minimal",
-          "alsoAllow": ["read", "write", "web_fetch", "sessions_list", "sessions_history"],
-          "deny": ["exec", "delete", "browser"]
-        }
       }
     ]
   },
