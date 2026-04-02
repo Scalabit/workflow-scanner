@@ -159,7 +159,7 @@ Type=simple
 User=root
 WorkingDirectory=/root
 EnvironmentFile=/opt/openclaw-autopilot/.env
-ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token ${OPENCLAW_GATEWAY_TOKEN} --auth none
+ExecStart=$OPENCLAW_PATH gateway run --bind lan --port 18789 --force --token ${OPENCLAW_GATEWAY_TOKEN} --auth token
 Restart=always
 
 [Install]
