@@ -1,51 +1,53 @@
 #!/bin/bash
-# Safer Wazuh Webhook Configuration Script
+# Ultra-Robust Wazuh Configuration Cleaner and Updater
 
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
-TMP_CONF="/tmp/ossec.conf.tmp"
+TMP_BASE="/tmp/ossec.base"
+TMP_FINAL="/tmp/ossec.final"
 
-echo "Updating Wazuh configuration..."
+echo "Starting robust Wazuh configuration update..."
 
 if [ -f "$OSSEC_CONF" ]; then
-    # 1. Create a clean base from the backup if possible, otherwise use current
-    if [ -f "${OSSEC_CONF}.backup" ]; then
-        cp "${OSSEC_CONF}.backup" "$TMP_CONF"
-    else
-        cp "$OSSEC_CONF" "$TMP_CONF"
-    fi
+    # 1. Select source (prefer backup for a cleaner start)
+    SOURCE="$OSSEC_CONF"
+    if [ -f "${OSSEC_CONF}.backup" ]; then SOURCE="${OSSEC_CONF}.backup"; fi
     
-    # 2. Robust Cleanup: Remove any invalid or duplicate blocks
-    # Remove integratord blocks (invalid in ossec.conf)
-    sed -i '/<integratord>/,/<\/integratord>/d' "$TMP_CONF"
+    # 2. Clean everything: Remove ALL config tags and previous additions
+    # This prevents the "End of file and some elements were not closed" error
+    grep -vE "ossec_config|custom-openclaw|/var/log/syslog|/var/log/auth.log|<integration>|<\/integration>|<localfile>|<\/localfile>|<log_format>|<location>" "$SOURCE" > "$TMP_BASE"
     
-    # Remove existing custom-openclaw integration blocks
-    sed -i '/<integration>/,/<\/integration>/ { /custom-openclaw/d; }' "$TMP_CONF"
-    # Clean up empty integration tags left behind by the previous sed
-    sed -i '/<integration>/{N;/<\/integration>/d;}' "$TMP_CONF"
-    
-    # Ensure only ONE closing tag exists at the very end
-    sed -i '/<\/ossec_config>/d' "$TMP_CONF"
-    echo "</ossec_config>" >> "$TMP_CONF"
+    # 3. Build the new configuration from scratch
+    {
+      echo "<ossec_config>"
+      cat "$TMP_BASE"
+      echo ""
+      echo "  <!-- OpenClaw Autonomous SOC Integration -->"
+      echo "  <integration>"
+      echo "    <name>custom-openclaw</name>"
+      echo "    <level>12</level>"
+      echo "    <alert_format>json</alert_format>"
+      echo "  </integration>"
+      echo ""
+      echo "  <localfile>"
+      echo "    <log_format>syslog</log_format>"
+      echo "    <location>/var/log/syslog</location>"
+      echo "  </localfile>"
+      echo "  <localfile>"
+      echo "    <log_format>syslog</log_format>"
+      echo "    <location>/var/log/auth.log</location>"
+      echo "  </localfile>"
+      echo "</ossec_config>"
+    } > "$TMP_FINAL"
 
-    # 3. Insert the new clean integration block before the closing tag
-    # Using Level 12 as requested
-    sed -i '/<\/ossec_config>/i \
-  <integration> \
-    <name>custom-openclaw</name> \
-    <level>12</level> \
-    <alert_format>json</alert_format> \
-  </integration>' "$TMP_CONF"
-
-    # 4. Verify the config before applying
-    if /var/ossec/bin/wazuh-analysisd -t -c "$TMP_CONF" > /dev/null 2>&1; then
-        echo "Configuration validated successfully. Applying..."
-        sudo cp "$TMP_CONF" "$OSSEC_CONF"
+    # 4. Verify before applying
+    if /var/ossec/bin/wazuh-analysisd -t -c "$TMP_FINAL" > /dev/null 2>&1; then
+        echo "Configuration validated successfully. Applying clean config..."
+        sudo cp "$TMP_FINAL" "$OSSEC_CONF"
         sudo systemctl restart wazuh-manager
         echo "Wazuh manager restarted successfully."
     else
-        echo "ERROR: New configuration is invalid. Check for XML syntax errors."
-        # Output the actual error for the logs
-        /var/ossec/bin/wazuh-analysisd -t -c "$TMP_CONF"
+        echo "ERROR: Generated configuration is still invalid. Diagnostics follow:"
+        /var/ossec/bin/wazuh-analysisd -t -c "$TMP_FINAL"
         exit 1
     fi
 else
