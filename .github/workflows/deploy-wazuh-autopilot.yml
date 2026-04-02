@@ -52,7 +52,7 @@ jobs:
     - name: Deploy to Wazuh Manager VM
       run: |
         echo "Copying autopilot files to VM..."
-        gcloud compute scp --recursive wazuh-autopilot wazuh-manager:/tmp/ --zone=${{ env.GCP_ZONE }} --ssh-key-expire-after=1h
+        gcloud compute scp --recurse wazuh-autopilot wazuh-manager:/tmp/ --zone=${{ env.GCP_ZONE }} --ssh-key-expire-after=1h
         
         echo "Executing deployment script on VM..."
         gcloud compute ssh wazuh-manager \
