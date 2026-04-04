@@ -16,7 +16,7 @@ log "Starting OpenClaw configuration for Wazuh Autopilot..."
 log "Creating OpenClaw directory structure..."
 mkdir -p ~/.openclaw/wazuh-autopilot
 
-# Copy autopilot configuration if available
+# Copy autopilot configuration
 if [ -d /opt/openclaw-autopilot/openclaw ]; then
     log "Copying OpenClaw autopilot configuration..."
     
