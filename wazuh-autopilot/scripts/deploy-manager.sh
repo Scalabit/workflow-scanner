@@ -26,6 +26,7 @@ OLLAMA_CONF
   sudo systemctl start ollama
   sleep 10
   ollama pull qwen2.5:0.5b
+  ollama pull qwen2.5:1.5b
 fi
 
 # 3. System dependencies
@@ -86,7 +87,7 @@ AUTOPILOT_INSTALL_MODE=bootstrap
 WAZUH_MANAGER_IP=localhost
 WAZUH_MANAGER_PORT=1514
 OLLAMA_URL=http://localhost:11434
-ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-""}
 AUTOPILOT_RESPONDER_ENABLED=true
 CORS_ORIGIN=*
 OPENCLAW_GATEWAY_URL=http://localhost:18789
@@ -167,7 +168,6 @@ HOOKS_TOKEN=$(openssl rand -hex 24)
 sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /etc/openclaw/openclaw.json
 sudo sed -i "s/HOOKS_TOKEN_PLACEHOLDER/${HOOKS_TOKEN}/g" /opt/openclaw-autopilot/.env
 sudo sed -i "s/\${OPENCLAW_GATEWAY_TOKEN}/${OPENCLAW_GATEWAY_TOKEN}/g" /etc/openclaw/openclaw.json
-sudo sed -i "s/\${ANTHROPIC_API_KEY}/${ANTHROPIC_API_KEY}/g" /etc/openclaw/openclaw.json
 
 # Hard restart to pick up tokens
 sudo systemctl restart wazuh-autopilot openclaw-gateway
