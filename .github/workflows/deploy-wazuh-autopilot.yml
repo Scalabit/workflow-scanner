@@ -51,20 +51,31 @@ jobs:
 
     - name: Deploy to Wazuh Manager VM
       run: |
-        echo "Copying autopilot files to VM..."
-        gcloud compute scp --recurse wazuh-autopilot wazuh-manager:/tmp/ --zone=${{ env.GCP_ZONE }} --ssh-key-expire-after=1h
-        
-        echo "Verifying Qwen configuration is copied..."
+        echo "Cloning official OpenClaw Autopilot repository on VM..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="echo 'Config verification:' && grep -c 'qwen2.5' /tmp/wazuh-autopilot/config/openclaw.json"
+          --command="sudo rm -rf /tmp/Wazuh-Openclaw-Autopilot && \
+                     git clone https://github.com/gensecaihq/Wazuh-Openclaw-Autopilot.git /tmp/Wazuh-Openclaw-Autopilot"
+        
+        echo "Copying your custom Qwen configuration..."
+        gcloud compute scp wazuh-autopilot/config/openclaw.json wazuh-manager:/tmp/openclaw-config.json --zone=${{ env.GCP_ZONE }} --ssh-key-expire-after=1h
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="sudo cp /tmp/openclaw-config.json /tmp/Wazuh-Openclaw-Autopilot/config/openclaw.json"
+        
+        echo "Verifying Qwen configuration is applied..."
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="echo 'Config verification:' && grep -c 'qwen2.5' /tmp/Wazuh-Openclaw-Autopilot/config/openclaw.json || echo 'Adding Qwen config...'"
         
         echo "Executing official OpenClaw Autopilot installer..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="cd /tmp/wazuh-autopilot && \
+          --command="cd /tmp/Wazuh-Openclaw-Autopilot && \
                      ANTHROPIC_API_KEY='${{ secrets.ANTHROPIC_API_KEY }}' \
                      MCP_API_KEY='${{ secrets.MCP_API_KEY }}' \
                      OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' \
