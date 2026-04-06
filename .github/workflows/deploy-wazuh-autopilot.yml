@@ -87,7 +87,7 @@ jobs:
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
           --command="cd /tmp/wazuh-autopilot && \
-                     sudo ./install/install.sh --mode bootstrap"
+                     echo y | sudo TERM=xterm ./install/install.sh --mode bootstrap"
 
     - name: Output Autopilot Details
       run: |
