@@ -60,15 +60,21 @@ jobs:
           --ssh-key-expire-after=1h \
           --command="echo 'Qwen models configured:' && grep -c 'qwen2.5' /tmp/wazuh-autopilot/openclaw/openclaw-airgapped.json"
         
-        echo "Ensuring Wazuh Manager is running..."
+        echo "Fixing Wazuh configuration and ensuring service is running..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="sudo systemctl is-active --quiet wazuh-manager || \
-                     (echo 'Starting Wazuh Manager...' && \
-                      sudo systemctl start wazuh-manager && \
-                      sleep 20 && \
-                      sudo systemctl status wazuh-manager --no-pager)"
+          --command="sudo cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.backup && \
+                     sudo sed -i '/<integratord>/,/<\/integratord>/d' /var/ossec/etc/ossec.conf && \
+                     echo 'Fixed invalid integratord section in ossec.conf'"
+        
+        echo "Starting Wazuh Manager..."
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="sudo systemctl start wazuh-manager && \
+                     sleep 20 && \
+                     sudo systemctl status wazuh-manager --no-pager"
         
         echo "Creating required .env configuration file..."
         gcloud compute ssh wazuh-manager \
