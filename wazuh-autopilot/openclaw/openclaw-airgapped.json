@@ -86,7 +86,7 @@
   },
   "hooks": {
     "enabled": true,
-    "token": "HOOKS_TOKEN_PLACEHOLDER",
+    "token": "${OPENCLAW_WEBHOOK_TOKEN}",
     "path": "/webhook",
     "mappings": [
       {
