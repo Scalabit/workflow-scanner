@@ -60,6 +60,16 @@ jobs:
           --ssh-key-expire-after=1h \
           --command="echo 'Qwen models configured:' && grep -c 'qwen2.5' /tmp/wazuh-autopilot/openclaw/openclaw-airgapped.json"
         
+        echo "Installing Python 3.11+ (required for OpenClaw Autopilot)..."
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="sudo add-apt-repository ppa:deadsnakes/ppa -y && \
+                     sudo apt-get update && \
+                     sudo apt-get install -y python3.11 python3.11-venv python3.11-pip && \
+                     sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+                     python3 --version"
+        
         echo "Fixing Wazuh configuration errors..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
@@ -105,7 +115,7 @@ jobs:
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
           --command="cd /tmp/wazuh-autopilot && \
-                     echo y | sudo TERM=xterm ./install/install.sh --mode bootstrap"
+                     yes | sudo TERM=xterm timeout 30 ./install/install.sh --mode bootstrap"
 
     - name: Output Autopilot Details
       run: |
