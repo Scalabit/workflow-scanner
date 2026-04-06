@@ -65,8 +65,9 @@ jobs:
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
           --command="sudo systemctl stop wazuh-manager 2>/dev/null || true && \
+                     sudo cp /var/ossec/etc/ossec.conf.backup /var/ossec/etc/ossec.conf 2>/dev/null || true && \
                      sudo sed -i '/<integratord>/,/<\/integratord>/d' /var/ossec/etc/ossec.conf && \
-                     sudo sed -i '/<max_log>.*<\/max_log>/d' /var/ossec/etc/ossec.conf && \
+                     sudo sed -i 's/<max_log>50<\/max_log>//g' /var/ossec/etc/ossec.conf && \
                      echo 'Fixed invalid configuration in ossec.conf'"
         
         echo "Starting Wazuh Manager..."
