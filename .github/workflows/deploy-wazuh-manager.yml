@@ -96,13 +96,11 @@ jobs:
       if: steps.plan.outcome == 'failure'
       run: exit 1
 
-    - name: Replace Webhook Token Placeholder
+    - name: Prepare OpenClaw Configuration
       if: |
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
         (inputs.action == 'apply' || github.event.inputs.action == 'apply')
       run: |
-        # Replace webhook token placeholder in install script
-        sed -i "s/__OPENCLAW_WEBHOOK_TOKEN__/${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}/g" scripts/install-wazuh-manager.sh
 
     - name: Terraform Apply
       if: |
@@ -119,13 +117,15 @@ jobs:
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
         (inputs.action == 'apply' || github.event.inputs.action == 'apply')
       run: |
-        echo "## Wazuh Manager Deployed" >> $GITHUB_STEP_SUMMARY
+        echo "## Wazuh Manager + OpenClaw Autopilot Deployed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Connection Information" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**External IP:** $(terraform output -raw manager_external_ip)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Dashboard URL:** $(terraform output -raw wazuh_dashboard_url)" >> $GITHUB_STEP_SUMMARY
+        echo "**Wazuh Dashboard:** $(terraform output -raw wazuh_dashboard_url)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**OpenClaw Gateway:** http://$(terraform output -raw manager_external_ip):18789" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**SSH Command:** $(terraform output -raw ssh_connection_command)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

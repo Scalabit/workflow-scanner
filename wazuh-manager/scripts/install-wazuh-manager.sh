@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Wazuh Manager Installation Script for Ubuntu 22.04
-# This script installs Wazuh manager, indexer, and dashboard using the all-in-one installer
+# Wazuh Manager Installation Script for Ubuntu 22.04  
+# This script installs ONLY Wazuh manager, indexer, and dashboard
+# OpenClaw will be installed separately by the autopilot installer
 
 set -e
 
@@ -10,7 +11,7 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a /var/log/wazuh-install.log
 }
 
-log "Starting Wazuh all-in-one installation..."
+log "Starting Wazuh-only installation..."
 
 # Update system packages
 log "Updating system packages..."
@@ -21,11 +22,6 @@ apt-get upgrade -y
 log "Installing required dependencies..."
 apt-get install -y curl wget gnupg lsb-release
 
-# Install Node.js 24.x (required for OpenClaw)
-log "Installing Node.js 24.x for OpenClaw compatibility..."
-curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y nodejs
-log "Node.js version: $(node -v)"
 
 # Download and install Wazuh all-in-one
 log "Downloading Wazuh installation script..."
@@ -42,7 +38,7 @@ log "Starting Wazuh all-in-one installation (this may take several minutes)..."
 # The installation script generates random passwords, let's save them
 log "Saving installation output and credentials..."
 
-# Extract the admin credentials from the installation log
+# Extract and save credentials
 if grep -q "User: admin" /var/log/wazuh-install.log; then
     log "Installation completed successfully!"
     
@@ -79,87 +75,6 @@ else
     log "Warning: Wazuh Dashboard service is not running"
 fi
 
-# Configure OpenClaw webhook integration
-log "Configuring OpenClaw webhook integration..."
-
-# Create the custom integration script
-cat > /var/ossec/integrations/custom-openclaw << 'EOF'
-#!/bin/bash
-# OpenClaw Webhook Integration for Wazuh (Middleware Version)
-ALERT_FILE=$1
-ALERT_OUTPUT=`cat $ALERT_FILE`
-
-# Get webhook token from environment or metadata
-WEBHOOK_TOKEN=""
-if [ -f /opt/openclaw-autopilot/.env ]; then
-    WEBHOOK_TOKEN=$(grep "OPENCLAW_WEBHOOK_TOKEN=" /opt/openclaw-autopilot/.env | cut -d'=' -f2)
-fi
-
-if [ -z "$WEBHOOK_TOKEN" ] && command -v curl >/dev/null 2>&1; then
-    WEBHOOK_TOKEN=$(curl -s -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/openclaw-webhook-token" 2>/dev/null || echo "")
-fi
-
-# Default fallback (will be replaced by GitHub Actions)
-if [ -z "$WEBHOOK_TOKEN" ]; then
-    WEBHOOK_TOKEN="__OPENCLAW_WEBHOOK_TOKEN__"
-fi
-
-# Send alert to MCP Server Middleware (port 3001) which translates it for OpenClaw Runtime API
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-  --data "$ALERT_OUTPUT" \
-  "http://localhost:3001/webhook/wazuh-alert" \
-  --silent --show-error --max-time 10 || \
-  echo "$(date) - Failed to send alert to OpenClaw Middleware: $ALERT_OUTPUT" >> /var/log/wazuh-openclaw-integration.log
-EOF
-
-# Set correct permissions for Wazuh integration script
-chown root:wazuh /var/ossec/integrations/custom-openclaw
-chmod 750 /var/ossec/integrations/custom-openclaw
-
-# Add webhook configuration to ossec.conf
-if [ -f /var/ossec/etc/ossec.conf ]; then
-    # Backup original configuration
-    cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.webhook_backup
-    
-    # Enable integratord if not already present
-    if ! grep -q "<integratord>" /var/ossec/etc/ossec.conf; then
-        sed -i '/<\/ossec_config>/i \
-  <integratord> \
-    <enabled>yes</enabled> \
-  </integratord>' /var/ossec/etc/ossec.conf
-    fi
-
-    # Add webhook integration before closing tag
-    sed -i '/<\/ossec_config>/i \
-\
-  <!-- OpenClaw Autonomous SOC Integration --> \
-  <integration> \
-    <name>custom-openclaw</name> \
-    <level>12</level> <!-- Forward high severity alerts to AI agents (Changed from 10 to 12+) --> \
-    <alert_format>json</alert_format> \
-    <max_log>50</max_log> \
-  </integration>' /var/ossec/etc/ossec.conf
-    
-    # Add monitoring for local logs (syslog and auth.log)
-    if ! grep -q "/var/log/syslog" /var/ossec/etc/ossec.conf; then
-        sed -i '/<\/ossec_config>/i \
-  <localfile> \
-    <log_format>syslog</log_format> \
-    <location>/var/log/syslog</location> \
-  </localfile> \
-  <localfile> \
-    <log_format>syslog</log_format> \
-    <location>/var/log/auth.log</location> \
-  </localfile>' /var/ossec/etc/ossec.conf
-    fi
-    
-    log "OpenClaw webhook integration (Level 12) and local log monitoring added to ossec.conf"
-else
-    log "Warning: Wazuh configuration file not found"
-fi
-
 # Configure agent enrollment settings
 log "Configuring agent enrollment..."
 
@@ -183,7 +98,7 @@ chown ossec:ossec /var/ossec/etc/authd.pass
 chmod 640 /var/ossec/etc/authd.pass
 log "Agent registration password configured"
 
-# Restart wazuh-manager to apply BOTH the conf and password changes
+# Restart wazuh-manager to apply changes
 log "Restarting wazuh-manager service..."
 systemctl stop wazuh-manager
 sleep 5
@@ -239,25 +154,11 @@ log "Cleaning up old disconnected agents..."
   fi
 done
 
-# Configure OpenClaw for proper webhook handling
-log "Setting up OpenClaw configuration for webhook integration..."
-
-# Ensure OpenClaw config directory exists
-mkdir -p ~/.openclaw/wazuh-autopilot
-
-# Copy OpenClaw autopilot configuration if it exists
-if [ -d /opt/openclaw-autopilot/openclaw ]; then
-    log "Copying OpenClaw autopilot configuration..."
-    cp /opt/openclaw-autopilot/openclaw/openclaw.json ~/.openclaw/ 2>/dev/null || log "Warning: Could not copy OpenClaw config"
-    cp -r /opt/openclaw-autopilot/openclaw/agents ~/.openclaw/wazuh-autopilot/ 2>/dev/null || log "Warning: Could not copy OpenClaw agents"
-fi
-
 # Display installation summary
 log "=== Wazuh Installation Summary ==="
 log "Wazuh Manager: Installed"
 log "Wazuh Indexer: Installed" 
 log "Wazuh Dashboard: Installed"
-log "OpenClaw Integration: Configured"
 log "External IP: $(curl -s ifconfig.me 2>/dev/null || echo 'Unable to determine')"
 log "Internal IP: $(hostname -I | awk '{print $1}')"
 log ""

@@ -28,3 +28,5 @@ wazuh-windows-vm/README.md
 wazuh-manager/README.md
 
 ssh-brute-force.sh
+
+*.backup

@@ -54,16 +54,24 @@ jobs:
         echo "Copying autopilot files to VM..."
         gcloud compute scp --recurse wazuh-autopilot wazuh-manager:/tmp/ --zone=${{ env.GCP_ZONE }} --ssh-key-expire-after=1h
         
-        echo "Executing deployment script on VM..."
+        echo "Verifying Qwen configuration is copied..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="ANTHROPIC_API_KEY='${{ secrets.ANTHROPIC_API_KEY }}' \
+          --command="echo 'Config verification:' && grep -c 'qwen2.5' /tmp/wazuh-autopilot/config/openclaw.json"
+        
+        echo "Executing official OpenClaw Autopilot installer..."
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="cd /tmp/wazuh-autopilot && \
+                     ANTHROPIC_API_KEY='${{ secrets.ANTHROPIC_API_KEY }}' \
                      MCP_API_KEY='${{ secrets.MCP_API_KEY }}' \
                      OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' \
                      OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' \
                      OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' \
-                     bash /tmp/wazuh-autopilot/scripts/deploy-manager.sh"
+                     AUTOPILOT_MODE=bootstrap \
+                     sudo ./install/install.sh --mode bootstrap"
 
     - name: Output Autopilot Details
       run: |
@@ -89,8 +97,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Ollama API:** http://$VM_IP:11434" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- Local AI model (qwen2.5:0.5b)" >> $GITHUB_STEP_SUMMARY
-        echo "- No external API costs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Local Qwen AI model (qwen2.5:0.5b) - Zero Claude API costs!**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**MCP Server:** http://$VM_IP:3001" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
