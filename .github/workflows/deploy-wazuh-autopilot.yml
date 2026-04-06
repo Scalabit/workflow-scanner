@@ -60,18 +60,33 @@ jobs:
           --ssh-key-expire-after=1h \
           --command="echo 'Qwen models configured:' && grep -c 'qwen2.5' /tmp/wazuh-autopilot/openclaw/openclaw-airgapped.json"
         
+        echo "Creating required .env configuration file..."
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="sudo mkdir -p /etc/wazuh-autopilot && \
+                     sudo tee /etc/wazuh-autopilot/.env > /dev/null << 'ENV_EOF'
+                      AUTOPILOT_MODE=bootstrap
+                      MCP_API_KEY=${{ secrets.MCP_API_KEY }}
+                      OPENCLAW_GATEWAY_TOKEN=${{ secrets.OPENCLAW_GATEWAY_TOKEN }}
+                      OPENCLAW_TOKEN=${{ secrets.OPENCLAW_TOKEN }}
+                      OPENCLAW_WEBHOOK_TOKEN=${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}
+                      ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+                      OPENCLAW_LLM_MODE=local
+                      AUTOPILOT_REQUIRE_TAILSCALE=false
+                      OPENCLAW_GATEWAY_URL=http://127.0.0.1:18789
+                      MCP_URL=http://localhost:3001
+                      RUNTIME_PORT=9090
+                      AUTOPILOT_RESPONDER_ENABLED=false
+                      AUTOPILOT_DATA_DIR=/var/lib/wazuh-autopilot
+                      AUTOPILOT_CONFIG_DIR=/etc/wazuh-autopilot
+                      ENV_EOF"
+        
         echo "Executing official OpenClaw Autopilot installer in bootstrap mode..."
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
           --command="cd /tmp/wazuh-autopilot && \
-                     ANTHROPIC_API_KEY='${{ secrets.ANTHROPIC_API_KEY }}' \
-                     MCP_API_KEY='${{ secrets.MCP_API_KEY }}' \
-                     OPENCLAW_GATEWAY_TOKEN='${{ secrets.OPENCLAW_GATEWAY_TOKEN }}' \
-                     OPENCLAW_TOKEN='${{ secrets.OPENCLAW_TOKEN }}' \
-                     OPENCLAW_WEBHOOK_TOKEN='${{ secrets.OPENCLAW_WEBHOOK_TOKEN }}' \
-                     OPENCLAW_LLM_MODE=local \
-                     AUTOPILOT_MODE=bootstrap \
                      sudo ./install/install.sh --mode bootstrap"
 
     - name: Output Autopilot Details
