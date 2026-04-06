@@ -80,12 +80,17 @@ log "Configuring agent enrollment..."
 
 # Enable agent registration
 if [ -f /var/ossec/etc/ossec.conf ]; then
-    # Backup original configuration
-    cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.backup
-    
-    # Enable auto-enrollment
-    sed -i 's/<use_password>no<\/use_password>/<use_password>yes<\/use_password>/' /var/ossec/etc/ossec.conf
-    log "Agent registration enabled in ossec.conf"
+    # Check if agent registration is already enabled
+    if grep -q "<use_password>yes</use_password>" /var/ossec/etc/ossec.conf; then
+        log "Agent registration already enabled in ossec.conf"
+    else
+        # Backup original configuration
+        cp /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.backup
+        
+        # Enable auto-enrollment
+        sed -i 's/<use_password>no<\/use_password>/<use_password>yes<\/use_password>/' /var/ossec/etc/ossec.conf
+        log "Agent registration enabled in ossec.conf"
+    fi
 else
     log "Warning: Wazuh configuration file not found"
 fi
@@ -106,16 +111,20 @@ systemctl start wazuh-manager
 log "Wazuh manager restarted successfully"
 
 log "Configuring Windows Event Log monitoring..."
-if [ -f /var/ossec/etc/shared/default/agent.conf ]; then
-    # Backup existing agent.conf
-    cp /var/ossec/etc/shared/default/agent.conf /var/ossec/etc/shared/default/agent.conf.backup
-else
-    # Create directory if it doesn't exist
-    mkdir -p /var/ossec/etc/shared/default
-fi
+# Create directory if it doesn't exist
+mkdir -p /var/ossec/etc/shared/default
 
-# Create agent.conf with Windows Event Log monitoring
-cat > /var/ossec/etc/shared/default/agent.conf << 'EOF'
+# Check if Windows Event Log monitoring is already configured
+if [ -f /var/ossec/etc/shared/default/agent.conf ] && grep -q "Microsoft-Windows-Sysmon" /var/ossec/etc/shared/default/agent.conf 2>/dev/null; then
+    log "Windows Event Log monitoring already configured, skipping..."
+else
+    # Backup existing agent.conf if it exists
+    if [ -f /var/ossec/etc/shared/default/agent.conf ]; then
+        cp /var/ossec/etc/shared/default/agent.conf /var/ossec/etc/shared/default/agent.conf.backup
+    fi
+
+    # Create agent.conf with Windows Event Log monitoring
+    cat > /var/ossec/etc/shared/default/agent.conf << 'EOF'
 <agent_config os="windows">
   <localfile>
     <location>Application</location>
@@ -140,9 +149,10 @@ cat > /var/ossec/etc/shared/default/agent.conf << 'EOF'
 </agent_config>
 EOF
 
-chown ossec:ossec /var/ossec/etc/shared/default/agent.conf
-chmod 640 /var/ossec/etc/shared/default/agent.conf
-log "Windows Event Log monitoring configured in shared agent.conf"
+    chown ossec:ossec /var/ossec/etc/shared/default/agent.conf
+    chmod 640 /var/ossec/etc/shared/default/agent.conf
+    log "Windows Event Log monitoring configured in shared agent.conf"
+fi
 
 # Clean up old disconnected agents
 log "Cleaning up old disconnected agents..."
