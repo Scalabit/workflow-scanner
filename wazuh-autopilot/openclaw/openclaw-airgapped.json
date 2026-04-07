@@ -18,11 +18,6 @@
       "dangerouslyAllowPrivateNetwork": true
     }
   },
-  "tools": {
-    "web": {
-      "dangerouslyAllowInternalDestinations": true
-    }
-  },
   "models": {
     "mode": "replace",
     "providers": {
@@ -66,8 +61,7 @@
           "alsoAllow": ["read", "edit", "web_fetch", "sessions_list", "sessions_history"],
           "deny": ["write", "exec", "delete", "browser"]
         },
-        "heartbeat": { "every": "10m" },
-        "timeout": 0
+        "heartbeat": { "every": "10m" }
       },
       {
         "id": "wazuh-correlation",
@@ -79,8 +73,7 @@
           "alsoAllow": ["read", "edit", "web_fetch", "sessions_list", "sessions_history"],
           "deny": ["write", "exec", "delete", "browser"]
         },
-        "heartbeat": { "every": "5m" },
-        "timeout": 0
+        "heartbeat": { "every": "5m" }
       }
     ]
   },
@@ -96,11 +89,7 @@
         "agentId": "wazuh-triage",
         "name": "Wazuh Alert Triage: {{case_id}}",
         "messageTemplate": "WAZUH SECURITY ALERT\n\nRule: {{rule.description}}\nLevel: {{rule.level}}\nFull Alert:\n{{.}}",
-        "deliver": true,
-        "deduplicate": {
-          "key": "{{case_id}}",
-          "window": "1h"
-        }
+        "deliver": true
       }
     ]
   }
