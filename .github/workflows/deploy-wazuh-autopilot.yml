@@ -64,11 +64,15 @@ jobs:
         gcloud compute ssh wazuh-manager \
           --zone=${{ env.GCP_ZONE }} \
           --ssh-key-expire-after=1h \
-          --command="sudo add-apt-repository ppa:deadsnakes/ppa -y && \
+          --command="sudo apt-get update && \
+                     sudo apt-get install -y software-properties-common && \
+                     sudo /usr/bin/python3 -m apt_pkg || true && \
+                     echo 'deb https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu/ jammy main' | sudo tee /etc/apt/sources.list.d/deadsnakes-ppa.list && \
+                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F23C5A6CF475977595C89F51BA6932366A755776 && \
                      sudo apt-get update && \
                      sudo apt-get install -y python3.11 python3.11-venv python3.11-dev && \
                      sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
-                     curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 && \
+                     curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.11 && \
                      python3 --version"
         
         echo "Fixing Wazuh configuration errors..."
