@@ -126,6 +126,117 @@ jobs:
           --command="cd /tmp/wazuh-autopilot && \
                      yes | sudo TERM=xterm timeout 300 ./install/install.sh --mode bootstrap"
 
+    - name: Fix OpenClaw Gateway Configuration
+      run: |
+        echo "Fixing OpenClaw Gateway for air-gapped deployment..."
+        
+        # Stop any running OpenClaw service
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="sudo systemctl stop openclaw-gateway 2>/dev/null || true"
+        
+        # Create airgapped OpenClaw configuration
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command='sudo tee /root/.openclaw/openclaw.json > /dev/null << "EOF"
+        {
+          "gateway": {
+            "port": 18789,
+            "mode": "local",
+            "bind": "lan",
+            "auth": {
+              "mode": "token",
+              "token": "d2502996754e434c8d043743ba85eec3951e8ff3efdf1986"
+            },
+            "controlUi": {
+              "allowedOrigins": ["*"],
+              "dangerouslyAllowHostHeaderOriginFallback": true,
+              "dangerouslyDisableDeviceAuth": true
+            }
+          },
+          "agents": {
+            "defaults": {
+              "model": {
+                "primary": "ollama/qwen2.5:0.5b"
+              }
+            },
+            "list": [
+              {
+                "id": "wazuh-triage",
+                "name": "Wazuh Alert Triage",
+                "default": true,
+                "workspace": "/var/lib/openclaw/wazuh-autopilot/agents/triage",
+                "agentDir": "/var/lib/openclaw/wazuh-autopilot/agents/triage"
+              }
+            ]
+          },
+          "channels": {
+            "slack": {
+              "enabled": false
+            }
+          },
+          "hooks": {
+            "enabled": true,
+            "token": "83680fd455b3afa6c662618ce38fbcf5a0b08ecb03daa96a896db55ffc0a78db",
+            "path": "/webhook"
+          },
+          "models": {
+            "mode": "replace",
+            "providers": {
+              "ollama": {
+                "baseUrl": "http://localhost:11434",
+                "apiKey": "ollama-local",
+                "api": "ollama",
+                "models": [
+                  {
+                    "id": "qwen2.5:0.5b",
+                    "name": "qwen2.5:0.5b",
+                    "contextWindow": 32768,
+                    "maxTokens": 8192
+                  }
+                ]
+              }
+            }
+          }
+        }
+        EOF'
+        
+        # Create systemd service for OpenClaw Gateway
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command='sudo tee /etc/systemd/system/openclaw-gateway.service > /dev/null << "EOF"
+        [Unit]
+        Description=OpenClaw Gateway (Air-gapped)
+        After=network.target ollama.service
+
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/var/lib/openclaw
+        EnvironmentFile=/etc/wazuh-autopilot/.env
+        Environment="OPENCLAW_STATE_DIR=/var/lib/openclaw"
+        Environment="OPENCLAW_GATEWAY_TOKEN=d2502996754e434c8d043743ba85eec3951e8ff3efdf1986"
+        ExecStart=/usr/bin/openclaw gateway run
+        Restart=always
+        RestartSec=10
+
+        [Install]
+        WantedBy=multi-user.target
+        EOF'
+        
+        # Start OpenClaw Gateway service
+        gcloud compute ssh wazuh-manager \
+          --zone=${{ env.GCP_ZONE }} \
+          --ssh-key-expire-after=1h \
+          --command="sudo systemctl daemon-reload && \
+                     sudo systemctl enable openclaw-gateway && \
+                     sudo systemctl start openclaw-gateway"
+        
+        echo "OpenClaw Gateway configured and started successfully"
+
     - name: Output Autopilot Details
       run: |
         VM_IP=$(gcloud compute instances describe wazuh-manager \
