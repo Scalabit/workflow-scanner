@@ -173,7 +173,7 @@ resource "google_compute_instance" "wazuh_manager" {
     }
   }
 
-  # Metadata for initialization
+  # Metadata for init
   metadata = {
     enable-oslogin = "TRUE"
     wazuh-registration-password = var.wazuh_registration_password
