@@ -92,5 +92,6 @@
         "deliver": true
       }
     ]
-  }
+  },
+  "channels": {}
 }

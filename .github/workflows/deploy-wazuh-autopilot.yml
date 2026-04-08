@@ -148,7 +148,7 @@ jobs:
             "bind": "lan",
             "auth": {
               "mode": "token",
-              "token": "d2502996754e434c8d043743ba85eec3951e8ff3efdf1986"
+              "token": "${OPENCLAW_GATEWAY_TOKEN}"
             },
             "controlUi": {
               "allowedOrigins": ["*"],
@@ -179,7 +179,7 @@ jobs:
           },
           "hooks": {
             "enabled": true,
-            "token": "83680fd455b3afa6c662618ce38fbcf5a0b08ecb03daa96a896db55ffc0a78db",
+            "token": "${OPENCLAW_WEBHOOK_TOKEN}",
             "path": "/webhook"
           },
           "models": {
@@ -218,8 +218,7 @@ jobs:
         WorkingDirectory=/var/lib/openclaw
         EnvironmentFile=/etc/wazuh-autopilot/.env
         Environment="OPENCLAW_STATE_DIR=/var/lib/openclaw"
-        Environment="OPENCLAW_GATEWAY_TOKEN=d2502996754e434c8d043743ba85eec3951e8ff3efdf1986"
-        ExecStart=/usr/bin/openclaw gateway run
+        ExecStart=/usr/bin/openclaw gateway run --bind lan --port 18789 --token ${OPENCLAW_GATEWAY_TOKEN}
         Restart=always
         RestartSec=10
 
