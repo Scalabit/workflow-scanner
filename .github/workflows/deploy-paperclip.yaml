@@ -1,0 +1,50 @@
+name: Deploy VM for paperclip ai
+
+on:
+  workflow_dispatch:
+    
+jobs:
+  deploy-paperclip-vm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        
+      - name: Create Paperclip VM
+        run: |
+          gcloud compute instances create paperclip-ai-vm \
+            --zone=europe-north1-a \
+            --machine-type=e2-standard-4 \
+            --network=wazuh-manager-network \
+            --subnet=wazuh-manager-subnet \
+            --image-family=ubuntu-2204-lts \
+            --image-project=ubuntu-os-cloud \
+            --boot-disk-size=50GB \
+            --boot-disk-type=pd-standard \
+            --tags=paperclip-ai \
+            --metadata-from-file=startup-script=scripts/paperclip-startup.sh
+            
+      - name: Configure firewall for Paperclip
+        run: |
+          gcloud compute firewall-rules create allow-paperclip-web \
+            --network=wazuh-manager-network \
+            --allow=tcp:3100 \
+            --source-ranges=0.0.0.0/0 \
+            --target-tags=paperclip-ai \
+            --description="Allow Paperclip web interface access"
+            
+      - name: Get VM external IP
+        run: |
+          VM_IP=$(gcloud compute instances describe paperclip-ai-vm \
+            --zone=europe-north1-a \
+            --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+          echo "Paperclip AI will be available at: http://$VM_IP:3100"
+  
