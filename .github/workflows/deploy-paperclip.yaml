@@ -1,6 +1,8 @@
 name: Deploy VM for paperclip ai
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     
 jobs:
@@ -47,4 +49,3 @@ jobs:
             --zone=europe-north1-a \
             --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
           echo "Paperclip AI will be available at: http://$VM_IP:3100"
-  
