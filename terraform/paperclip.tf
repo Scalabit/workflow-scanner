@@ -89,9 +89,6 @@ resource "google_compute_instance" "paperclip_vm" {
 
   metadata_startup_script = file("${path.module}/../scripts/paperclip-startup.sh")
 
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 output "paperclip_vm_ip" {
