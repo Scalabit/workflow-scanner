@@ -32,30 +32,42 @@ jobs:
       - name: Import existing resources
         working-directory: terraform
         run: |
-          # Import existing VM
-          if gcloud compute instances describe paperclip-ai-vm --zone=europe-north1-a &>/dev/null; then
-            echo "VM exists, importing..."
-            terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm || echo "Import failed or already imported"
+          # Check if resources are already in state
+          if ! terraform state show google_compute_instance.paperclip_vm &>/dev/null; then
+            if gcloud compute instances describe paperclip-ai-vm --zone=europe-north1-a &>/dev/null; then
+              echo "VM exists but not in state, importing..."
+              terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm
+            fi
           else
-            echo "VM does not exist, will create new"
+            echo "VM already in Terraform state"
           fi
           
-          # Import existing firewalls
-          if gcloud compute firewall-rules describe allow-ssh-paperclip &>/dev/null; then
-            echo "SSH firewall exists, importing..."
-            terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip || echo "Import failed or already imported"
+          # Import firewalls if they exist and aren't in state
+          if ! terraform state show google_compute_firewall.allow_ssh_paperclip &>/dev/null; then
+            if gcloud compute firewall-rules describe allow-ssh-paperclip &>/dev/null; then
+              echo "SSH firewall exists but not in state, importing..."
+              terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip
+            fi
           fi
           
-          if gcloud compute firewall-rules describe allow-paperclip-web &>/dev/null; then
-            echo "Web firewall exists, importing..."
-            terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web || echo "Import failed or already imported"
+          if ! terraform state show google_compute_firewall.allow_paperclip_web &>/dev/null; then
+            if gcloud compute firewall-rules describe allow-paperclip-web &>/dev/null; then
+              echo "Web firewall exists but not in state, importing..."
+              terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web
+            fi
           fi
           
       - name: Deploy Paperclip Infrastructure
         working-directory: terraform
         run: |
           terraform plan
-          terraform apply -auto-approve
+          # Force replacement if startup script changed
+          if git diff --name-only HEAD~1 HEAD | grep -q "scripts/paperclip-startup.sh"; then
+            echo "Startup script changed, forcing VM replacement..."
+            terraform apply -replace=google_compute_instance.paperclip_vm -auto-approve
+          else
+            terraform apply -auto-approve
+          fi
             
       - name: Get VM external IP
         run: |
