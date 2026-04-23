@@ -32,12 +32,21 @@ usermod -aG sudo paperclip
 # Switch to paperclip user home directory
 cd /home/paperclip
 
-# Clone Paperclip repository
-sudo -u paperclip git clone https://github.com/paperclipai/paperclip.git
-cd paperclip
+# Create Paperclip configuration directory and config file
+sudo -u paperclip mkdir -p /home/paperclip/.paperclip
 
-# Install dependencies
-sudo -u paperclip pnpm install
+# Create config to bind to all interfaces
+sudo -u paperclip cat > /home/paperclip/.paperclip/config.toml << 'EOF'
+[server]
+bind = "0.0.0.0"
+port = 3100
+
+[auth]
+mode = "disabled"
+EOF
+
+# Install Paperclip AI using npx and run onboarding
+sudo -u paperclip npx paperclipai onboard --yes
 
 # Create systemd service for Paperclip
 cat > /etc/systemd/system/paperclip.service << 'EOF'
@@ -48,11 +57,9 @@ After=network.target
 [Service]
 Type=simple
 User=paperclip
-WorkingDirectory=/home/paperclip/paperclip
-Environment=HOST=0.0.0.0
-Environment=PORT=3100
+WorkingDirectory=/home/paperclip
 Environment=PAPERCLIP_HOME=/home/paperclip/.paperclip
-ExecStart=/usr/bin/pnpm dev
+ExecStart=/usr/bin/npx paperclipai run
 Restart=always
 RestartSec=10
 
