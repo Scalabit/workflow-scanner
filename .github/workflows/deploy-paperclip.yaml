@@ -25,14 +25,26 @@ jobs:
         with:
           terraform_version: 1.5.7
           
-      - name: Import existing VM if it exists
+      - name: Initialize Terraform
+        working-directory: terraform
+        run: terraform init
+        
+      - name: Import existing resources
         working-directory: terraform
         continue-on-error: true
         run: |
-          terraform init
-          terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm || echo "VM does not exist, will create new"
-          terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip || echo "SSH firewall does not exist"
-          terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web || echo "Web firewall does not exist"
+          # Check if resources exist and import them
+          if gcloud compute instances describe paperclip-ai-vm --zone=europe-north1-a &>/dev/null; then
+            terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm
+          fi
+          
+          if gcloud compute firewall-rules describe allow-ssh-paperclip &>/dev/null; then
+            terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip
+          fi
+          
+          if gcloud compute firewall-rules describe allow-paperclip-web &>/dev/null; then
+            terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web
+          fi
           
       - name: Deploy Paperclip Infrastructure
         working-directory: terraform
