@@ -20,28 +20,25 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         
-      - name: Create Paperclip VM
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          
+      - name: Import existing VM if it exists
+        working-directory: terraform
+        continue-on-error: true
         run: |
-          gcloud compute instances create paperclip-ai-vm \
-            --zone=europe-north1-a \
-            --machine-type=e2-standard-4 \
-            --network=wazuh-manager-network \
-            --subnet=wazuh-manager-subnet \
-            --image-family=ubuntu-2204-lts \
-            --image-project=ubuntu-os-cloud \
-            --boot-disk-size=50GB \
-            --boot-disk-type=pd-standard \
-            --tags=paperclip-ai \
-            --metadata-from-file=startup-script=scripts/paperclip-startup.sh
-            
-      - name: Configure firewall for Paperclip
+          terraform init
+          terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm || echo "VM does not exist, will create new"
+          terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip || echo "SSH firewall does not exist"
+          terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web || echo "Web firewall does not exist"
+          
+      - name: Deploy Paperclip Infrastructure
+        working-directory: terraform
         run: |
-          gcloud compute firewall-rules create allow-paperclip-web \
-            --network=wazuh-manager-network \
-            --allow=tcp:3100 \
-            --source-ranges=0.0.0.0/0 \
-            --target-tags=paperclip-ai \
-            --description="Allow Paperclip web interface access"
+          terraform plan
+          terraform apply -auto-approve
             
       - name: Get VM external IP
         run: |
