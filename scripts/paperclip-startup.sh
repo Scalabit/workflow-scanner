@@ -19,11 +19,8 @@ apt-get install -y nodejs
 node --version
 npm --version
 
-# Install pnpm globally
-npm install -g pnpm@latest
-
-# Verify pnpm installation
-pnpm --version
+# Install Paperclip CLI globally
+npm install -g paperclipai@latest
 
 # Create paperclip user
 useradd -m -s /bin/bash paperclip
@@ -32,21 +29,8 @@ usermod -aG sudo paperclip
 # Switch to paperclip user home directory
 cd /home/paperclip
 
-# Create Paperclip configuration directory and config file
-sudo -u paperclip mkdir -p /home/paperclip/.paperclip
-
-# Create config to bind to all interfaces
-sudo -u paperclip cat > /home/paperclip/.paperclip/config.toml << 'EOF'
-[server]
-bind = "0.0.0.0"
-port = 3100
-
-[auth]
-mode = "disabled"
-EOF
-
-# Install Paperclip AI using npx and run onboarding
-sudo -u paperclip npx paperclipai onboard --yes
+# Run onboarding as paperclip user
+sudo -u paperclip paperclipai onboard
 
 # Create systemd service for Paperclip
 cat > /etc/systemd/system/paperclip.service << 'EOF'
@@ -58,8 +42,8 @@ After=network.target
 Type=simple
 User=paperclip
 WorkingDirectory=/home/paperclip
-Environment=PAPERCLIP_HOME=/home/paperclip/.paperclip
-ExecStart=/usr/bin/npx paperclipai run
+Environment=HOST=0.0.0.0
+ExecStart=/usr/bin/paperclipai run
 Restart=always
 RestartSec=10
 
