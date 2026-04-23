@@ -31,19 +31,24 @@ jobs:
         
       - name: Import existing resources
         working-directory: terraform
-        continue-on-error: true
         run: |
-          # Check if resources exist and import them
+          # Import existing VM
           if gcloud compute instances describe paperclip-ai-vm --zone=europe-north1-a &>/dev/null; then
-            terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm
+            echo "VM exists, importing..."
+            terraform import google_compute_instance.paperclip_vm projects/workflow-scanner/zones/europe-north1-a/instances/paperclip-ai-vm || echo "Import failed or already imported"
+          else
+            echo "VM does not exist, will create new"
           fi
           
+          # Import existing firewalls
           if gcloud compute firewall-rules describe allow-ssh-paperclip &>/dev/null; then
-            terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip
+            echo "SSH firewall exists, importing..."
+            terraform import google_compute_firewall.allow_ssh_paperclip projects/workflow-scanner/global/firewalls/allow-ssh-paperclip || echo "Import failed or already imported"
           fi
           
           if gcloud compute firewall-rules describe allow-paperclip-web &>/dev/null; then
-            terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web
+            echo "Web firewall exists, importing..."
+            terraform import google_compute_firewall.allow_paperclip_web projects/workflow-scanner/global/firewalls/allow-paperclip-web || echo "Import failed or already imported"
           fi
           
       - name: Deploy Paperclip Infrastructure
