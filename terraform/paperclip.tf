@@ -5,6 +5,11 @@ terraform {
       version = "~> 5.0"
     }
   }
+  
+  backend "gcs" {
+    bucket = "workflow-scanner-terraform-state"
+    prefix = "paperclip"
+  }
 }
 
 provider "google" {

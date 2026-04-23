@@ -25,9 +25,13 @@ jobs:
         with:
           terraform_version: 1.5.7
           
+      - name: Create Terraform state bucket
+        run: |
+          gsutil mb gs://workflow-scanner-terraform-state || echo "Bucket already exists"
+          
       - name: Initialize Terraform
         working-directory: terraform
-        run: terraform init
+        run: terraform init -backend-config="bucket=workflow-scanner-terraform-state"
         
       - name: Import existing resources
         working-directory: terraform
